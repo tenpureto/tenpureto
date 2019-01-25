@@ -1,0 +1,36 @@
+name:                tenpureto
+version:             0.1.0.0
+license:             BSD3
+author:              "Roman Timushev"
+maintainer:          "rtimush@gmail.com"
+copyright:           "2019 Roman Timushev"
+description:         Please see the README on GitHub at <https://github.com/rtimush/tenpureto#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- optparse-applicative
+
+library:
+  source-dirs: src
+
+executables:
+  tenpureto:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - tenpureto
+
+tests:
+  tenpureto-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - tenpureto
