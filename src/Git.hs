@@ -3,6 +3,9 @@
 module Git where
 
 import           Control.Monad.IO.Class
+import           System.IO
+import           System.Exit
+import           System.Process
 
 newtype RepositoryUrl = RepositoryUrl String
 newtype RepositoryLocation = RepositoryLocation String
@@ -16,7 +19,10 @@ newtype GitCLI a = GitCLI (IO a)
 
 runGitCLI :: GitCLI a -> IO a
 runGitCLI (GitCLI a) = a
-     
+
+gitcmd :: [String] -> IO ()
+gitcmd = callProcess "git"
+
 instance MonadGit GitCLI where
     cloneRemoteReporitory (RepositoryUrl url) (RepositoryLocation dst) =
-        liftIO $ putStrLn ("Cloning " ++ url)
+        liftIO $ gitcmd ["clone", "--no-checkout", url, dst]
