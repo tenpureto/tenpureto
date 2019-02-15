@@ -1,7 +1,13 @@
 module Tenpureto where
 
-createProject :: String -> Bool -> IO ()
-createProject template unattended = putStrLn ("Creating from " ++ template)
+import           Git
 
-updateProject :: Maybe String -> Bool -> IO ()
-updateProject template unattended = putStrLn "Updating"
+createProject :: MonadGit m => String -> Bool -> m ()
+createProject template unattended = 
+    cloneRemoteReporitory
+        (RepositoryUrl template)
+        (RepositoryLocation "/tmp/test")
+
+updateProject :: MonadGit m => Maybe String -> Bool -> m ()
+updateProject template unattended = 
+    return ()

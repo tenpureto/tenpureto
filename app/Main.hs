@@ -3,6 +3,8 @@ module Main where
 import           Options.Applicative
 import           Data.Semigroup                 ( (<>) )
 import           Tenpureto
+import           Git
+import           Control.Monad.IO.Class
 
 data Command
     = Create
@@ -30,8 +32,10 @@ update :: Parser Command
 update = Update <$> (optional template) <*> unattended
 
 run :: Command -> IO ()
-run Create { templateName = t, runUnattended = u }      = createProject t u
-run Update { maybeTemplateName = t, runUnattended = u } = updateProject t u
+run Create { templateName = t, runUnattended = u } =
+    runGitCLI $ createProject t u
+run Update { maybeTemplateName = t, runUnattended = u } =
+    runGitCLI $ updateProject t u
 
 main :: IO ()
 main = run =<< customExecParser p opts
