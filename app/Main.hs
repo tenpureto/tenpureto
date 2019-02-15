@@ -2,7 +2,7 @@ module Main where
 
 import           Options.Applicative
 import           Data.Semigroup                 ( (<>) )
-
+import           Tenpureto
 
 data Command
     = Create
@@ -15,7 +15,10 @@ data Command
             }
 
 template :: Parser String
-template = strOption (long "template" <> metavar "<repository>" <> help "Template repository name or URL")
+template = strOption
+    (long "template" <> metavar "<repository>" <> help
+        "Template repository name or URL"
+    )
 
 unattended :: Parser Bool
 unattended = switch (long "unattended" <> help "Do not ask anything")
@@ -27,8 +30,8 @@ update :: Parser Command
 update = Update <$> (optional template) <*> unattended
 
 run :: Command -> IO ()
-run Create { templateName = t, runUnattended = u }      = putStrLn "Creating"
-run Update { maybeTemplateName = t, runUnattended = u } = putStrLn "Updating"
+run Create { templateName = t, runUnattended = u }      = createProject t u
+run Update { maybeTemplateName = t, runUnattended = u } = updateProject t u
 
 main :: IO ()
 main = run =<< customExecParser p opts
