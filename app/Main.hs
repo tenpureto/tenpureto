@@ -7,26 +7,28 @@ import           Data.Semigroup                 ( (<>) )
 data Command
     = Create
             { templateName :: String
+            , runUnattended :: Bool
             }
     | Update
             { maybeTemplateName :: Maybe String
+            , runUnattended :: Bool
             }
 
 template :: Parser String
-template = strOption
-    (long "template" <> metavar "<repository>" <> help
-        "Template repository name or URL"
-    )
+template = strOption (long "template" <> metavar "<repository>" <> help "Template repository name or URL")
+
+unattended :: Parser Bool
+unattended = switch (long "unattended" <> help "Do not ask anything")
 
 create :: Parser Command
-create = Create <$> template
+create = Create <$> template <*> unattended
 
 update :: Parser Command
-update = Update <$> (optional template)
+update = Update <$> (optional template) <*> unattended
 
 run :: Command -> IO ()
-run Create { templateName = t }      = putStrLn "Creating"
-run Update { maybeTemplateName = t } = putStrLn "Updating"
+run Create { templateName = t, runUnattended = u }      = putStrLn "Creating"
+run Update { maybeTemplateName = t, runUnattended = u } = putStrLn "Updating"
 
 main :: IO ()
 main = run =<< customExecParser p opts
