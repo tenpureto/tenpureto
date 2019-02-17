@@ -3,6 +3,7 @@
 module Git where
 
 import           Control.Monad.IO.Class
+import           Control.Monad.Catch
 import           System.IO
 import           System.Exit
 import           System.Process
@@ -15,7 +16,7 @@ class Monad m => MonadGit m where
 
 
 newtype GitCLI a = GitCLI (IO a)
-     deriving (Functor, Applicative, Monad, MonadIO)
+     deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)
 
 runGitCLI :: GitCLI a -> IO a
 runGitCLI (GitCLI a) = a

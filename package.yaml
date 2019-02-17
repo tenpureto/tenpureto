@@ -8,8 +8,10 @@ description:         Please see the README on GitHub at <https://github.com/rtim
 
 dependencies:
 - base >= 4.7 && < 5
-- optparse-applicative
+- exceptions
 - process
+- temporary
+- optparse-applicative
 
 library:
   source-dirs: src
