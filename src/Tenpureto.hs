@@ -1,4 +1,9 @@
-module Tenpureto where
+module Tenpureto
+    ( createProject
+    , updateProject
+    , withClonedRepository
+    )
+where
 
 import           Data.List
 import           Control.Monad.IO.Class
@@ -17,21 +22,26 @@ data ProjectConfiguration = ProjectConfiguration
     , variableValues :: [(String, String)]
     }
 
-createProject :: (MonadGit m, MonadIO m, MonadMask m) => String -> Bool -> m ()
-createProject template unattended =
-    withSystemTempDirectory "tenpureto" $ prepareTemplate template unattended
+createProject
+    :: (MonadIO m, MonadMask m, MonadIO n, MonadMask n, MonadGit n)
+    => (RepositoryUrl -> n () -> m ())
+    -> String
+    -> Bool
+    -> m ()
+createProject withRepository template unattended =
+    withRepository (RepositoryUrl template)
+        $ prepareTemplate template unattended
 
 updateProject
-    :: (MonadGit m, MonadIO m, MonadMask m) => Maybe String -> Bool -> m ()
-updateProject template unattended = return ()
+    :: (MonadIO m, MonadMask m, MonadIO n, MonadMask n, MonadGit n)
+    => (RepositoryUrl -> n () -> m ())
+    -> Maybe String
+    -> Bool
+    -> m ()
+updateProject withRepository template unattended = return ()
 
 prepareTemplate
-    :: (MonadGit m, MonadIO m, MonadMask m)
-    => String
-    -> Bool
-    -> FilePath
-    -> m ()
-prepareTemplate template unattended path = do
-    cloneRemoteReporitory (RepositoryUrl template) path
-    branches <- listBranches path
+    :: (MonadIO m, MonadMask m, MonadGit m) => String -> Bool -> m ()
+prepareTemplate template unattended = do
+    branches <- listBranches
     liftIO $ putStrLn $ intercalate ", " branches

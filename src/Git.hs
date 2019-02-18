@@ -1,21 +1,27 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Git where
 
+import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
+import           Control.Monad.Reader.Class
+import           Control.Monad.Trans.Reader     ( ReaderT
+                                                , runReaderT
+                                                )
 import           System.IO
+import           System.IO.Temp
 import           System.Exit
 import           System.Process
 
 newtype RepositoryUrl = RepositoryUrl String
 
 class Monad m => MonadGit m where
-    cloneRemoteReporitory :: RepositoryUrl -> FilePath -> m ()
-    listBranches :: FilePath -> m [String]
+    listBranches :: m [String]
 
-newtype GitCLI a = GitCLI (IO a)
-     deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)
+newtype CliRepo = CliRepo FilePath
+type CliRepoT = ReaderT CliRepo
 
 data GitException = GitCallException
     { exitCode :: Int
@@ -24,28 +30,29 @@ data GitException = GitCallException
 
 instance Exception GitException
 
-runGitCLI :: GitCLI a -> IO a
-runGitCLI (GitCLI a) = a
+withClonedRepository
+    :: (MonadIO m, MonadMask m) => RepositoryUrl -> CliRepoT m a -> m a
+withClonedRepository url f = withSystemTempDirectory "tenpureto"
+    $ \x -> cloneReporitory url x >> runReaderT f (CliRepo x)
 
-gitcmd :: [String] -> IO ()
-gitcmd = callProcess "git"
+cloneReporitory :: (MonadIO m) => RepositoryUrl -> FilePath -> m ()
+cloneReporitory (RepositoryUrl url) dst =
+    liftIO $ callProcess "git" ["clone", "--no-checkout", url, dst]
 
 stdoutOrThrow :: MonadThrow m => (ExitCode, String, String) -> m String
 stdoutOrThrow (ExitSuccess, out, err) = return out
 stdoutOrThrow ((ExitFailure code), out, err) =
     throwM $ GitCallException code err
 
-gitcmdStdout :: (MonadIO m, MonadThrow m) => [String] -> m String
-gitcmdStdout cmd =
-    liftIO $ readProcessWithExitCode "git" cmd "" >>= stdoutOrThrow
+gitcmdStdout
+    :: (MonadIO m, MonadThrow m, MonadReader CliRepo m) => [String] -> m String
+gitcmdStdout cmd = do
+    CliRepo repo <- ask
+    liftIO
+        $   readProcessWithExitCode "git" (["-C", repo] ++ cmd) ""
+        >>= stdoutOrThrow
 
-instance MonadGit GitCLI where
-    cloneRemoteReporitory (RepositoryUrl url) dst =
-        liftIO $ gitcmd ["clone", "--no-checkout", url, dst]
-    listBranches repo = fmap lines $ liftIO $ gitcmdStdout
-        [ "-C"
-        , repo
-        , "for-each-ref"
-        , "--format='%(refname:strip=3)'"
-        , "refs/remotes/origin"
-        ]
+instance (MonadMask m, MonadIO m) => MonadGit (CliRepoT m) where
+
+    listBranches = lines <$> gitcmdStdout
+        ["for-each-ref", "--format='%(refname:strip=3)'", "refs/remotes/origin"]
