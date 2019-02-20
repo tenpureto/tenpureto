@@ -17,16 +17,24 @@ instance Show UIException where
     show UnattendedNotPossible =
         "Running in an unattended mode, but some input required"
 
-unattendedConfiguration
+unattendedTemplateConfiguration
     :: (MonadThrow m)
     => PreliminaryProjectConfiguration
+    -> m FinalTemplateConfiguration
+unattendedTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = Just t }
+    = return FinalTemplateConfiguration { selectedTemplate = t }
+unattendedTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = Nothing }
+    = throwM UnattendedNotPossible
+
+unattendedProjectConfiguration
+    :: (MonadThrow m)
+    => TemplateInformation
+    -> PreliminaryProjectConfiguration
     -> m FinalProjectConfiguration
-unattendedConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = Just t, preSelectedBranches = b, preVariableValues = v }
-    = return FinalProjectConfiguration { selectedTemplate = t
-                                       , selectedBranches = b
+unattendedProjectConfiguration _ PreliminaryProjectConfiguration { preSelectedBranches = b, preVariableValues = v }
+    = return FinalProjectConfiguration { selectedBranches = b
                                        , variableValues   = v
                                        }
-unattendedConfiguration _ = throwM UnattendedNotPossible
 
 required :: (Monad m) => m (Maybe a) -> m a
 required input = input >>= maybe (required input) return
@@ -34,16 +42,24 @@ required input = input >>= maybe (required input) return
 inputTemplate :: (MonadException m) => InputT m String
 inputTemplate = required . getInputLine $ "Template URL: "
 
-inputConfiguration
+
+inputTemplateConfiguration
     :: (MonadIO m, MonadException m)
     => PreliminaryProjectConfiguration
-    -> m FinalProjectConfiguration
-inputConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = mbt, preSelectedBranches = b, preVariableValues = v }
+    -> m FinalTemplateConfiguration
+inputTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = mbt }
     = runInputT defaultSettings $ do
         t <- case mbt of
             Just t  -> return t
             Nothing -> inputTemplate
-        return FinalProjectConfiguration { selectedTemplate = t
-                                         , selectedBranches = b
-                                         , variableValues   = v
-                                         }
+        return FinalTemplateConfiguration { selectedTemplate = t }
+
+inputProjectConfiguration
+    :: (MonadIO m, MonadException m)
+    => TemplateInformation
+    -> PreliminaryProjectConfiguration
+    -> m FinalProjectConfiguration
+inputProjectConfiguration _ PreliminaryProjectConfiguration { preSelectedBranches = b, preVariableValues = v }
+    = return FinalProjectConfiguration { selectedBranches = b
+                                       , variableValues   = v
+                                       }

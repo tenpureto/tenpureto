@@ -5,8 +5,20 @@ data PreliminaryProjectConfiguration    = PreliminaryProjectConfiguration
         , preSelectedBranches :: [String]
         , preVariableValues :: [(String, String)]
         }
-data FinalProjectConfiguration = FinalProjectConfiguration
+
+newtype FinalTemplateConfiguration = FinalTemplateConfiguration
         { selectedTemplate :: String
-        , selectedBranches :: [String]
+        }
+
+data FinalProjectConfiguration = FinalProjectConfiguration
+        { selectedBranches :: [String]
         , variableValues :: [(String, String)]
         }
+
+data TemplateBranchInformation = TemplateBranchInformation
+    { branchName :: String
+    , requiredBranches :: [String]
+    , branchVariables :: [String]
+    }
+
+newtype TemplateInformation = TemplateInformation { branchesInformation :: [TemplateBranchInformation] }

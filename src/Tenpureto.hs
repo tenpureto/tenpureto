@@ -5,6 +5,7 @@ module Tenpureto
 where
 
 import           Data.List
+import           Data.Maybe
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import           System.IO.Temp
@@ -12,23 +13,27 @@ import           Data
 import           Git
 import           UI
 
-data TemplateBranchConfiguration = TemplateBranchConfiguration
-    { branchName :: String
-    , requiredBranches :: [String]
-    , branchVariables :: [String]
-    }
+makeFinalTemplateConfiguration
+    :: (MonadThrow m, MonadException m, MonadIO m)
+    => Bool
+    -> PreliminaryProjectConfiguration
+    -> m FinalTemplateConfiguration
+makeFinalTemplateConfiguration True  = unattendedTemplateConfiguration
+makeFinalTemplateConfiguration False = inputTemplateConfiguration
 
 makeFinalProjectConfiguration
     :: (MonadThrow m, MonadException m, MonadIO m)
     => Bool
+    -> TemplateInformation
     -> PreliminaryProjectConfiguration
     -> m FinalProjectConfiguration
-makeFinalProjectConfiguration True  = unattendedConfiguration
-makeFinalProjectConfiguration False = inputConfiguration
+makeFinalProjectConfiguration True  = unattendedProjectConfiguration
+makeFinalProjectConfiguration False = inputProjectConfiguration
 
 createProject
     :: ( MonadIO m
        , MonadMask m
+       , MonadException n
        , MonadIO n
        , MonadMask n
        , MonadException m
@@ -39,11 +44,17 @@ createProject
     -> Bool
     -> m ()
 createProject withRepository projectConfiguration unattended = do
-    finalProjectConfiguration <- makeFinalProjectConfiguration
+    finalTemplateConfiguration <- makeFinalTemplateConfiguration
         unattended
         projectConfiguration
-    withRepository (RepositoryUrl $ selectedTemplate finalProjectConfiguration)
-        $ prepareTemplate finalProjectConfiguration
+    withRepository (RepositoryUrl $ selectedTemplate finalTemplateConfiguration)
+        $ do
+              templateInformation       <- loadTemplateInformation
+              finalProjectConfiguration <- makeFinalProjectConfiguration
+                  unattended
+                  templateInformation
+                  projectConfiguration
+              prepareTemplate finalProjectConfiguration
 
 updateProject
     :: (MonadIO m, MonadMask m, MonadIO n, MonadMask n, MonadGit n)
@@ -58,3 +69,23 @@ prepareTemplate
 prepareTemplate configuration = do
     branches <- listBranches
     liftIO $ putStrLn $ intercalate ", " branches
+
+loadBranchConfiguration
+    :: (MonadIO m, MonadGit m) => String -> m (Maybe TemplateBranchInformation)
+loadBranchConfiguration branch = return $ Just TemplateBranchInformation
+    { branchName       = branch
+    , requiredBranches = []
+    , branchVariables  = []
+    }
+
+validBranch :: String -> Bool
+validBranch branch = True
+
+loadTemplateInformation :: (MonadIO m, MonadGit m) => m TemplateInformation
+loadTemplateInformation = do
+    branches             <- listBranches
+    branchConfigurations <- traverse loadBranchConfiguration
+        $ filter validBranch branches
+    return $ TemplateInformation
+        { branchesInformation = catMaybes branchConfigurations
+        }
