@@ -8,7 +8,7 @@ import           Data
 
 data Command
     = Create
-            { templateName :: String
+            { templateName :: Maybe String
             , runUnattended :: Bool
             }
     | Update
@@ -26,7 +26,7 @@ unattended :: Parser Bool
 unattended = switch (long "unattended" <> help "Do not ask anything")
 
 create :: Parser Command
-create = Create <$> template <*> unattended
+create = Create <$> (optional template) <*> unattended
 
 update :: Parser Command
 update = Update <$> (optional template) <*> unattended
@@ -34,7 +34,7 @@ update = Update <$> (optional template) <*> unattended
 run :: Command -> IO ()
 run Create { templateName = t, runUnattended = u } = createProject
     withClonedRepository
-    PreliminaryProjectConfiguration { preSelectedTemplate = Just t
+    PreliminaryProjectConfiguration { preSelectedTemplate = t
                                     , preSelectedBranches = []
                                     , preVariableValues   = []
                                     }

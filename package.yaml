@@ -14,6 +14,7 @@ dependencies:
 - process
 - temporary
 - optparse-applicative
+- haskeline
 
 library:
   source-dirs: src
