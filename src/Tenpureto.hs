@@ -26,6 +26,7 @@ makeFinalProjectConfiguration
     => Bool
     -> TemplateInformation
     -> PreliminaryProjectConfiguration
+    -> Maybe FinalProjectConfiguration
     -> m FinalProjectConfiguration
 makeFinalProjectConfiguration True  = unattendedProjectConfiguration
 makeFinalProjectConfiguration False = inputProjectConfiguration
@@ -54,6 +55,7 @@ createProject withRepository projectConfiguration unattended = do
                   unattended
                   templateInformation
                   projectConfiguration
+                  Nothing
               prepareTemplate finalProjectConfiguration
 
 updateProject

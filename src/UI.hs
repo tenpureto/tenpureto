@@ -7,6 +7,8 @@ module UI
 where
 
 import           Data
+import           Control.Applicative
+import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           System.Console.Haskeline
@@ -30,11 +32,17 @@ unattendedProjectConfiguration
     :: (MonadThrow m)
     => TemplateInformation
     -> PreliminaryProjectConfiguration
+    -> Maybe FinalProjectConfiguration
     -> m FinalProjectConfiguration
-unattendedProjectConfiguration _ PreliminaryProjectConfiguration { preSelectedBranches = b, preVariableValues = v }
-    = return FinalProjectConfiguration { selectedBranches = b
-                                       , variableValues   = v
-                                       }
+unattendedProjectConfiguration _ providedConfiguration currentConfiguration =
+    let b =
+                preSelectedBranches providedConfiguration
+                    `mplus` fmap selectedBranches currentConfiguration
+        v =
+                preVariableValues providedConfiguration
+                    `mplus` fmap variableValues currentConfiguration
+        cfg = FinalProjectConfiguration <$> b <*> v
+    in  maybe (throwM UnattendedNotPossible) return cfg
 
 required :: (Monad m) => m (Maybe a) -> m a
 required input = input >>= maybe (required input) return
@@ -48,18 +56,17 @@ inputTemplateConfiguration
     => PreliminaryProjectConfiguration
     -> m FinalTemplateConfiguration
 inputTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = mbt }
-    = runInputT defaultSettings $ do
-        t <- case mbt of
-            Just t  -> return t
-            Nothing -> inputTemplate
-        return FinalTemplateConfiguration { selectedTemplate = t }
+    = runInputT defaultSettings
+        $   FinalTemplateConfiguration
+        <$> maybe inputTemplate return mbt
 
 inputProjectConfiguration
     :: (MonadIO m, MonadException m)
     => TemplateInformation
     -> PreliminaryProjectConfiguration
+    -> Maybe FinalProjectConfiguration
     -> m FinalProjectConfiguration
-inputProjectConfiguration _ PreliminaryProjectConfiguration { preSelectedBranches = b, preVariableValues = v }
-    = return FinalProjectConfiguration { selectedBranches = b
-                                       , variableValues   = v
-                                       }
+inputProjectConfiguration _ providedConfiguration currentConfiguration =
+    return FinalProjectConfiguration { selectedBranches = []
+                                     , variableValues   = []
+                                     }

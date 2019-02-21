@@ -2,8 +2,8 @@ module Data where
 
 data PreliminaryProjectConfiguration    = PreliminaryProjectConfiguration
         { preSelectedTemplate :: Maybe String
-        , preSelectedBranches :: [String]
-        , preVariableValues :: [(String, String)]
+        , preSelectedBranches :: Maybe [String]
+        , preVariableValues :: Maybe [(String, String)]
         }
 
 newtype FinalTemplateConfiguration = FinalTemplateConfiguration

@@ -35,15 +35,15 @@ run :: Command -> IO ()
 run Create { templateName = t, runUnattended = u } = createProject
     withClonedRepository
     PreliminaryProjectConfiguration { preSelectedTemplate = t
-                                    , preSelectedBranches = []
-                                    , preVariableValues   = []
+                                    , preSelectedBranches = Nothing
+                                    , preVariableValues   = Nothing
                                     }
     u
 run Update { maybeTemplateName = t, runUnattended = u } = updateProject
     withClonedRepository
     PreliminaryProjectConfiguration { preSelectedTemplate = t
-                                    , preSelectedBranches = []
-                                    , preVariableValues   = []
+                                    , preSelectedBranches = Nothing
+                                    , preVariableValues   = Nothing
                                     }
     u
 
