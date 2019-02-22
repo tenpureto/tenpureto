@@ -1,4 +1,6 @@
 resolver: lts-13.4
 packages:
 - .
-extra-deps: []
+extra-deps:
+- byline-0.3.2.0@sha256:6ae89ed017b4de372f0d1527ebe098ce655a59129350e596ca61963251bc7d69
+- terminfo-hs-0.2.1.1@sha256:c193c5333a18ad030c146c2282dd3828e670af344fbfdbcb681dbf6abd99ca1c

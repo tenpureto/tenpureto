@@ -18,7 +18,7 @@ import           System.Process
 newtype RepositoryUrl = RepositoryUrl String
 
 class Monad m => MonadGit m where
-    listBranches :: m [String]
+    listBranches :: String -> m [String]
 
 newtype CliRepo = CliRepo FilePath
 type CliRepoT = ReaderT CliRepo
@@ -54,5 +54,8 @@ gitcmdStdout cmd = do
 
 instance (MonadMask m, MonadIO m) => MonadGit (CliRepoT m) where
 
-    listBranches = lines <$> gitcmdStdout
-        ["for-each-ref", "--format='%(refname:strip=3)'", "refs/remotes/origin"]
+    listBranches prefix = lines <$> gitcmdStdout
+        [ "for-each-ref"
+        , "--format=%(refname:strip=3)"
+        , "refs/remotes/origin/" ++ prefix
+        ]

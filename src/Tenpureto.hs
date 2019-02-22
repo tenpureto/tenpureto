@@ -14,7 +14,7 @@ import           Git
 import           UI
 
 makeFinalTemplateConfiguration
-    :: (MonadThrow m, MonadException m, MonadIO m)
+    :: (MonadThrow m, MonadMask m, MonadIO m)
     => Bool
     -> PreliminaryProjectConfiguration
     -> m FinalTemplateConfiguration
@@ -22,7 +22,7 @@ makeFinalTemplateConfiguration True  = unattendedTemplateConfiguration
 makeFinalTemplateConfiguration False = inputTemplateConfiguration
 
 makeFinalProjectConfiguration
-    :: (MonadThrow m, MonadException m, MonadIO m)
+    :: (MonadThrow m, MonadMask m, MonadIO m)
     => Bool
     -> TemplateInformation
     -> PreliminaryProjectConfiguration
@@ -32,14 +32,7 @@ makeFinalProjectConfiguration True  = unattendedProjectConfiguration
 makeFinalProjectConfiguration False = inputProjectConfiguration
 
 createProject
-    :: ( MonadIO m
-       , MonadMask m
-       , MonadException n
-       , MonadIO n
-       , MonadMask n
-       , MonadException m
-       , MonadGit n
-       )
+    :: (MonadIO m, MonadMask m, MonadIO n, MonadMask n, MonadGit n)
     => (RepositoryUrl -> n () -> m ())
     -> PreliminaryProjectConfiguration
     -> Bool
@@ -68,9 +61,7 @@ updateProject withRepository projectConfiguration unattended = return ()
 
 prepareTemplate
     :: (MonadIO m, MonadMask m, MonadGit m) => FinalProjectConfiguration -> m ()
-prepareTemplate configuration = do
-    branches <- listBranches
-    liftIO $ putStrLn $ intercalate ", " branches
+prepareTemplate configuration = liftIO $ print configuration
 
 loadBranchConfiguration
     :: (MonadIO m, MonadGit m) => String -> m (Maybe TemplateBranchInformation)
@@ -80,14 +71,12 @@ loadBranchConfiguration branch = return $ Just TemplateBranchInformation
     , branchVariables  = []
     }
 
-validBranch :: String -> Bool
-validBranch branch = True
-
 loadTemplateInformation :: (MonadIO m, MonadGit m) => m TemplateInformation
 loadTemplateInformation = do
-    branches             <- listBranches
+    baseBranches         <- listBranches "base/"
+    featureBranches      <- listBranches "feature/"
     branchConfigurations <- traverse loadBranchConfiguration
-        $ filter validBranch branches
+        $ sort (baseBranches ++ featureBranches)
     return $ TemplateInformation
         { branchesInformation = catMaybes branchConfigurations
         }
