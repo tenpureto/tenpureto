@@ -1,10 +1,25 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Main where
 
 import           Options.Applicative
 import           Data.Semigroup                 ( (<>) )
 import           Tenpureto
 import           Control.Monad.IO.Class
+import           Control.Monad.Catch
 import           Data
+import           Git
+import qualified Git.Cli                       as GC
+
+newtype AppM a = AppM { unAppM :: IO a }
+    deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)
+
+runAppM :: AppM a -> IO a
+runAppM = unAppM
+
+instance MonadGit AppM where
+    withClonedRepository = GC.withClonedRepository
+    listBranches         = GC.listBranches
 
 data Command
     = Create
@@ -26,21 +41,19 @@ unattended :: Parser Bool
 unattended = switch (long "unattended" <> help "Do not ask anything")
 
 create :: Parser Command
-create = Create <$> (optional template) <*> unattended
+create = Create <$> optional template <*> unattended
 
 update :: Parser Command
-update = Update <$> (optional template) <*> unattended
+update = Update <$> optional template <*> unattended
 
-run :: Command -> IO ()
+run :: Command -> AppM ()
 run Create { templateName = t, runUnattended = u } = createProject
-    withClonedRepository
     PreliminaryProjectConfiguration { preSelectedTemplate = t
                                     , preSelectedBranches = Nothing
                                     , preVariableValues   = Nothing
                                     }
     u
 run Update { maybeTemplateName = t, runUnattended = u } = updateProject
-    withClonedRepository
     PreliminaryProjectConfiguration { preSelectedTemplate = t
                                     , preSelectedBranches = Nothing
                                     , preVariableValues   = Nothing
@@ -48,7 +61,7 @@ run Update { maybeTemplateName = t, runUnattended = u } = updateProject
     u
 
 main :: IO ()
-main = run =<< customExecParser p opts
+main = runAppM . run =<< customExecParser p opts
   where
     commands = subparser
         (  command
