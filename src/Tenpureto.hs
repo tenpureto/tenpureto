@@ -7,10 +7,11 @@ import           Control.Monad.Catch
 import           System.IO.Temp
 import           Data
 import           Git
+import           Console
 import           UI
 
 makeFinalTemplateConfiguration
-    :: (MonadThrow m, MonadMask m, MonadIO m)
+    :: (MonadThrow m, MonadMask m, MonadIO m, MonadConsole m)
     => Bool
     -> PreliminaryProjectConfiguration
     -> m FinalTemplateConfiguration
@@ -18,7 +19,7 @@ makeFinalTemplateConfiguration True  = unattendedTemplateConfiguration
 makeFinalTemplateConfiguration False = inputTemplateConfiguration
 
 makeFinalProjectConfiguration
-    :: (MonadThrow m, MonadMask m, MonadIO m)
+    :: (MonadThrow m, MonadMask m, MonadIO m, MonadConsole m)
     => Bool
     -> TemplateInformation
     -> PreliminaryProjectConfiguration
@@ -28,7 +29,7 @@ makeFinalProjectConfiguration True  = unattendedProjectConfiguration
 makeFinalProjectConfiguration False = inputProjectConfiguration
 
 createProject
-    :: (MonadIO m, MonadMask m, MonadGit m)
+    :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m)
     => PreliminaryProjectConfiguration
     -> Bool
     -> m ()

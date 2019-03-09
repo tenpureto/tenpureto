@@ -4,12 +4,15 @@ module Main where
 
 import           Options.Applicative
 import           Data.Semigroup                 ( (<>) )
-import           Tenpureto
+import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
-import           Data
+import           Console
+import qualified Console.Byline                as B
 import           Git
 import qualified Git.Cli                       as GC
+import           Data
+import           Tenpureto
 
 newtype AppM a = AppM { unAppM :: IO a }
     deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask)
@@ -20,6 +23,11 @@ runAppM = unAppM
 instance MonadGit AppM where
     withClonedRepository = GC.withClonedRepository
     listBranches         = GC.listBranches
+
+instance MonadConsole AppM where
+    ask = B.ask
+    askUntil a b c = B.askUntil a b (return . c)
+    sayLn = B.sayLn
 
 data Command
     = Create

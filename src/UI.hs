@@ -1,7 +1,11 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module UI where
+module UI
+    ( module UI
+    , MonadConsole
+    )
+where
 
 import           Data
 import           Data.Text                      ( Text )
@@ -19,7 +23,7 @@ import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
-import           System.Console.Byline
+import           Console
 
 data UIException = UnattendedNotPossibleException | InvalidInputException | InterruptedInputException deriving (Exception)
 
@@ -54,24 +58,21 @@ unattendedProjectConfiguration _ providedConfiguration currentConfiguration =
         cfg = FinalProjectConfiguration <$> b <*> v
     in  maybe (throwM UnattendedNotPossibleException) return cfg
 
-runUI :: (MonadIO m, MonadMask m) => Byline m a -> m a
-runUI a = runByline a >>= maybe (throwM InterruptedInputException) return
-
 required :: (Monad m) => m (Maybe a) -> m a
 required input = input >>= maybe (required input) return
 
-inputTemplate :: (MonadIO m, MonadMask m) => m String
-inputTemplate = runUI $ T.unpack <$> ask "Template URL: " Nothing
+inputTemplate :: (MonadIO m, MonadMask m, MonadConsole m) => m String
+inputTemplate = T.unpack <$> ask "Template URL: " Nothing
 
 inputTemplateConfiguration
-    :: (MonadIO m, MonadMask m)
+    :: (MonadIO m, MonadMask m, MonadConsole m)
     => PreliminaryProjectConfiguration
     -> m FinalTemplateConfiguration
 inputTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = mbt }
     = FinalTemplateConfiguration <$> maybe inputTemplate return mbt
 
 inputBranch
-    :: (MonadIO m, MonadMask m)
+    :: (MonadIO m, MonadMask m, MonadConsole m)
     => [TemplateBranchInformation]
     -> Set String
     -> m (Maybe String)
@@ -103,10 +104,10 @@ inputBranch availableBranches selected =
         indexToBranch :: Text -> Maybe String
         indexToBranch index = branchByIndex index <&> branchName
     in
-        runUI $ do
+        do
             sayLn "Template branches"
             traverse_ (sayLn . branchLine) indexedBranches
-            askUntil "Add/remove branch: " Nothing (return . validateInput)
+            askUntil "Add/remove branch: " Nothing validateInput
                 <&> indexToBranch
 
 toggleBranch :: String -> Set String -> Set String
@@ -115,7 +116,7 @@ toggleBranch branch selected = bool (Set.insert branch selected)
                                     (Set.member branch selected)
 
 inputBranches
-    :: (MonadIO m, MonadMask m)
+    :: (MonadIO m, MonadMask m, MonadConsole m)
     => [TemplateBranchInformation]
     -> Set String
     -> m (Set String)
@@ -126,7 +127,7 @@ inputBranches branches selected = do
         Nothing     -> return selected
 
 inputProjectConfiguration
-    :: (MonadIO m, MonadMask m)
+    :: (MonadIO m, MonadMask m, MonadConsole m)
     => TemplateInformation
     -> PreliminaryProjectConfiguration
     -> Maybe FinalProjectConfiguration
