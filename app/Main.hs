@@ -23,6 +23,7 @@ runAppM = unAppM
 instance MonadGit AppM where
     withClonedRepository = GC.withClonedRepository
     listBranches         = GC.listBranches
+    getBranchFile        = GC.getBranchFile
 
 instance MonadConsole AppM where
     ask = B.ask

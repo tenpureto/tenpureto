@@ -1,9 +1,15 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Git.Cli where
 
 import           Git
+import           Data.ByteString                ( ByteString )
+import qualified Data.ByteString               as BS
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
+import           Data.Text.Encoding            as E
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
@@ -11,10 +17,11 @@ import           System.IO
 import           System.IO.Temp
 import           System.Exit
 import           System.Process
+import qualified System.Process.ByteString     as BP
 
 data GitException = GitCallException
     { exitCode :: Int
-    , stdErr :: String }
+    , stdErr :: Text }
     deriving Show
 
 instance Exception GitException
@@ -32,23 +39,34 @@ cloneReporitory (RepositoryUrl url) dst = do
     liftIO $ callProcess "git" ["clone", "--no-checkout", url, dst]
     return $ GitRepository dst
 
-stdoutOrThrow :: MonadThrow m => (ExitCode, String, String) -> m String
+stdoutOrThrow
+    :: MonadThrow m => (ExitCode, ByteString, ByteString) -> m ByteString
 stdoutOrThrow (ExitSuccess, out, err) = return out
-stdoutOrThrow ((ExitFailure code), out, err) =
-    throwM $ GitCallException code err
+stdoutOrThrow (ExitFailure code, out, err) =
+    throwM $ GitCallException code (E.decodeUtf8 err)
 
 gitcmdStdout
-    :: (MonadIO m, MonadThrow m) => GitRepository -> [String] -> m String
+    :: (MonadIO m, MonadThrow m) => GitRepository -> [String] -> m ByteString
 gitcmdStdout (GitRepository path) cmd =
     liftIO
-        $   readProcessWithExitCode "git" (["-C", path] ++ cmd) ""
+        $   BP.readProcessWithExitCode "git" (["-C", path] ++ cmd) BS.empty
         >>= stdoutOrThrow
 
 listBranches
     :: (MonadIO m, MonadThrow m) => GitRepository -> String -> m [String]
-listBranches repo prefix = lines <$> gitcmdStdout
-    repo
-    [ "for-each-ref"
-    , "--format=%(refname:strip=3)"
-    , "refs/remotes/origin/" ++ prefix
-    ]
+listBranches repo prefix =
+    map T.unpack . T.lines . E.decodeUtf8 <$> gitcmdStdout
+        repo
+        [ "for-each-ref"
+        , "--format=%(refname:strip=3)"
+        , "refs/remotes/origin/" ++ prefix
+        ]
+
+getBranchFile
+    :: (MonadIO m, MonadThrow m)
+    => GitRepository
+    -> String
+    -> String
+    -> m ByteString
+getBranchFile repo branch file =
+    gitcmdStdout repo ["show", branch ++ ":" ++ file]

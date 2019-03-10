@@ -8,12 +8,14 @@ description:         Please see the README on GitHub at <https://github.com/rtim
 
 dependencies:
 - base >= 4.7 && < 5
+- bytestring
 - text
 - containers
 - exceptions
 - mtl
 - transformers
 - process
+- process-extras
 - temporary
 - optparse-applicative
 - byline
