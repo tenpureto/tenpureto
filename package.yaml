@@ -9,6 +9,7 @@ description:         Please see the README on GitHub at <https://github.com/rtim
 dependencies:
 - base >= 4.7 && < 5
 - bytestring
+- either
 - text
 - containers
 - exceptions
@@ -19,6 +20,7 @@ dependencies:
 - temporary
 - optparse-applicative
 - byline
+- yaml
 
 library:
   source-dirs: src

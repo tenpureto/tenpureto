@@ -8,4 +8,4 @@ newtype GitRepository = GitRepository FilePath
 class Monad m => MonadGit m where
     withClonedRepository :: RepositoryUrl -> (GitRepository -> m a) -> m a
     listBranches :: GitRepository -> String -> m [String]
-    getBranchFile :: GitRepository -> String -> String -> m ByteString
+    getBranchFile :: GitRepository -> String -> String -> m (Maybe ByteString)

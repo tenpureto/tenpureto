@@ -45,12 +45,21 @@ stdoutOrThrow (ExitSuccess, out, err) = return out
 stdoutOrThrow (ExitFailure code, out, err) =
     throwM $ GitCallException code (E.decodeUtf8 err)
 
+stdoutOrNothing :: (ExitCode, ByteString, ByteString) -> Maybe ByteString
+stdoutOrNothing (ExitSuccess     , out, err) = Just out
+stdoutOrNothing (ExitFailure code, out, err) = Nothing
+
+gitcmd
+    :: (MonadIO m, MonadThrow m)
+    => GitRepository
+    -> [String]
+    -> m (ExitCode, ByteString, ByteString)
+gitcmd (GitRepository path) cmd =
+    liftIO $ BP.readProcessWithExitCode "git" (["-C", path] ++ cmd) BS.empty
+
 gitcmdStdout
     :: (MonadIO m, MonadThrow m) => GitRepository -> [String] -> m ByteString
-gitcmdStdout (GitRepository path) cmd =
-    liftIO
-        $   BP.readProcessWithExitCode "git" (["-C", path] ++ cmd) BS.empty
-        >>= stdoutOrThrow
+gitcmdStdout repo cmd = gitcmd repo cmd >>= stdoutOrThrow
 
 listBranches
     :: (MonadIO m, MonadThrow m) => GitRepository -> String -> m [String]
@@ -67,6 +76,6 @@ getBranchFile
     => GitRepository
     -> String
     -> String
-    -> m ByteString
+    -> m (Maybe ByteString)
 getBranchFile repo branch file =
-    gitcmdStdout repo ["show", branch ++ ":" ++ file]
+    stdoutOrNothing <$> gitcmd repo ["show", branch ++ ":" ++ file]
