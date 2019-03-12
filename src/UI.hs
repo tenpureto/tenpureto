@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 module UI
     ( module UI
@@ -16,8 +17,11 @@ import           Data.Maybe
 import           Data.List
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
+import           Data.Map                       ( Map )
+import qualified Data.Map                      as Map
 import           Data.Foldable
 import           Data.Functor
+import           Data.Monoid
 import           Text.Printf
 import           Control.Applicative
 import           Control.Monad
@@ -62,7 +66,7 @@ required :: (Monad m) => m (Maybe a) -> m a
 required input = input >>= maybe (required input) return
 
 inputTemplate :: (MonadIO m, MonadMask m, MonadConsole m) => m String
-inputTemplate = T.unpack <$> ask "Template URL: " Nothing
+inputTemplate = T.unpack <$> ask "Template URL " Nothing
 
 inputTemplateConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)
@@ -126,6 +130,18 @@ inputBranches branches selected = do
         Just branch -> inputBranches branches (toggleBranch branch selected)
         Nothing     -> return selected
 
+inputVariable
+    :: (MonadIO m, MonadMask m, MonadConsole m)
+    => (String, String)
+    -> m (String, String)
+inputVariable (desc, name) = (name, ) . T.unpack <$> ask (text $ T.pack desc <> " ") (Just $ T.pack name)
+
+inputVariables
+    :: (MonadIO m, MonadMask m, MonadConsole m)
+    => Map String String
+    -> m (Map String String)
+inputVariables v = Map.fromList <$> traverse inputVariable (Map.assocs v)
+
 inputProjectConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)
     => TemplateInformation
@@ -133,9 +149,13 @@ inputProjectConfiguration
     -> Maybe FinalProjectConfiguration
     -> m FinalProjectConfiguration
 inputProjectConfiguration templateInformation providedConfiguration currentConfiguration
-    = do
-        branches <- inputBranches (branchesInformation templateInformation)
-                                  Set.empty
-        return FinalProjectConfiguration { selectedBranches = toList branches
-                                         , variableValues   = []
-                                         }
+    = let bi = branchesInformation templateInformation in do
+        branches <- inputBranches bi Set.empty
+        let sbi = filter (flip Set.member branches . branchName) bi
+            vars = mconcat (map branchVariables sbi) in do
+            varVals <- inputVariables vars
+            return FinalProjectConfiguration
+                { selectedBranches = branches
+                , variableValues   = varVals
+                }
+ 

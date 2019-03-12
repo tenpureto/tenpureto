@@ -82,7 +82,7 @@ loadBranchConfiguration repo branch = runMaybeT $ do
     templateYaml <- MaybeT $ return $ parseTemplateYaml descriptor
     return $ TemplateBranchInformation
         { branchName       = branch
-        , requiredBranches = []
+        , requiredBranches = features templateYaml
         , branchVariables  = variables templateYaml
         }
 
