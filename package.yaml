@@ -15,6 +15,10 @@ dependencies:
 - exceptions
 - mtl
 - transformers
+- logging-effect
+- prettyprinter
+- prettyprinter-ansi-terminal
+- terminal-size
 - process
 - process-extras
 - temporary
