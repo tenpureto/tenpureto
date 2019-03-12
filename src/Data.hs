@@ -2,6 +2,7 @@
 
 module Data where
 
+import           Data.Text                      ( Text )
 import           Data.Set                       ( Set )
 import           Data.Map                       ( Map )
 import           Data.Yaml                      ( FromJSON(..)
@@ -10,27 +11,27 @@ import           Data.Yaml                      ( FromJSON(..)
 import qualified Data.Yaml                     as Y
 
 data PreliminaryProjectConfiguration    = PreliminaryProjectConfiguration
-        { preSelectedTemplate :: Maybe String
-        , preSelectedBranches :: Maybe (Set String)
-        , preVariableValues :: Maybe (Map String String)
+        { preSelectedTemplate :: Maybe Text
+        , preSelectedBranches :: Maybe (Set Text)
+        , preVariableValues :: Maybe (Map Text Text)
         }
         deriving (Show)
 
 newtype FinalTemplateConfiguration = FinalTemplateConfiguration
-        { selectedTemplate :: String
+        { selectedTemplate :: Text
         }
         deriving (Show)
 
 data FinalProjectConfiguration = FinalProjectConfiguration
-        { selectedBranches :: Set String
-        , variableValues :: Map String String
+        { selectedBranches :: Set Text
+        , variableValues :: Map Text Text
         }
         deriving (Show)
 
 data TemplateBranchInformation = TemplateBranchInformation
-        { branchName :: String
-        , requiredBranches :: Set String
-        , branchVariables :: Map String String
+        { branchName :: Text
+        , requiredBranches :: Set Text
+        , branchVariables :: Map Text Text
         }
         deriving (Show)
 
@@ -40,8 +41,8 @@ newtype TemplateInformation = TemplateInformation
         deriving (Show)
 
 data TemplateYaml = TemplateYaml
-        { variables :: Map String String
-        , features :: Set String
+        { variables :: Map Text Text
+        , features :: Set Text
         }
         deriving (Show)
 

@@ -41,12 +41,12 @@ stdoutOrNothing (ExitFailure code, out, err) = Nothing
 
 gitCmd
     :: (MonadIO m, MonadThrow m, MonadLog m)
-    => [String]
+    => [Text]
     -> m (ExitCode, ByteString, ByteString)
 gitCmd cmd = do
     logInfo $ "Running git" <+> fillSep (map pretty cmd)
     (exitCode, out, err) <- liftIO
-        $ BP.readProcessWithExitCode "git" cmd BS.empty
+        $ BP.readProcessWithExitCode "git" (map T.unpack cmd) BS.empty
     logDebug $ (align . pretty) (E.decodeUtf8 err)
     logDebug $ (align . pretty) (E.decodeUtf8 out)
     return (exitCode, out, err)
@@ -54,14 +54,14 @@ gitCmd cmd = do
 gitRepoCmd
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
-    -> [String]
+    -> [Text]
     -> m (ExitCode, ByteString, ByteString)
-gitRepoCmd (GitRepository path) cmd = gitCmd (["-C", path :: String] ++ cmd)
+gitRepoCmd (GitRepository path) cmd = gitCmd (map T.pack ["-C", path] ++ cmd)
 
 gitcmdStdout
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
-    -> [String]
+    -> [Text]
     -> m ByteString
 gitcmdStdout repo cmd = gitRepoCmd repo cmd >>= stdoutOrThrow
 
@@ -80,30 +80,28 @@ cloneReporitory
     -> FilePath
     -> m GitRepository
 cloneReporitory (RepositoryUrl url) dst = do
-    (exitCode, out, err) <- gitCmd ["clone", "--no-checkout", url, dst]
+    (exitCode, out, err) <- gitCmd ["clone", "--no-checkout", url, T.pack dst]
     case exitCode of
         ExitSuccess      -> return $ GitRepository dst
         ExitFailure code -> throwM $ GitCallException code (E.decodeUtf8 err)
 
-
 listBranches
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
-    -> String
-    -> m [String]
-listBranches repo prefix =
-    map T.unpack . T.lines . E.decodeUtf8 <$> gitcmdStdout
-        repo
-        [ "for-each-ref"
-        , "--format=%(refname:strip=3)"
-        , "refs/remotes/origin/" ++ prefix
-        ]
+    -> Text
+    -> m [Text]
+listBranches repo prefix = T.lines . E.decodeUtf8 <$> gitcmdStdout
+    repo
+    [ "for-each-ref"
+    , "--format=%(refname:strip=3)"
+    , "refs/remotes/origin/" <> prefix
+    ]
 
 getBranchFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
-    -> String
-    -> String
+    -> Text
+    -> Text
     -> m (Maybe ByteString)
 getBranchFile repo branch file =
-    stdoutOrNothing <$> gitRepoCmd repo ["show", branch ++ ":" ++ file]
+    stdoutOrNothing <$> gitRepoCmd repo ["show", branch <> ":" <> file]

@@ -7,6 +7,8 @@ import           Data.Semigroup                 ( (<>) )
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
 import           Data.Text.Prettyprint.Doc
 import           Console
 import qualified Console.Byline                as B
@@ -34,17 +36,17 @@ instance MonadConsole AppM where
 
 data Command
     = Create
-            { templateName :: Maybe String
+            { templateName :: Maybe Text
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
             }
     | Update
-            { maybeTemplateName :: Maybe String
+            { maybeTemplateName :: Maybe Text
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
             }
 
-template :: Parser String
+template :: Parser Text
 template = strOption
     (long "template" <> metavar "<repository>" <> help
         "Template repository name or URL"

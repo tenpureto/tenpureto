@@ -65,8 +65,8 @@ unattendedProjectConfiguration _ providedConfiguration currentConfiguration =
 required :: (Monad m) => m (Maybe a) -> m a
 required input = input >>= maybe (required input) return
 
-inputTemplate :: (MonadIO m, MonadMask m, MonadConsole m) => m String
-inputTemplate = T.unpack <$> ask "Template URL " Nothing
+inputTemplate :: (MonadIO m, MonadMask m, MonadConsole m) => m Text
+inputTemplate = ask "Template URL " Nothing
 
 inputTemplateConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)
@@ -78,8 +78,8 @@ inputTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate
 inputBranch
     :: (MonadIO m, MonadMask m, MonadConsole m)
     => [TemplateBranchInformation]
-    -> Set String
-    -> m (Maybe String)
+    -> Set Text
+    -> m (Maybe Text)
 inputBranch availableBranches selected =
     let
         indexedBranches :: [(Int, TemplateBranchInformation)]
@@ -91,7 +91,7 @@ inputBranch availableBranches selected =
             let isSelected = Set.member (branchName branch) selected
             in  text $ T.pack $ bool "  " " *" isSelected
         branchLineName :: TemplateBranchInformation -> Stylized
-        branchLineName = text . T.pack . branchName
+        branchLineName = text . branchName
         branchLine :: (Int, TemplateBranchInformation) -> Stylized
         branchLine (index, branch) =
             (branchLineSelected branch <> fg green)
@@ -105,7 +105,7 @@ inputBranch availableBranches selected =
         validateInput input = if T.null input || isJust (branchByIndex input)
             then Right input
             else Left (text input <> " is not a valid branch number.")
-        indexToBranch :: Text -> Maybe String
+        indexToBranch :: Text -> Maybe Text
         indexToBranch index = branchByIndex index <&> branchName
     in
         do
@@ -114,7 +114,7 @@ inputBranch availableBranches selected =
             askUntil "Add/remove branch: " Nothing validateInput
                 <&> indexToBranch
 
-toggleBranch :: String -> Set String -> Set String
+toggleBranch :: Text -> Set Text -> Set Text
 toggleBranch branch selected = bool (Set.insert branch selected)
                                     (Set.delete branch selected)
                                     (Set.member branch selected)
@@ -122,8 +122,8 @@ toggleBranch branch selected = bool (Set.insert branch selected)
 inputBranches
     :: (MonadIO m, MonadMask m, MonadConsole m)
     => [TemplateBranchInformation]
-    -> Set String
-    -> m (Set String)
+    -> Set Text
+    -> m (Set Text)
 inputBranches branches selected = do
     selection <- inputBranch branches selected
     case selection of
@@ -132,14 +132,14 @@ inputBranches branches selected = do
 
 inputVariable
     :: (MonadIO m, MonadMask m, MonadConsole m)
-    => (String, String)
-    -> m (String, String)
-inputVariable (desc, name) = (name, ) . T.unpack <$> ask (text $ T.pack desc <> " ") (Just $ T.pack name)
+    => (Text, Text)
+    -> m (Text, Text)
+inputVariable (desc, name) = (name, ) <$> ask (text $ desc <> " ") (Just name)
 
 inputVariables
     :: (MonadIO m, MonadMask m, MonadConsole m)
-    => Map String String
-    -> m (Map String String)
+    => Map Text Text
+    -> m (Map Text Text)
 inputVariables v = Map.fromList <$> traverse inputVariable (Map.assocs v)
 
 inputProjectConfiguration

@@ -1,9 +1,13 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Tenpureto where
 
 import           Data.List
 import           Data.Maybe
 import           Data.Either.Combinators
 import           Data.ByteString                ( ByteString )
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import           Control.Monad.Trans
@@ -74,11 +78,13 @@ parseTemplateYaml yaml =
 loadBranchConfiguration
     :: (MonadIO m, MonadGit m)
     => GitRepository
-    -> String
+    -> Text
     -> m (Maybe TemplateBranchInformation)
 loadBranchConfiguration repo branch = runMaybeT $ do
-    descriptor <- MaybeT
-        $ getBranchFile repo ("remotes/origin/" ++ branch) ".template.yaml"
+    descriptor <- MaybeT $ getBranchFile
+        repo
+        (T.pack "remotes/origin/" <> branch)
+        ".template.yaml"
     templateYaml <- MaybeT $ return $ parseTemplateYaml descriptor
     return $ TemplateBranchInformation
         { branchName       = branch
