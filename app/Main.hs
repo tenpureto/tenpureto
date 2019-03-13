@@ -67,16 +67,18 @@ update = Update <$> optional template <*> unattended <*> debug
 run :: Command -> IO ()
 run Create { templateName = t, runUnattended = u, enableDebugLogging = d } =
     runAppM d $ createProject
-        PreliminaryProjectConfiguration { preSelectedTemplate = t
-                                        , preSelectedBranches = Nothing
-                                        , preVariableValues   = Nothing
+        PreliminaryProjectConfiguration { preSelectedTemplate        = t
+                                        , preSelectedBaseBranch      = Nothing
+                                        , preSelectedFeatureBranches = Nothing
+                                        , preVariableValues          = Nothing
                                         }
         u
 run Update { maybeTemplateName = t, runUnattended = u, enableDebugLogging = d }
     = runAppM d $ updateProject
-        PreliminaryProjectConfiguration { preSelectedTemplate = t
-                                        , preSelectedBranches = Nothing
-                                        , preVariableValues   = Nothing
+        PreliminaryProjectConfiguration { preSelectedTemplate        = t
+                                        , preSelectedBaseBranch      = Nothing
+                                        , preSelectedFeatureBranches = Nothing
+                                        , preVariableValues          = Nothing
                                         }
         u
 

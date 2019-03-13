@@ -12,7 +12,8 @@ import qualified Data.Yaml                     as Y
 
 data PreliminaryProjectConfiguration    = PreliminaryProjectConfiguration
         { preSelectedTemplate :: Maybe Text
-        , preSelectedBranches :: Maybe (Set Text)
+        , preSelectedBaseBranch :: Maybe Text
+        , preSelectedFeatureBranches :: Maybe (Set Text)
         , preVariableValues :: Maybe (Map Text Text)
         }
         deriving (Show)
@@ -23,13 +24,15 @@ newtype FinalTemplateConfiguration = FinalTemplateConfiguration
         deriving (Show)
 
 data FinalProjectConfiguration = FinalProjectConfiguration
-        { selectedBranches :: Set Text
+        { baseBranch :: Text
+        , featureBranches :: Set Text
         , variableValues :: Map Text Text
         }
         deriving (Show)
 
 data TemplateBranchInformation = TemplateBranchInformation
         { branchName :: Text
+        , isBaseBranch :: Bool
         , requiredBranches :: Set Text
         , branchVariables :: Map Text Text
         }

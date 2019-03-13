@@ -53,13 +53,16 @@ unattendedProjectConfiguration
     -> Maybe FinalProjectConfiguration
     -> m FinalProjectConfiguration
 unattendedProjectConfiguration _ providedConfiguration currentConfiguration =
-    let b =
-                preSelectedBranches providedConfiguration
-                    `mplus` fmap selectedBranches currentConfiguration
+    let bb = 
+                preSelectedBaseBranch providedConfiguration
+                    `mplus` fmap baseBranch currentConfiguration
+        fb =
+                preSelectedFeatureBranches providedConfiguration
+                    `mplus` fmap featureBranches currentConfiguration
         v =
                 preVariableValues providedConfiguration
                     `mplus` fmap variableValues currentConfiguration
-        cfg = FinalProjectConfiguration <$> b <*> v
+        cfg = FinalProjectConfiguration <$> bb <*> fb <*> v
     in  maybe (throwM UnattendedNotPossibleException) return cfg
 
 required :: (Monad m) => m (Maybe a) -> m a
@@ -77,10 +80,12 @@ inputTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate
 
 inputBranch
     :: (MonadIO m, MonadMask m, MonadConsole m)
-    => [TemplateBranchInformation]
+    => Stylized 
+    -> Stylized
+    -> [TemplateBranchInformation]
     -> Set Text
     -> m (Maybe Text)
-inputBranch availableBranches selected =
+inputBranch title request availableBranches selected =
     let
         indexedBranches :: [(Int, TemplateBranchInformation)]
         indexedBranches = [1 ..] `zip` availableBranches
@@ -109,9 +114,9 @@ inputBranch availableBranches selected =
         indexToBranch index = branchByIndex index <&> branchName
     in
         do
-            sayLn "Template branches"
+            sayLn title
             traverse_ (sayLn . branchLine) indexedBranches
-            askUntil "Add/remove branch: " Nothing validateInput
+            askUntil (request <> ": ") Nothing validateInput
                 <&> indexToBranch
 
 toggleBranch :: Text -> Set Text -> Set Text
@@ -119,15 +124,22 @@ toggleBranch branch selected = bool (Set.insert branch selected)
                                     (Set.delete branch selected)
                                     (Set.member branch selected)
 
-inputBranches
+inputBaseBranch :: (MonadIO m, MonadMask m, MonadConsole m) => [TemplateBranchInformation] -> Maybe Text -> m Text
+inputBaseBranch branches selected = do
+    selection <- inputBranch "Base branches" "Select a base branch" branches (maybe Set.empty Set.singleton selected)
+    case selection of
+        Just branch -> return branch
+        Nothing     -> inputBaseBranch branches selected
+
+inputFeatureBranches
     :: (MonadIO m, MonadMask m, MonadConsole m)
     => [TemplateBranchInformation]
     -> Set Text
     -> m (Set Text)
-inputBranches branches selected = do
-    selection <- inputBranch branches selected
+inputFeatureBranches branches selected = do
+    selection <- inputBranch "Feature branches" "Add or remove a feature branch" branches selected
     case selection of
-        Just branch -> inputBranches branches (toggleBranch branch selected)
+        Just branch -> inputFeatureBranches branches (toggleBranch branch selected)
         Nothing     -> return selected
 
 inputVariable
@@ -145,17 +157,21 @@ inputVariables v = Map.fromList <$> traverse inputVariable (Map.assocs v)
 inputProjectConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)
     => TemplateInformation
-    -> PreliminaryProjectConfiguration
+    -> PreliminaryProjectConfiguration 
     -> Maybe FinalProjectConfiguration
     -> m FinalProjectConfiguration
 inputProjectConfiguration templateInformation providedConfiguration currentConfiguration
-    = let bi = branchesInformation templateInformation in do
-        branches <- inputBranches bi Set.empty
-        let sbi = filter (flip Set.member branches . branchName) bi
-            vars = mconcat (map branchVariables sbi) in do
-            varVals <- inputVariables vars
-            return FinalProjectConfiguration
-                { selectedBranches = branches
-                , variableValues   = varVals
-                }
- 
+    = let bi = branchesInformation templateInformation
+          bases = filter isBaseBranch bi
+          child base branch = Set.member base (requiredBranches branch) && not (isBaseBranch branch) in do
+        base <- inputBaseBranch bases Nothing
+        let fbi = filter (child base) bi in do
+            branches <- inputFeatureBranches fbi Set.empty
+            let sbi = filter (flip Set.member branches . branchName) bi
+                vars = mconcat (map branchVariables sbi) in do
+                varVals <- inputVariables vars
+                return FinalProjectConfiguration
+                    { baseBranch = base
+                    , featureBranches = branches
+                    , variableValues   = varVals
+                    }

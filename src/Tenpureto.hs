@@ -8,6 +8,7 @@ import           Data.Either.Combinators
 import           Data.ByteString                ( ByteString )
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
+import qualified Data.Set                      as Set
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import           Control.Monad.Trans
@@ -55,7 +56,7 @@ createProject projectConfiguration unattended = do
                   templateInformation
                   projectConfiguration
                   Nothing
-              prepareTemplate finalProjectConfiguration
+              prepareTemplate repository finalProjectConfiguration
 
 
 updateProject
@@ -64,10 +65,6 @@ updateProject
     -> Bool
     -> m ()
 updateProject projectConfiguration unattended = return ()
-
-prepareTemplate
-    :: (MonadIO m, MonadMask m, MonadGit m) => FinalProjectConfiguration -> m ()
-prepareTemplate configuration = liftIO $ print configuration
 
 parseTemplateYaml :: ByteString -> Maybe TemplateYaml
 parseTemplateYaml yaml =
@@ -86,9 +83,10 @@ loadBranchConfiguration repo branch = runMaybeT $ do
         (T.pack "remotes/origin/" <> branch)
         ".template.yaml"
     templateYaml <- MaybeT $ return $ parseTemplateYaml descriptor
-    return $ TemplateBranchInformation
+    let fb = features templateYaml in    return $ TemplateBranchInformation
         { branchName       = branch
-        , requiredBranches = features templateYaml
+        , isBaseBranch     = Set.size fb <= 1
+        , requiredBranches = fb
         , branchVariables  = variables templateYaml
         }
 
@@ -102,3 +100,10 @@ loadTemplateInformation repository = do
     return $ TemplateInformation
         { branchesInformation = catMaybes branchConfigurations
         }
+
+prepareTemplate
+    :: (MonadIO m, MonadMask m, MonadGit m)
+    => GitRepository
+    -> FinalProjectConfiguration
+    -> m ()
+prepareTemplate repository configuration = liftIO $ print $ show configuration
