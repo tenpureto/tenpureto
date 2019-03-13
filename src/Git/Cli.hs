@@ -82,11 +82,13 @@ cloneReporitory
     => RepositoryUrl
     -> FilePath
     -> m GitRepository
-cloneReporitory (RepositoryUrl url) dst = do
-    (exitCode, out, err) <- gitCmd ["clone", "--no-checkout", url, T.pack dst]
-    case exitCode of
-        ExitSuccess      -> return $ GitRepository dst
-        ExitFailure code -> throwM $ GitCallException code (E.decodeUtf8 err)
+cloneReporitory (RepositoryUrl url) dst =
+    let repo = GitRepository dst
+    in  do
+            gitCmd ["init", T.pack dst] >>= unitOrThrow
+            gitRepoCmd repo ["remote", "add", "origin", url] >>= unitOrThrow
+            gitRepoCmd repo ["fetch", "origin"] >>= unitOrThrow
+            return repo
 
 listBranches
     :: (MonadIO m, MonadThrow m, MonadLog m)
