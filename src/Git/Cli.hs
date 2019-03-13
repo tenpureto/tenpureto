@@ -39,6 +39,9 @@ stdoutOrNothing :: (ExitCode, ByteString, ByteString) -> Maybe ByteString
 stdoutOrNothing (ExitSuccess     , out, err) = Just out
 stdoutOrNothing (ExitFailure code, out, err) = Nothing
 
+unitOrThrow :: MonadThrow m => (ExitCode, ByteString, ByteString) -> m ()
+unitOrThrow a = const () <$> stdoutOrThrow a
+
 gitCmd
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => [Text]
@@ -105,3 +108,18 @@ getBranchFile
     -> m (Maybe ByteString)
 getBranchFile repo branch file =
     stdoutOrNothing <$> gitRepoCmd repo ["show", branch <> ":" <> file]
+
+checkoutBranch
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> Text
+    -> Text
+    -> m ()
+checkoutBranch repo branch name = do
+    gitRepoCmd repo ["checkout", branch] >>= unitOrThrow
+    gitRepoCmd repo ["checkout", "-b", name] >>= unitOrThrow
+
+mergeBranch
+    :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> Text -> m ()
+mergeBranch repo branch =
+    gitRepoCmd repo ["merge", "--no-ff", branch] >>= unitOrThrow

@@ -9,6 +9,7 @@ import           Data.ByteString                ( ByteString )
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Set                      as Set
+import           Data.Foldable
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import           Control.Monad.Trans
@@ -106,4 +107,6 @@ prepareTemplate
     => GitRepository
     -> FinalProjectConfiguration
     -> m ()
-prepareTemplate repository configuration = liftIO $ print $ show configuration
+prepareTemplate repository configuration = let branch = "template" in do
+    checkoutBranch repository (baseBranch configuration) branch
+    traverse_ (\b -> mergeBranch repository ("origin/" <> b)) (featureBranches configuration)

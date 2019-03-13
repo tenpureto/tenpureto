@@ -27,6 +27,8 @@ runAppM debug app = initPrintToTerminal debug >>= runLoggingT (unAppM app)
 instance MonadGit AppM where
     withClonedRepository = GC.withClonedRepository
     listBranches         = GC.listBranches
+    checkoutBranch       = GC.checkoutBranch
+    mergeBranch          = GC.mergeBranch
     getBranchFile        = GC.getBranchFile
 
 instance MonadConsole AppM where
