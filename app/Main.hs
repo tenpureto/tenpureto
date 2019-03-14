@@ -26,6 +26,7 @@ runAppM debug app = initPrintToTerminal debug >>= runLoggingT (unAppM app)
 
 instance MonadGit AppM where
     withClonedRepository = GC.withClonedRepository
+    initRepository       = GC.initRepository
     listBranches         = GC.listBranches
     checkoutBranch       = GC.checkoutBranch
     mergeBranch          = GC.mergeBranch
@@ -41,11 +42,13 @@ instance MonadConsole AppM where
 data Command
     = Create
             { templateName :: Maybe Text
+            , maybeTargetDirectory :: Maybe FilePath
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
             }
     | Update
             { maybeTemplateName :: Maybe Text
+            , maybeTargetDirectory :: Maybe FilePath
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
             }
@@ -56,6 +59,9 @@ template = strOption
         "Template repository name or URL"
     )
 
+target :: Parser FilePath
+target = strArgument (metavar "<directory>" <> help "Target directory")
+
 unattended :: Parser Bool
 unattended = switch (long "unattended" <> help "Do not ask anything")
 
@@ -63,23 +69,27 @@ debug :: Parser Bool
 debug = switch (long "debug" <> help "Print debug information")
 
 create :: Parser Command
-create = Create <$> optional template <*> unattended <*> debug
+create =
+    Create <$> optional template <*> optional target <*> unattended <*> debug
 
 update :: Parser Command
-update = Update <$> optional template <*> unattended <*> debug
+update =
+    Update <$> optional template <*> optional target <*> unattended <*> debug
 
 run :: Command -> IO ()
-run Create { templateName = t, runUnattended = u, enableDebugLogging = d } =
-    runAppM d $ createProject
+run Create { templateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
+    = runAppM d $ createProject
         PreliminaryProjectConfiguration { preSelectedTemplate        = t
+                                        , preTargetDirectory         = td
                                         , preSelectedBaseBranch      = Nothing
                                         , preSelectedFeatureBranches = Nothing
                                         , preVariableValues          = Nothing
                                         }
         u
-run Update { maybeTemplateName = t, runUnattended = u, enableDebugLogging = d }
+run Update { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
     = runAppM d $ updateProject
         PreliminaryProjectConfiguration { preSelectedTemplate        = t
+                                        , preTargetDirectory         = td
                                         , preSelectedBaseBranch      = Nothing
                                         , preSelectedFeatureBranches = Nothing
                                         , preVariableValues          = Nothing

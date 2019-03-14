@@ -21,8 +21,6 @@ import           System.Exit
 import           System.Process
 import qualified System.Process.ByteString     as BP
 
-import qualified Control.Monad.Log             as L
-
 data GitException = GitCallException
     { exitCode :: Int
     , stdErr :: Text }
@@ -83,6 +81,11 @@ withClonedRepository
     -> m a
 withClonedRepository url f =
     withSystemTempDirectory "tenpureto" $ cloneReporitory url >=> f
+
+initRepository
+    :: (MonadIO m, MonadMask m, MonadLog m) => FilePath -> m GitRepository
+initRepository dir =
+    gitCmd ["init", T.pack dir] >>= unitOrThrow >> return (GitRepository dir)
 
 cloneReporitory
     :: (MonadIO m, MonadThrow m, MonadLog m)

@@ -22,6 +22,7 @@ import           Data
 import           Git
 import           Console
 import           UI
+import           System.Directory
 
 templateYamlFile :: Text
 templateYamlFile = ".template.yaml"
@@ -55,7 +56,7 @@ createProject projectConfiguration unattended = do
         projectConfiguration
     withClonedRepository
             (RepositoryUrl $ selectedTemplate finalTemplateConfiguration)
-        $ \repository -> do
+        $ \repository -> let dst = targetDirectory finalTemplateConfiguration in do
               templateInformation       <- loadTemplateInformation repository
               finalProjectConfiguration <- makeFinalProjectConfiguration
                   unattended
@@ -63,6 +64,8 @@ createProject projectConfiguration unattended = do
                   projectConfiguration
                   Nothing
               mergedTemplateYaml <- prepareTemplate repository templateInformation finalProjectConfiguration
+              liftIO $ createDirectory dst
+              project <- initRepository dst
               return ()
 
 updateProject

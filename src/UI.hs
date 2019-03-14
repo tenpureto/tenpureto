@@ -42,9 +42,9 @@ unattendedTemplateConfiguration
     :: (MonadThrow m)
     => PreliminaryProjectConfiguration
     -> m FinalTemplateConfiguration
-unattendedTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = Just t }
-    = return FinalTemplateConfiguration { selectedTemplate = t }
-unattendedTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = Nothing }
+unattendedTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = Just t, preTargetDirectory = Just td }
+    = return FinalTemplateConfiguration { selectedTemplate = t, targetDirectory = td }
+unattendedTemplateConfiguration _
     = throwM UnattendedNotPossibleException
 
 unattendedProjectConfiguration
@@ -72,12 +72,15 @@ required input = input >>= maybe (required input) return
 inputTemplate :: (MonadIO m, MonadMask m, MonadConsole m) => m Text
 inputTemplate = ask "Template URL " Nothing
 
+inputTarget :: (MonadIO m, MonadMask m, MonadConsole m) => m FilePath
+inputTarget = T.unpack <$> ask "Target directory  " Nothing
+
 inputTemplateConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)
     => PreliminaryProjectConfiguration
     -> m FinalTemplateConfiguration
-inputTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = mbt }
-    = FinalTemplateConfiguration <$> maybe inputTemplate return mbt
+inputTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = mbt, preTargetDirectory = mbtd }
+    = FinalTemplateConfiguration <$> maybe inputTemplate return mbt <*> maybe inputTarget return mbtd
 
 inputBranch
     :: (MonadIO m, MonadMask m, MonadConsole m)

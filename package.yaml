@@ -12,6 +12,7 @@ dependencies:
 - either
 - text
 - filepath
+- directory
 - containers
 - exceptions
 - mtl

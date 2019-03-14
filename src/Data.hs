@@ -14,14 +14,16 @@ import qualified Data.Yaml                     as Y
 
 data PreliminaryProjectConfiguration    = PreliminaryProjectConfiguration
         { preSelectedTemplate :: Maybe Text
+        , preTargetDirectory :: Maybe FilePath
         , preSelectedBaseBranch :: Maybe Text
         , preSelectedFeatureBranches :: Maybe (Set Text)
         , preVariableValues :: Maybe (Map Text Text)
         }
         deriving (Show)
 
-newtype FinalTemplateConfiguration = FinalTemplateConfiguration
+data FinalTemplateConfiguration = FinalTemplateConfiguration
         { selectedTemplate :: Text
+        , targetDirectory :: FilePath
         }
         deriving (Show)
 
