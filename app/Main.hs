@@ -29,7 +29,9 @@ instance MonadGit AppM where
     listBranches         = GC.listBranches
     checkoutBranch       = GC.checkoutBranch
     mergeBranch          = GC.mergeBranch
+    runMergeTool         = GC.runMergeTool
     getBranchFile        = GC.getBranchFile
+    addFile              = GC.addFile
 
 instance MonadConsole AppM where
     ask = B.ask

@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Tenpureto where
 
@@ -6,6 +7,7 @@ import           Data.List
 import           Data.Maybe
 import           Data.Either.Combinators
 import           Data.ByteString                ( ByteString )
+import qualified Data.ByteString                     as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Set                      as Set
@@ -20,6 +22,9 @@ import           Data
 import           Git
 import           Console
 import           UI
+
+templateYamlFile :: Text
+templateYamlFile = ".template.yaml"
 
 makeFinalTemplateConfiguration
     :: (MonadThrow m, MonadMask m, MonadIO m, MonadConsole m)
@@ -57,8 +62,8 @@ createProject projectConfiguration unattended = do
                   templateInformation
                   projectConfiguration
                   Nothing
-              prepareTemplate repository finalProjectConfiguration
-
+              mergedTemplateYaml <- prepareTemplate repository templateInformation finalProjectConfiguration
+              return ()
 
 updateProject
     :: (MonadIO m, MonadMask m, MonadGit m)
@@ -82,13 +87,14 @@ loadBranchConfiguration repo branch = runMaybeT $ do
     descriptor <- MaybeT $ getBranchFile
         repo
         (T.pack "remotes/origin/" <> branch)
-        ".template.yaml"
+        templateYamlFile
     templateYaml <- MaybeT $ return $ parseTemplateYaml descriptor
-    let fb = features templateYaml in    return $ TemplateBranchInformation
+    let fb = features templateYaml in return $ TemplateBranchInformation
         { branchName       = branch
         , isBaseBranch     = Set.size fb <= 1
         , requiredBranches = fb
         , branchVariables  = variables templateYaml
+        , templateYaml     = templateYaml
         }
 
 loadTemplateInformation
@@ -103,10 +109,24 @@ loadTemplateInformation repository = do
         }
 
 prepareTemplate
-    :: (MonadIO m, MonadMask m, MonadGit m)
+    :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m)
     => GitRepository
+    -> TemplateInformation
     -> FinalProjectConfiguration
-    -> m ()
-prepareTemplate repository configuration = let branch = "template" in do
-    checkoutBranch repository (baseBranch configuration) branch
-    traverse_ (\b -> mergeBranch repository ("origin/" <> b)) (featureBranches configuration)
+    -> m TemplateYaml
+prepareTemplate repository template configuration =
+    let branch = "template"
+        resolve descriptor conflicts =
+            if templateYamlFile `elem` conflicts
+                then addFile repository templateYamlFile (Y.encode descriptor) >> resolve descriptor (delete templateYamlFile conflicts)
+                else inputResolutionStrategy (repositoryPath repository) conflicts >>= \case
+                    AlreadyResolved -> return ()
+                    MergeTool -> runMergeTool repository >> sayLn "Successfully merged."
+        mergeTemplateBranch a b = let
+            bi = find ((==) b . branchName) (branchesInformation template)
+            d = maybe a ((<>) a . templateYaml) bi in do
+                mergeBranch repository ("origin/" <> b) (resolve d)
+                return d
+        in do
+            checkoutBranch repository (baseBranch configuration) branch
+            foldlM mergeTemplateBranch mempty (featureBranches configuration)

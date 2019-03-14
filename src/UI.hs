@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE LambdaCase #-}
 
 module UI
     ( module UI
@@ -53,7 +54,7 @@ unattendedProjectConfiguration
     -> Maybe FinalProjectConfiguration
     -> m FinalProjectConfiguration
 unattendedProjectConfiguration _ providedConfiguration currentConfiguration =
-    let bb = 
+    let bb =
                 preSelectedBaseBranch providedConfiguration
                     `mplus` fmap baseBranch currentConfiguration
         fb =
@@ -80,7 +81,7 @@ inputTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate
 
 inputBranch
     :: (MonadIO m, MonadMask m, MonadConsole m)
-    => Stylized 
+    => Stylized
     -> Stylized
     -> [TemplateBranchInformation]
     -> Set Text
@@ -157,7 +158,7 @@ inputVariables v = Map.fromList <$> traverse inputVariable (Map.assocs v)
 inputProjectConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)
     => TemplateInformation
-    -> PreliminaryProjectConfiguration 
+    -> PreliminaryProjectConfiguration
     -> Maybe FinalProjectConfiguration
     -> m FinalProjectConfiguration
 inputProjectConfiguration templateInformation providedConfiguration currentConfiguration
@@ -175,3 +176,18 @@ inputProjectConfiguration templateInformation providedConfiguration currentConfi
                     , featureBranches = branches
                     , variableValues   = varVals
                     }
+
+data ConflictResolutionStrategy = AlreadyResolved | MergeTool
+
+inputResolutionStrategy :: MonadConsole m => FilePath -> [Text] -> m ConflictResolutionStrategy
+inputResolutionStrategy repo conflicts = let
+    mapAnswer x = case x of
+        "y" -> Right x
+        "n" -> Right x
+        _ -> Left "Please answer \"y\" or \"n\"."
+    in do
+        sayLn "The following files have merge conflicts:"
+        traverse_ (\c -> sayLn ("  " <> text c)) conflicts
+        sayLn $ text $ "Repository path: " <> T.pack repo
+        result <- askUntil "Run \"git mergetool\" (y/n)? " (Just "y") mapAnswer
+        return $ bool AlreadyResolved MergeTool (result == "y")

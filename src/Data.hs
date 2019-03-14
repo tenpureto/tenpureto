@@ -6,7 +6,9 @@ import           Data.Text                      ( Text )
 import           Data.Set                       ( Set )
 import           Data.Map                       ( Map )
 import           Data.Yaml                      ( FromJSON(..)
+                                                , ToJSON(..)
                                                 , (.:)
+                                                , (.=)
                                                 )
 import qualified Data.Yaml                     as Y
 
@@ -35,6 +37,7 @@ data TemplateBranchInformation = TemplateBranchInformation
         , isBaseBranch :: Bool
         , requiredBranches :: Set Text
         , branchVariables :: Map Text Text
+        , templateYaml :: TemplateYaml
         }
         deriving (Show)
 
@@ -53,3 +56,15 @@ instance FromJSON TemplateYaml where
         parseJSON (Y.Object v) =
                 TemplateYaml <$> v .: "variables" <*> v .: "features"
         parseJSON _ = fail "Invalid template YAML definition"
+
+instance ToJSON TemplateYaml where
+        toJSON TemplateYaml { variables = v, features = f } =
+                Y.object ["variables" .= v, "features" .= f]
+
+instance Semigroup TemplateYaml where
+        (<>) a b = TemplateYaml { variables = variables a <> variables b
+                                , features  = features a <> features b
+                                }
+
+instance Monoid TemplateYaml where
+        mempty = TemplateYaml { variables = mempty, features = mempty }
