@@ -12,7 +12,9 @@ dependencies:
 - either
 - text
 - filepath
-- directory
+- directory # TO REMOVE
+- path
+- path-io
 - containers
 - exceptions
 - mtl

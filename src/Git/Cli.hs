@@ -16,6 +16,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import           System.IO
 import           System.IO.Temp
+import           System.Directory
 import           System.FilePath
 import           System.Exit
 import           System.Process
@@ -85,7 +86,7 @@ withClonedRepository url f =
 initRepository
     :: (MonadIO m, MonadMask m, MonadLog m) => FilePath -> m GitRepository
 initRepository dir =
-    gitCmd ["init", T.pack dir] >>= unitOrThrow >> return (GitRepository dir)
+    GitRepository <$> (gitCmd ["init", T.pack dir] >>= unitOrThrow >> liftIO (makeAbsolute dir))
 
 cloneReporitory
     :: (MonadIO m, MonadThrow m, MonadLog m)

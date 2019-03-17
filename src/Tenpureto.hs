@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
 
@@ -22,6 +23,8 @@ import           Data
 import           Git
 import           Console
 import           UI
+import           Logging
+import           Templater
 import           System.Directory
 
 templateYamlFile :: Text
@@ -45,8 +48,11 @@ makeFinalProjectConfiguration
 makeFinalProjectConfiguration True  = unattendedProjectConfiguration
 makeFinalProjectConfiguration False = inputProjectConfiguration
 
+buildTemplaterSettings :: TemplateYaml -> TemplaterSettings
+buildTemplaterSettings TemplateYaml { variables = v } = TemplaterSettings { templaterVariables = v, templaterExcludes = Set.empty }
+
 createProject
-    :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m)
+    :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
     => PreliminaryProjectConfiguration
     -> Bool
     -> m ()
@@ -56,7 +62,7 @@ createProject projectConfiguration unattended = do
         projectConfiguration
     withClonedRepository
             (RepositoryUrl $ selectedTemplate finalTemplateConfiguration)
-        $ \repository -> let dst = targetDirectory finalTemplateConfiguration in do
+        $ \repository -> do
               templateInformation       <- loadTemplateInformation repository
               finalProjectConfiguration <- makeFinalProjectConfiguration
                   unattended
@@ -64,9 +70,11 @@ createProject projectConfiguration unattended = do
                   projectConfiguration
                   Nothing
               mergedTemplateYaml <- prepareTemplate repository templateInformation finalProjectConfiguration
-              liftIO $ createDirectory dst
-              project <- initRepository dst
-              return ()
+              let dst = targetDirectory finalTemplateConfiguration
+                  templaterSettings = buildTemplaterSettings mergedTemplateYaml in do
+                liftIO $ createDirectory dst
+                project <- initRepository dst
+                copy templaterSettings (repositoryPath repository) (repositoryPath project)
 
 updateProject
     :: (MonadIO m, MonadMask m, MonadGit m)
