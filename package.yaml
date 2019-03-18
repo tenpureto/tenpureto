@@ -11,8 +11,6 @@ dependencies:
 - bytestring
 - either
 - text
-- filepath
-- directory # TO REMOVE
 - path
 - path-io
 - containers
@@ -25,7 +23,6 @@ dependencies:
 - terminal-size
 - process
 - process-extras
-- temporary
 - optparse-applicative
 - byline
 - yaml

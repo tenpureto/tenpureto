@@ -14,10 +14,9 @@ import           Data.Text.Encoding            as E
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
-import           System.IO
-import           System.IO.Temp
-import           System.Directory
-import           System.FilePath
+import           Data.Foldable
+import           Path
+import           Path.IO
 import           System.Exit
 import           System.Process
 import qualified System.Process.ByteString     as BP
@@ -65,7 +64,8 @@ gitRepoCmd
     => GitRepository
     -> [Text]
     -> m (ExitCode, ByteString, ByteString)
-gitRepoCmd (GitRepository path) cmd = gitCmd (map T.pack ["-C", path] ++ cmd)
+gitRepoCmd (GitRepository path) cmd =
+    gitCmd (map T.pack ["-C", toFilePath path] ++ cmd)
 
 gitcmdStdout
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -81,22 +81,25 @@ withClonedRepository
     -> (GitRepository -> m a)
     -> m a
 withClonedRepository url f =
-    withSystemTempDirectory "tenpureto" $ cloneReporitory url >=> f
+    withSystemTempDir "tenpureto" $ cloneReporitory url >=> f
 
 initRepository
-    :: (MonadIO m, MonadMask m, MonadLog m) => FilePath -> m GitRepository
+    :: (MonadIO m, MonadMask m, MonadLog m) => Path Abs Dir -> m GitRepository
 initRepository dir =
-    GitRepository <$> (gitCmd ["init", T.pack dir] >>= unitOrThrow >> liftIO (makeAbsolute dir))
+    GitRepository
+        <$> (gitCmd ["init", T.pack (toFilePath dir)] >>= unitOrThrow >> liftIO
+                (makeAbsolute dir)
+            )
 
 cloneReporitory
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => RepositoryUrl
-    -> FilePath
+    -> Path Abs Dir
     -> m GitRepository
 cloneReporitory (RepositoryUrl url) dst =
     let repo = GitRepository dst
     in  do
-            gitCmd ["init", T.pack dst] >>= unitOrThrow
+            gitCmd ["init", T.pack (toFilePath dst)] >>= unitOrThrow
             gitRepoCmd repo ["remote", "add", "origin", url] >>= unitOrThrow
             gitRepoCmd repo ["fetch", "origin"] >>= unitOrThrow
             return repo
@@ -117,10 +120,10 @@ getBranchFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
     -> Text
-    -> Text
+    -> Path Rel File
     -> m (Maybe ByteString)
-getBranchFile repo branch file =
-    stdoutOrNothing <$> gitRepoCmd repo ["show", branch <> ":" <> file]
+getBranchFile repo branch file = stdoutOrNothing
+    <$> gitRepoCmd repo ["show", branch <> ":" <> T.pack (toFilePath file)]
 
 checkoutBranch
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -133,19 +136,20 @@ checkoutBranch repo branch name = do
     gitRepoCmd repo ["checkout", "-b", name] >>= unitOrThrow
 
 listConflicts
-    :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> m [Text]
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> m [Path Rel File]
 listConflicts repo =
     gitRepoCmd repo ["diff", "--name-only", "--diff-filter=U"]
         >>= stdoutOrThrow
-        >>= return
-        .   T.lines
-        .   E.decodeUtf8
+        >>= traverse (parseRelFile . T.unpack)
+        .   (T.lines . E.decodeUtf8)
 
 mergeBranch
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
     -> Text
-    -> ([Text] -> m ())
+    -> ([Path Rel File] -> m ())
     -> m ()
 mergeBranch repo branch resolve = do
     (mergeResult, _, _) <- gitRepoCmd
@@ -159,14 +163,14 @@ mergeBranch repo branch resolve = do
 addFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
-    -> Text
+    -> Path Rel File
     -> ByteString
     -> m ()
 addFile repo file content = do
     logInfo $ "Writing to " <+> pretty file
     logDebug $ prefixed "file> " (E.decodeUtf8 content)
-    liftIO $ BS.writeFile (repositoryPath repo </> T.unpack file) content
-    gitRepoCmd repo ["add", "--", file] >>= unitOrThrow
+    liftIO $ (BS.writeFile . toFilePath) (repositoryPath repo </> file) content
+    gitRepoCmd repo ["add", "--", T.pack (toFilePath file)] >>= unitOrThrow
 
 runMergeTool :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> m ()
 runMergeTool repo = gitRepoCmd repo ["mergetool"] >>= unitOrThrow

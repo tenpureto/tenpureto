@@ -2,16 +2,17 @@ module Git where
 
 import           Data.ByteString
 import           Data.Text                      ( Text )
+import           Path
 
 newtype RepositoryUrl = RepositoryUrl Text
-newtype GitRepository = GitRepository { repositoryPath :: FilePath }
+newtype GitRepository = GitRepository { repositoryPath :: Path Abs Dir }
 
 class Monad m => MonadGit m where
     withClonedRepository :: RepositoryUrl -> (GitRepository -> m a) -> m a
-    initRepository :: FilePath -> m GitRepository
+    initRepository :: Path Abs Dir -> m GitRepository
     listBranches :: GitRepository -> Text -> m [Text]
     checkoutBranch :: GitRepository -> Text -> Text -> m ()
-    mergeBranch :: GitRepository -> Text -> ([Text] -> m ()) -> m ()
+    mergeBranch :: GitRepository -> Text -> ([Path Rel File] -> m ()) -> m ()
     runMergeTool :: GitRepository -> m ()
-    getBranchFile :: GitRepository -> Text -> Text -> m (Maybe ByteString)
-    addFile :: GitRepository -> Text -> ByteString -> m ()
+    getBranchFile :: GitRepository -> Text -> Path Rel File -> m (Maybe ByteString)
+    addFile :: GitRepository -> Path Rel File -> ByteString -> m ()

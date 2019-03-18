@@ -11,10 +11,11 @@ import           Data.Yaml                      ( FromJSON(..)
                                                 , (.=)
                                                 )
 import qualified Data.Yaml                     as Y
+import           Path
 
 data PreliminaryProjectConfiguration    = PreliminaryProjectConfiguration
         { preSelectedTemplate :: Maybe Text
-        , preTargetDirectory :: Maybe FilePath
+        , preTargetDirectory :: Maybe (Path Abs Dir)
         , preSelectedBaseBranch :: Maybe Text
         , preSelectedFeatureBranches :: Maybe (Set Text)
         , preVariableValues :: Maybe (Map Text Text)
@@ -23,7 +24,7 @@ data PreliminaryProjectConfiguration    = PreliminaryProjectConfiguration
 
 data FinalTemplateConfiguration = FinalTemplateConfiguration
         { selectedTemplate :: Text
-        , targetDirectory :: FilePath
+        , targetDirectory :: Path Abs Dir
         }
         deriving (Show)
 

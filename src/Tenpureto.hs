@@ -17,7 +17,6 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import           Control.Monad.Trans
 import           Control.Monad.Trans.Maybe
-import           System.IO.Temp
 import qualified Data.Yaml                     as Y
 import           Data
 import           Git
@@ -25,10 +24,11 @@ import           Console
 import           UI
 import           Logging
 import           Templater
-import           System.Directory
+import           Path
+import           Path.IO
 
-templateYamlFile :: Text
-templateYamlFile = ".template.yaml"
+templateYamlFile :: MonadThrow m => m (Path Rel File)
+templateYamlFile = parseRelFile ".template.yaml"
 
 makeFinalTemplateConfiguration
     :: (MonadThrow m, MonadMask m, MonadIO m, MonadConsole m)
@@ -72,7 +72,7 @@ createProject projectConfiguration unattended = do
               mergedTemplateYaml <- prepareTemplate repository templateInformation finalProjectConfiguration
               let dst = targetDirectory finalTemplateConfiguration
                   templaterSettings = buildTemplaterSettings mergedTemplateYaml in do
-                liftIO $ createDirectory dst
+                createDir dst
                 project <- initRepository dst
                 copy templaterSettings (repositoryPath repository) (repositoryPath project)
 
@@ -90,15 +90,16 @@ parseTemplateYaml yaml =
     in  rightToMaybe templateYaml
 
 loadBranchConfiguration
-    :: (MonadIO m, MonadGit m)
+    :: (MonadThrow m, MonadGit m)
     => GitRepository
     -> Text
     -> m (Maybe TemplateBranchInformation)
 loadBranchConfiguration repo branch = runMaybeT $ do
+    file <- templateYamlFile
     descriptor <- MaybeT $ getBranchFile
         repo
         (T.pack "remotes/origin/" <> branch)
-        templateYamlFile
+        file
     templateYaml <- MaybeT $ return $ parseTemplateYaml descriptor
     let fb = features templateYaml in return $ TemplateBranchInformation
         { branchName       = branch
@@ -109,7 +110,7 @@ loadBranchConfiguration repo branch = runMaybeT $ do
         }
 
 loadTemplateInformation
-    :: (MonadIO m, MonadGit m) => GitRepository -> m TemplateInformation
+    :: (MonadThrow m, MonadGit m) => GitRepository -> m TemplateInformation
 loadTemplateInformation repository = do
     baseBranches         <- listBranches repository "base/"
     featureBranches      <- listBranches repository "feature/"
@@ -125,11 +126,12 @@ prepareTemplate
     -> TemplateInformation
     -> FinalProjectConfiguration
     -> m TemplateYaml
-prepareTemplate repository template configuration =
+prepareTemplate repository template configuration = do
+    templateYamlRelFile <- templateYamlFile
     let branch = "template"
         resolve descriptor conflicts =
-            if templateYamlFile `elem` conflicts
-                then addFile repository templateYamlFile (Y.encode descriptor) >> resolve descriptor (delete templateYamlFile conflicts)
+            if templateYamlRelFile `elem` conflicts
+                then addFile repository templateYamlRelFile (Y.encode descriptor) >> resolve descriptor (delete templateYamlRelFile conflicts)
                 else inputResolutionStrategy (repositoryPath repository) conflicts >>= \case
                     AlreadyResolved -> return ()
                     MergeTool -> runMergeTool repository >> sayLn "Successfully merged."

@@ -17,6 +17,9 @@ import qualified Git.Cli                       as GC
 import           Data
 import           Logging
 import           Tenpureto
+import           Path
+import           Path.IO
+import           UI                             ( resolveTargetDir )
 
 newtype AppM a = AppM { unAppM :: LoggingT IO a }
     deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadLog)
@@ -78,23 +81,29 @@ update =
 
 run :: Command -> IO ()
 run Create { templateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
-    = runAppM d $ createProject
-        PreliminaryProjectConfiguration { preSelectedTemplate        = t
-                                        , preTargetDirectory         = td
-                                        , preSelectedBaseBranch      = Nothing
-                                        , preSelectedFeatureBranches = Nothing
-                                        , preVariableValues          = Nothing
-                                        }
-        u
+    = runAppM d $ do
+        resolvedTd <- traverse resolveTargetDir td
+        createProject
+            PreliminaryProjectConfiguration
+                { preSelectedTemplate        = t
+                , preTargetDirectory         = resolvedTd
+                , preSelectedBaseBranch      = Nothing
+                , preSelectedFeatureBranches = Nothing
+                , preVariableValues          = Nothing
+                }
+            u
 run Update { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
-    = runAppM d $ updateProject
-        PreliminaryProjectConfiguration { preSelectedTemplate        = t
-                                        , preTargetDirectory         = td
-                                        , preSelectedBaseBranch      = Nothing
-                                        , preSelectedFeatureBranches = Nothing
-                                        , preVariableValues          = Nothing
-                                        }
-        u
+    = runAppM d $ do
+        resolvedTd <- traverse resolveTargetDir td
+        updateProject
+            PreliminaryProjectConfiguration
+                { preSelectedTemplate        = t
+                , preTargetDirectory         = resolvedTd
+                , preSelectedBaseBranch      = Nothing
+                , preSelectedFeatureBranches = Nothing
+                , preVariableValues          = Nothing
+                }
+            u
 
 main :: IO ()
 main = run =<< customExecParser p opts

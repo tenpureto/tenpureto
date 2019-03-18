@@ -17,6 +17,7 @@ import           Data.Text.Prettyprint.Doc
 import           Data.Text.Prettyprint.Doc.Render.Terminal
 import           System.IO
 import qualified System.Console.Terminal.Size  as TS
+import           Path
 
 type LogMessage = L.WithSeverity (Doc ())
 type MonadLog = L.MonadLog LogMessage
@@ -36,3 +37,6 @@ printToTerminal width message =
         annotated   = annotate style reannotated
         sdoc        = layoutSmart layoutOptions annotated
     in  renderIO stdout sdoc
+
+instance Pretty (Path a t) where
+    pretty = pretty . toFilePath

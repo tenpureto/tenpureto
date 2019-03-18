@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE LambdaCase #-}
 
 module UI
     ( module UI
@@ -29,6 +28,8 @@ import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Console
+import Path
+import Path.IO
 
 data UIException = UnattendedNotPossibleException | InvalidInputException | InterruptedInputException deriving (Exception)
 
@@ -72,8 +73,11 @@ required input = input >>= maybe (required input) return
 inputTemplate :: (MonadIO m, MonadMask m, MonadConsole m) => m Text
 inputTemplate = ask "Template URL " Nothing
 
-inputTarget :: (MonadIO m, MonadMask m, MonadConsole m) => m FilePath
-inputTarget = T.unpack <$> ask "Target directory  " Nothing
+inputTarget :: (MonadIO m, MonadMask m, MonadConsole m) => m (Path Abs Dir)
+inputTarget = T.unpack <$> ask "Target directory  " Nothing >>= resolveTargetDir
+
+resolveTargetDir :: (MonadIO m, MonadCatch m) => FilePath -> m (Path Abs Dir)
+resolveTargetDir path = catch (resolveDir' path) (\e -> let _ = (e :: PathException) in parseAbsDir path)
 
 inputTemplateConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)
@@ -182,7 +186,7 @@ inputProjectConfiguration templateInformation providedConfiguration currentConfi
 
 data ConflictResolutionStrategy = AlreadyResolved | MergeTool
 
-inputResolutionStrategy :: MonadConsole m => FilePath -> [Text] -> m ConflictResolutionStrategy
+inputResolutionStrategy :: MonadConsole m => Path Abs Dir -> [Path Rel File] -> m ConflictResolutionStrategy
 inputResolutionStrategy repo conflicts = let
     mapAnswer x = case x of
         "y" -> Right x
@@ -190,7 +194,7 @@ inputResolutionStrategy repo conflicts = let
         _ -> Left "Please answer \"y\" or \"n\"."
     in do
         sayLn "The following files have merge conflicts:"
-        traverse_ (\c -> sayLn ("  " <> text c)) conflicts
-        sayLn $ text $ "Repository path: " <> T.pack repo
+        traverse_ (\c -> sayLn ("  " <> (text . T.pack . toFilePath) c)) conflicts
+        sayLn $ text $ "Repository path: " <> T.pack (toFilePath repo)
         result <- askUntil "Run \"git mergetool\" (y/n)? " (Just "y") mapAnswer
         return $ bool AlreadyResolved MergeTool (result == "y")

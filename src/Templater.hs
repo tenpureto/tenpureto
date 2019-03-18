@@ -28,25 +28,25 @@ data TemplaterException = TemplaterException
 copy
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => TemplaterSettings
-    -> FilePath
-    -> FilePath
+    -> Path Abs Dir
+    -> Path Abs Dir
     -> m ()
-copy settings src dst = do
-    srcDir <- parseAbsDir src
-    dstDir <- parseAbsDir dst
-    let
-        copyFile file = let srcFile = srcDir </> file
-                            dstFile = dstDir </> file in do
-            logDebug $ "Copying" <+> pretty srcFile <+> "to" <+> pretty dstFile
-            content <- liftIO $ BS.readFile (toFilePath srcFile)
-            ensureDir (parent dstFile)
-            liftIO $ BS.writeFile (toFilePath dstFile) content
+copy settings src dst =
+    let copyFile file =
+                let srcFile = src </> file
+                    dstFile = dst </> file
+                in  do
+                        logDebug
+                            $   "Copying"
+                            <+> pretty srcFile
+                            <+> "to"
+                            <+> pretty dstFile
+                        content <- liftIO $ BS.readFile (toFilePath srcFile)
+                        ensureDir (parent dstFile)
+                        liftIO $ BS.writeFile (toFilePath dstFile) content
         dirWalker dir subdirs files = do
             traverse_ (\f -> fileWalker (dir </> f)) files
             return $ WalkExclude (exclude subdirs)
         fileWalker = copyFile
         exclude    = filter ((==) ".git/" . fromRelDir)
-        in walkDirRel dirWalker srcDir
-
-instance Pretty (Path a t) where
-    pretty = pretty . toFilePath
+    in  walkDirRel dirWalker src
