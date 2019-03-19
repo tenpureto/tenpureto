@@ -4,12 +4,9 @@ module Main where
 
 import           Options.Applicative
 import           Data.Semigroup                 ( (<>) )
-import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
-import           Data.Text.Prettyprint.Doc
 import           Console
 import qualified Console.Byline                as B
 import           Git
@@ -17,15 +14,14 @@ import qualified Git.Cli                       as GC
 import           Data
 import           Logging
 import           Tenpureto
-import           Path
-import           Path.IO
 import           UI                             ( resolveTargetDir )
 
 newtype AppM a = AppM { unAppM :: LoggingT IO a }
     deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadLog)
 
 runAppM :: Bool -> AppM a -> IO a
-runAppM debug app = initPrintToTerminal debug >>= runLoggingT (unAppM app)
+runAppM withDebug app =
+    initPrintToTerminal withDebug >>= runLoggingT (unAppM app)
 
 instance MonadGit AppM where
     withClonedRepository = GC.withClonedRepository
