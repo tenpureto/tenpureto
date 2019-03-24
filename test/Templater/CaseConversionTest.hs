@@ -33,22 +33,21 @@ test_detectValueStyle = concatMap tests cases  where
     cases =
         [ ("aaaBbbCcc"    , CamelCase , NoSeparator)
         , ("AaaBbbCcc"    , PascalCase, NoSeparator)
-        , ("aaa-bbb-ccc"  , LowerCase , DashSeparator)
-        , ("AAA_BBB_CCC"  , UpperCase , UnderscoreSeparator)
+        , ("aaa-bbb-ccc"  , LowerCase , SingleSeparator '-')
+        , ("AAA_BBB_CCC"  , UpperCase , SingleSeparator '_')
         , ("aaabbbccc"    , LowerCase , NoSeparator)
         , ("Aaabbbccc"    , PascalCase, NoSeparator)
-        , ("Aaa bbb ccc"  , MixedCase , SpaceSeparator)
-        , ("aaa/bbb/ccc"  , LowerCase , SlashSeparator)
-        , ("aaa\\bbb\\ccc", LowerCase , BackslashSeparator)
+        , ("Aaa bbb ccc"  , MixedCase , SingleSeparator ' ')
+        , ("aaa/bbb/ccc"  , LowerCase , SingleSeparator '/')
+        , ("aaa\\bbb\\ccc", LowerCase , SingleSeparator '\\')
+        , ("aaa.bbb.ccc"  , LowerCase , SingleSeparator '.')
         ]
 
 newtype TestChar = TestChar { testChar :: Char }
 
 instance Monad m => Serial m TestChar where
-    series =
-        generate
-            (const $ map TestChar ['a', 'A', '1', ' ', '-', '_', '/', '\\', '!']
-            )
+    series = generate
+        (const $ map TestChar (['a', 'A', '1', '!'] ++ validSeparators))
 
 newtype TestText = TestText { testChars :: [TestChar] } deriving (Generic)
 

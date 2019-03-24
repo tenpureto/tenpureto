@@ -13,12 +13,21 @@ import qualified Data.Text.ICU                 as ICU
 data WordCase = LowerCase | UpperCase | CamelCase | PascalCase | MixedCase
     deriving (Show, Eq)
 
-data WordSeparator =  SpaceSeparator | UnderscoreSeparator | DashSeparator | SlashSeparator | BackslashSeparator | NoSeparator
+data WordSeparator =  NoSeparator | SingleSeparator Char
     deriving (Show, Eq)
 
 data TemplateValue = MultiWordTemplateValue WordCase WordSeparator [Text]
                    | LiteralTemplateValue Text
     deriving (Show, Eq)
+
+allWordCases :: [WordCase]
+allWordCases = [LowerCase, UpperCase, CamelCase, PascalCase, MixedCase]
+
+validSeparators :: [Char]
+validSeparators = [' ', '-', '_', '/', '\\', '.']
+
+allWordSeparators :: [WordSeparator]
+allWordSeparators = NoSeparator : [ SingleSeparator c | c <- validSeparators ]
 
 wordCase :: TemplateValue -> Maybe WordCase
 wordCase (MultiWordTemplateValue wc _ _) = Just wc
@@ -45,11 +54,7 @@ wordCaseApply MixedCase  = repeat id
 
 separator :: WordSeparator -> Text
 separator NoSeparator         = ""
-separator SpaceSeparator      = " "
-separator UnderscoreSeparator = "_"
-separator DashSeparator       = "-"
-separator SlashSeparator      = "/"
-separator BackslashSeparator  = "\\"
+separator (SingleSeparator c) = T.singleton c
 
 capitalLetterPattern :: Regex
 capitalLetterPattern = ICU.regex [] ".(?=[:upper:])|$"
@@ -59,11 +64,7 @@ splitOnR regex text = ICU.findAll regex text
     <&> \m -> ICU.span m <> fromMaybe T.empty (ICU.group 0 m)
 
 splitWords :: WordCase -> WordSeparator -> Text -> [Text]
-splitWords _          SpaceSeparator      = T.splitOn " "
-splitWords _          UnderscoreSeparator = T.splitOn "_"
-splitWords _          DashSeparator       = T.splitOn "-"
-splitWords _          SlashSeparator      = T.splitOn "/"
-splitWords _          BackslashSeparator  = T.splitOn "\\"
+splitWords _          (SingleSeparator c) = T.splitOn (T.singleton c)
 splitWords CamelCase  NoSeparator         = splitOnR capitalLetterPattern
 splitWords PascalCase NoSeparator         = splitOnR capitalLetterPattern
 splitWords _          NoSeparator         = pure
@@ -71,15 +72,8 @@ splitWords _          NoSeparator         = pure
 multiWordPatterns :: [(Regex, Text -> TemplateValue)]
 multiWordPatterns =
     [ (build c s, MultiWordTemplateValue c s . splitWords c s)
-    | c <- [LowerCase, UpperCase, CamelCase, PascalCase, MixedCase]
-    , s <-
-        [ SpaceSeparator
-        , UnderscoreSeparator
-        , DashSeparator
-        , SlashSeparator
-        , BackslashSeparator
-        , NoSeparator
-        ]
+    | c <- allWordCases
+    , s <- allWordSeparators
     ]  where
     build c s =
         let (fw, ow) = wordCasePatterns c
