@@ -9,6 +9,7 @@ import qualified Data.ByteString               as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Set                       ( Set )
+import qualified Data.Set                      as Set
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Maybe
@@ -36,7 +37,13 @@ data TemplaterException = TemplaterException
     deriving (Show, Exception)
 
 expandReplacement :: (Text, Text) -> [(Text, Text)]
-expandReplacement (a, b) = [(a, b)]
+expandReplacement (a, b) =
+    [ (templateValueText av, templateValueText bv)
+    | av <- variations a
+    , bv <- variations b
+    , sameStyle av bv
+    ]
+    where variations text = Set.toList . Set.fromList $ concatMap styleVariations (textToTemplateValues text)
 
 expandReplacements :: Map Text Text -> [(Text, Text)]
 expandReplacements = concatMap expandReplacement . Map.toList

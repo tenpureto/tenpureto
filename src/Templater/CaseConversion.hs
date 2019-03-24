@@ -13,15 +13,15 @@ import qualified Data.Text.ICU                 as ICU
 import           GHC.Generics
 
 data WordCase = LowerCase | UpperCase | TitleCase | MixedCase
-    deriving (Show, Eq, Generic)
+    deriving (Show, Eq, Ord, Generic)
 
 data WordSeparator =  NoSeparator | SingleSeparator Char
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 data TemplateValue = MultiWordTemplateValue WordCase WordCase WordSeparator [Text]
                    | SingleWordTemplateValue WordCase Text
                    | LiteralTemplateValue Text
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 allWordCases :: [WordCase]
 allWordCases = [LowerCase, UpperCase, TitleCase, MixedCase]
@@ -43,6 +43,10 @@ wordCaseApply LowerCase = T.toLower
 wordCaseApply UpperCase = T.toUpper
 wordCaseApply TitleCase = T.toTitle
 wordCaseApply MixedCase = id
+
+wordCasesApply :: WordCase -> WordCase -> [Text] -> [Text]
+wordCasesApply fwc owc =
+    zipWith ($) (wordCaseApply fwc : repeat (wordCaseApply owc))
 
 separator :: WordSeparator -> Text
 separator NoSeparator         = ""
@@ -98,5 +102,30 @@ templateValueText :: TemplateValue -> Text
 templateValueText (LiteralTemplateValue t     ) = t
 templateValueText (SingleWordTemplateValue c t) = wordCaseApply c t
 templateValueText (MultiWordTemplateValue fwc owc s tt) =
-    let wc = wordCaseApply fwc : repeat (wordCaseApply owc)
-    in  T.intercalate (separator s) (zipWith ($) wc tt)
+    T.intercalate (separator s) (wordCasesApply fwc owc tt)
+
+sameStyle :: TemplateValue -> TemplateValue -> Bool
+sameStyle (MultiWordTemplateValue fwc owc s _) (MultiWordTemplateValue fwc' owc' s' _)
+    = fwc == fwc' && owc == owc' && s == s'
+sameStyle (SingleWordTemplateValue c _) (SingleWordTemplateValue c' _) =
+    c == c'
+sameStyle (LiteralTemplateValue _) (LiteralTemplateValue _) = True
+sameStyle _                        _                        = False
+
+wordCaseVariations :: WordCase -> [WordCase]
+wordCaseVariations MixedCase = [LowerCase, UpperCase, TitleCase, MixedCase]
+wordCaseVariations _         = [LowerCase, UpperCase, TitleCase]
+
+styleVariations :: TemplateValue -> [TemplateValue]
+styleVariations (MultiWordTemplateValue fwc owc _ tt) =
+    [ MultiWordTemplateValue fwc' owc' s' (wordCasesApply fwc' owc' tt)
+    | fwc' <- wordCaseVariations fwc
+    , owc' <- wordCaseVariations owc
+    , s'   <- allWordSeparators
+    ]
+styleVariations (SingleWordTemplateValue c t) =
+    LiteralTemplateValue t
+        : [ SingleWordTemplateValue c' (wordCaseApply c' t)
+          | c' <- wordCaseVariations c
+          ]
+styleVariations (LiteralTemplateValue t) = [LiteralTemplateValue t]
