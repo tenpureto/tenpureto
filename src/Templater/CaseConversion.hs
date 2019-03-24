@@ -12,18 +12,19 @@ import           Data.Text.ICU                  ( Regex )
 import qualified Data.Text.ICU                 as ICU
 import           GHC.Generics
 
-data WordCase = LowerCase | UpperCase | CamelCase | PascalCase | MixedCase
+data WordCase = LowerCase | UpperCase | TitleCase | MixedCase
     deriving (Show, Eq, Generic)
 
 data WordSeparator =  NoSeparator | SingleSeparator Char
     deriving (Show, Eq)
 
-data TemplateValue = MultiWordTemplateValue WordCase WordSeparator [Text]
+data TemplateValue = MultiWordTemplateValue WordCase WordCase WordSeparator [Text]
+                   | SingleWordTemplateValue WordCase Text
                    | LiteralTemplateValue Text
     deriving (Show, Eq)
 
 allWordCases :: [WordCase]
-allWordCases = [LowerCase, UpperCase, CamelCase, PascalCase, MixedCase]
+allWordCases = [LowerCase, UpperCase, TitleCase, MixedCase]
 
 validSeparators :: [Char]
 validSeparators = [' ', '-', '_', '/', '\\', '.']
@@ -31,28 +32,17 @@ validSeparators = [' ', '-', '_', '/', '\\', '.']
 allWordSeparators :: [WordSeparator]
 allWordSeparators = NoSeparator : [ SingleSeparator c | c <- validSeparators ]
 
-wordCase :: TemplateValue -> Maybe WordCase
-wordCase (MultiWordTemplateValue wc _ _) = Just wc
-wordCase (LiteralTemplateValue _       ) = Nothing
+wordCasePattern :: WordCase -> Text
+wordCasePattern LowerCase = "[:lower:]+"
+wordCasePattern UpperCase = "[:upper:]+"
+wordCasePattern TitleCase = "[:upper:][:lower:]*"
+wordCasePattern MixedCase = "(?:[:upper:]|[:lower:])+"
 
-wordSeparator :: TemplateValue -> Maybe WordSeparator
-wordSeparator (MultiWordTemplateValue _ ws _) = Just ws
-wordSeparator (LiteralTemplateValue _       ) = Nothing
-
-wordCasePatterns :: WordCase -> (Text, Text)
-wordCasePatterns LowerCase  = ("[:lower:]+", "[:lower:]+")
-wordCasePatterns UpperCase  = ("[:upper:]+", "[:upper:]+")
-wordCasePatterns CamelCase  = ("[:lower:]+", "[:upper:][:lower:]*")
-wordCasePatterns PascalCase = ("[:upper:][:lower:]*", "[:upper:][:lower:]*")
-wordCasePatterns MixedCase =
-    ("(?:[:upper:]|[:lower:])+", "(?:[:upper:]|[:lower:])+")
-
-wordCaseApply :: WordCase -> [Text -> Text]
-wordCaseApply LowerCase  = repeat T.toLower
-wordCaseApply UpperCase  = repeat T.toUpper
-wordCaseApply CamelCase  = T.toLower : repeat T.toTitle
-wordCaseApply PascalCase = repeat T.toTitle
-wordCaseApply MixedCase  = repeat id
+wordCaseApply :: WordCase -> Text -> Text
+wordCaseApply LowerCase = T.toLower
+wordCaseApply UpperCase = T.toUpper
+wordCaseApply TitleCase = T.toTitle
+wordCaseApply MixedCase = id
 
 separator :: WordSeparator -> Text
 separator NoSeparator         = ""
@@ -65,29 +55,48 @@ splitOnR :: ICU.Regex -> Text -> [Text]
 splitOnR regex text = ICU.findAll regex text
     <&> \m -> ICU.span m <> fromMaybe T.empty (ICU.group 0 m)
 
-splitWords :: WordCase -> WordSeparator -> Text -> [Text]
-splitWords _          (SingleSeparator c) = T.splitOn (T.singleton c)
-splitWords CamelCase  NoSeparator         = splitOnR capitalLetterPattern
-splitWords PascalCase NoSeparator         = splitOnR capitalLetterPattern
-splitWords _          NoSeparator         = pure
+splitWords :: WordCase -> WordCase -> WordSeparator -> Maybe (Text -> [Text])
+splitWords _ _ (SingleSeparator c) = Just $ T.splitOn (T.singleton c)
+splitWords LowerCase TitleCase NoSeparator =
+    Just $ splitOnR capitalLetterPattern
+splitWords TitleCase TitleCase NoSeparator =
+    Just $ splitOnR capitalLetterPattern
+splitWords _ _ NoSeparator = Nothing
 
 multiWordPatterns :: [(Regex, Text -> TemplateValue)]
 multiWordPatterns =
-    [ (build c s, MultiWordTemplateValue c s . splitWords c s)
-    | c <- allWordCases
-    , s <- allWordSeparators
+    [ (build fwc owc s, MultiWordTemplateValue fwc owc s . spl)
+    | fwc <- allWordCases
+    , owc <- allWordCases
+    , s   <- allWordSeparators
+    , spl <- maybeToList $ splitWords fwc owc s
     ]  where
-    build c s =
-        let (fw, ow) = wordCasePatterns c
-            ws       = separator s
-        in  ICU.regex [] ("^" <> fw <> "(?:\\Q" <> ws <> "\\E" <> ow <> ")*$")
+    build fwc owc s = ICU.regex
+        []
+        (  "^"
+        <> wordCasePattern fwc
+        <> "(?:\\Q"
+        <> separator s
+        <> "\\E"
+        <> wordCasePattern owc
+        <> ")+$"
+        )
+
+singleWordPatterns :: [(Regex, Text -> TemplateValue)]
+singleWordPatterns =
+    [ (build c, SingleWordTemplateValue c) | c <- allWordCases ]
+    where build c = ICU.regex [] ("^" <> wordCasePattern c <> "$")
 
 textToTemplateValues :: Text -> [TemplateValue]
 textToTemplateValues text =
-    LiteralTemplateValue text : mapMaybe (uncurry f) multiWordPatterns
+    LiteralTemplateValue text
+        :  mapMaybe (uncurry f) singleWordPatterns
+        ++ mapMaybe (uncurry f) multiWordPatterns
     where f p g = ICU.find p text $> g text
 
 templateValueText :: TemplateValue -> Text
-templateValueText (LiteralTemplateValue t) = t
-templateValueText (MultiWordTemplateValue c s tt) =
-    T.intercalate (separator s) (zipWith ($) (wordCaseApply c) tt)
+templateValueText (LiteralTemplateValue t     ) = t
+templateValueText (SingleWordTemplateValue c t) = wordCaseApply c t
+templateValueText (MultiWordTemplateValue fwc owc s tt) =
+    let wc = wordCaseApply fwc : repeat (wordCaseApply owc)
+    in  T.intercalate (separator s) (zipWith ($) wc tt)
