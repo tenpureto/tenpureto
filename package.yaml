@@ -11,6 +11,7 @@ dependencies:
 - bytestring
 - either
 - text
+- text-icu
 - path
 - path-io
 - containers
@@ -49,7 +50,7 @@ executables:
 
 tests:
   tenpureto-test:
-    main:                Spec.hs
+    main:                Driver.hs
     source-dirs:         test
     ghc-options:
     - -Wall
@@ -62,3 +63,8 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - tenpureto
+    - tasty
+    - tasty-discover
+    - tasty-smallcheck
+    - tasty-hunit
+    - smallcheck
