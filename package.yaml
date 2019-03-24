@@ -12,6 +12,7 @@ dependencies:
 - either
 - text
 - text-icu
+- text-regex-replace
 - path
 - path-io
 - containers
