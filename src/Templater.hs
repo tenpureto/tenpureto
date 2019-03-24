@@ -4,9 +4,10 @@
 
 module Templater where
 
+import           Data.ByteString                ( ByteString )
+import qualified Data.ByteString               as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
-import qualified Data.ByteString.Lazy          as Lazy
 import           Data.Set                       ( Set )
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
@@ -18,6 +19,7 @@ import           Logging
 import           Path
 import           Path.IO
 import qualified Data.Text.ICU                 as ICU
+import           Data.Text.Encoding
 import           Data.Text.ICU.Replace
 import           Templater.CaseConversion
 
@@ -55,6 +57,22 @@ replaceVariables rules = replaceAll regex replace
         where matchText = fold $ ICU.group 0 match
     replace = rtfn findReplacement
 
+data FileContent = BinaryContent ByteString
+                 | TextContent Text (Text -> ByteString)
+
+mapContent :: (Text -> Text) -> FileContent -> FileContent
+mapContent f (TextContent t enc) = TextContent (f t) enc
+mapContent f (BinaryContent b) = BinaryContent b
+
+detectEncoding :: ByteString -> FileContent
+detectEncoding bs = case decodeUtf8' bs of
+    Right t -> TextContent t encodeUtf8
+    Left  _ -> BinaryContent bs
+
+contentToByteString :: FileContent -> ByteString
+contentToByteString (TextContent t enc)  = enc t
+contentToByteString (BinaryContent bs) = bs
+
 translateFile
     :: MonadThrow m
     => CompiledTemplaterSettings
@@ -71,9 +89,12 @@ copyAbsFile
     -> m ()
 copyAbsFile settings src dst = do
     logDebug $ "Copying" <+> pretty src <+> "to" <+> pretty dst
-    content <- liftIO $ Lazy.readFile (toFilePath src)
-    ensureDir (parent dst)
-    liftIO $ Lazy.writeFile (toFilePath dst) content
+    byteContent <- liftIO $ BS.readFile (toFilePath src)
+    let content = detectEncoding byteContent
+        translatedContent = mapContent (translate settings) content
+        translated = contentToByteString translatedContent in do
+        ensureDir (parent dst)
+        liftIO $ BS.writeFile (toFilePath dst) translated
 
 copyRelFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
