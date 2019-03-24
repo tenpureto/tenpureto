@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Templater.CaseConversion where
 
@@ -9,9 +10,10 @@ import           Data.Maybe
 import           Data.Functor
 import           Data.Text.ICU                  ( Regex )
 import qualified Data.Text.ICU                 as ICU
+import           GHC.Generics
 
 data WordCase = LowerCase | UpperCase | CamelCase | PascalCase | MixedCase
-    deriving (Show, Eq)
+    deriving (Show, Eq, Generic)
 
 data WordSeparator =  NoSeparator | SingleSeparator Char
     deriving (Show, Eq)
@@ -43,7 +45,7 @@ wordCasePatterns UpperCase  = ("[:upper:]+", "[:upper:]+")
 wordCasePatterns CamelCase  = ("[:lower:]+", "[:upper:][:lower:]*")
 wordCasePatterns PascalCase = ("[:upper:][:lower:]*", "[:upper:][:lower:]*")
 wordCasePatterns MixedCase =
-    ("(?:[:upper:]|[:lower:])*", "(?:[:upper:]|[:lower:])*")
+    ("(?:[:upper:]|[:lower:])+", "(?:[:upper:]|[:lower:])+")
 
 wordCaseApply :: WordCase -> [Text -> Text]
 wordCaseApply LowerCase  = repeat T.toLower

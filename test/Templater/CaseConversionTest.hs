@@ -10,8 +10,10 @@ import           Test.Tasty.HUnit
 import           Test.SmallCheck
 import           Test.SmallCheck.Series
 
+import           Data.Maybe
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
+import qualified Data.Text.ICU                 as ICU
 import           Templater.CaseConversion
 import           GHC.Generics
 
@@ -19,6 +21,13 @@ assertElem :: (Show a, Eq a) => a -> [a] -> Assertion
 assertElem a b = assertBool
     ("expected: " ++ show a ++ " to be an element of: " ++ show b)
     (a `elem` b)
+
+scprop_wordCasePatternsNotEmpty :: WordCase -> Bool
+scprop_wordCasePatternsNotEmpty wc =
+    let (fw, ow) = wordCasePatterns wc
+        fwp      = ICU.regex [] fw
+        owp      = ICU.regex [] ow
+    in  isNothing (ICU.find fwp "") && isNothing (ICU.find owp "")
 
 test_detectValueStyle :: [TestTree]
 test_detectValueStyle = concatMap tests cases  where
@@ -43,18 +52,6 @@ test_detectValueStyle = concatMap tests cases  where
         , ("aaa.bbb.ccc"  , LowerCase , SingleSeparator '.')
         ]
 
-newtype TestChar = TestChar { testChar :: Char }
-
-instance Monad m => Serial m TestChar where
-    series = generate
-        (const $ map TestChar (['a', 'A', '1', '!'] ++ validSeparators))
-
-newtype TestText = TestText { testChars :: [TestChar] } deriving (Generic)
-
-instance Monad m => Serial m TestText
-instance Show TestText where
-    show testText = "\"" ++ map testChar (testChars testText) ++ "\""
-
 scprop_templateValueTextReversible :: TestText -> Either Reason Reason
 scprop_templateValueTextReversible testText =
     let text   = T.pack $ show testText
@@ -72,3 +69,17 @@ scprop_templateValueTextReversible testText =
                             )
         results = mapM_ reversible values
     in  results >> return (T.unpack text ++ " is reversible")
+
+instance Monad m => Serial m WordCase
+
+newtype TestChar = TestChar { testChar :: Char }
+
+instance Monad m => Serial m TestChar where
+    series = generate
+        (const $ map TestChar (['a', 'A', '1', '!'] ++ validSeparators))
+
+newtype TestText = TestText { testChars :: [TestChar] } deriving (Generic)
+
+instance Monad m => Serial m TestText
+instance Show TestText where
+    show testText = "\"" ++ map testChar (testChars testText) ++ "\""
