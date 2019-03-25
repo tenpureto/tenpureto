@@ -8,7 +8,6 @@ module Logging
     )
 where
 
-import           Data.Maybe
 import           Control.Monad.Log       hiding ( MonadLog
                                                 , LoggingT
                                                 )

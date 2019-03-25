@@ -25,7 +25,7 @@ import           Data.Text.ICU.Replace
 import           Templater.CaseConversion
 
 data TemplaterSettings = TemplaterSettings
-    { templaterVariables :: Map Text Text
+    { templaterVariables :: [(Text, Text)]
     , templaterExcludes :: Set Text
     }
 
@@ -45,14 +45,15 @@ expandReplacement (a, b) =
     ]
     where variations text = Set.toList . Set.fromList $ concatMap styleVariations (textToTemplateValues text)
 
-expandReplacements :: Map Text Text -> [(Text, Text)]
-expandReplacements = concatMap expandReplacement . Map.toList
+expandReplacements :: [(Text, Text)] -> [(Text, Text)]
+expandReplacements = concatMap expandReplacement
 
-compileSettings :: TemplaterSettings -> CompiledTemplaterSettings
+compileSettings :: MonadLog m => TemplaterSettings -> m CompiledTemplaterSettings
 compileSettings TemplaterSettings { templaterVariables = tv, templaterExcludes = _ }
-    = CompiledTemplaterSettings
-        { translate = replaceVariables (expandReplacements tv)
-        }
+    = let replacements = expandReplacements tv in do
+        logDebug $ "Veriables:" <+> align (sep [ pretty f <+> "->" <+> pretty t | (f, t) <- tv ])
+        logDebug $ "Replacements:" <+> align (sep [ pretty f <+> "->" <+> pretty t | (f, t) <- replacements ])
+        return CompiledTemplaterSettings { translate = replaceVariables replacements }
 
 replaceVariables :: [(Text, Text)] -> Text -> Text
 replaceVariables rules = replaceAll regex replace
@@ -120,11 +121,12 @@ copy
     -> Path Abs Dir
     -> Path Abs Dir
     -> m ()
-copy settings src dst =
-    let compiledSettings = compileSettings settings
+copy settings src dst = do
+    compiledSettings <- compileSettings settings
+    let
         dirWalker dir subdirs files = do
             traverse_ (\f -> fileWalker (dir </> f)) files
             return $ WalkExclude (exclude subdirs)
         fileWalker = copyRelFile compiledSettings src dst
         exclude    = filter ((==) ".git/" . fromRelDir)
-    in  walkDirRel dirWalker src
+        in walkDirRel dirWalker src

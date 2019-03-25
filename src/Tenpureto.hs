@@ -12,6 +12,7 @@ import qualified Data.ByteString                     as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Set                      as Set
+import qualified Data.Map                      as Map
 import           Data.Foldable
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
@@ -48,8 +49,12 @@ makeFinalProjectConfiguration
 makeFinalProjectConfiguration True  = unattendedProjectConfiguration
 makeFinalProjectConfiguration False = inputProjectConfiguration
 
-buildTemplaterSettings :: TemplateYaml -> TemplaterSettings
-buildTemplaterSettings TemplateYaml { variables = v } = TemplaterSettings { templaterVariables = v, templaterExcludes = Set.empty }
+buildTemplaterSettings :: TemplateYaml -> FinalProjectConfiguration -> TemplaterSettings
+buildTemplaterSettings TemplateYaml {}
+                       FinalProjectConfiguration { variableValues = values } = TemplaterSettings
+        { templaterVariables = Map.toList values
+        , templaterExcludes = Set.empty
+        }
 
 createProject
     :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
@@ -71,7 +76,7 @@ createProject projectConfiguration unattended = do
                   Nothing
               mergedTemplateYaml <- prepareTemplate repository templateInformation finalProjectConfiguration
               let dst = targetDirectory finalTemplateConfiguration
-                  templaterSettings = buildTemplaterSettings mergedTemplateYaml in do
+                  templaterSettings = buildTemplaterSettings mergedTemplateYaml finalProjectConfiguration in do
                 createDir dst
                 project <- initRepository dst
                 copy templaterSettings (repositoryPath repository) (repositoryPath project)
