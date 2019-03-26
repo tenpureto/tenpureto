@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 module Tenpureto where
 
@@ -28,8 +29,8 @@ import           Templater
 import           Path
 import           Path.IO
 
-templateYamlFile :: MonadThrow m => m (Path Rel File)
-templateYamlFile = parseRelFile ".template.yaml"
+templateYamlFile :: Path Rel File
+templateYamlFile = [relfile|.template.yaml|]
 
 makeFinalTemplateConfiguration
     :: (MonadThrow m, MonadMask m, MonadIO m, MonadConsole m)
@@ -100,11 +101,10 @@ loadBranchConfiguration
     -> Text
     -> m (Maybe TemplateBranchInformation)
 loadBranchConfiguration repo branch = runMaybeT $ do
-    file <- templateYamlFile
     descriptor <- MaybeT $ getBranchFile
         repo
         (T.pack "remotes/origin/" <> branch)
-        file
+        templateYamlFile
     templateYaml <- MaybeT $ return $ parseTemplateYaml descriptor
     let fb = features templateYaml in return $ TemplateBranchInformation
         { branchName       = branch
@@ -131,12 +131,11 @@ prepareTemplate
     -> TemplateInformation
     -> FinalProjectConfiguration
     -> m TemplateYaml
-prepareTemplate repository template configuration = do
-    templateYamlRelFile <- templateYamlFile
+prepareTemplate repository template configuration =
     let branch = "template"
         resolve descriptor conflicts =
-            if templateYamlRelFile `elem` conflicts
-                then addFile repository templateYamlRelFile (Y.encode descriptor) >> resolve descriptor (delete templateYamlRelFile conflicts)
+            if templateYamlFile `elem` conflicts
+                then addFile repository templateYamlFile (Y.encode descriptor) >> resolve descriptor (delete templateYamlFile conflicts)
                 else inputResolutionStrategy (repositoryPath repository) conflicts >>= \case
                     AlreadyResolved -> return ()
                     MergeTool -> runMergeTool repository >> sayLn "Successfully merged."
