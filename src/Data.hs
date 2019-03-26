@@ -5,6 +5,7 @@ module Data where
 import           Data.Text                      ( Text )
 import           Data.Set                       ( Set )
 import           Data.Map                       ( Map )
+import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
 import           Data.Yaml                      ( FromJSON(..)
                                                 , ToJSON(..)
                                                 , (.:)
@@ -39,7 +40,7 @@ data TemplateBranchInformation = TemplateBranchInformation
         { branchName :: Text
         , isBaseBranch :: Bool
         , requiredBranches :: Set Text
-        , branchVariables :: Map Text Text
+        , branchVariables :: InsOrdHashMap Text Text
         , templateYaml :: TemplateYaml
         }
         deriving (Show)
@@ -50,7 +51,7 @@ newtype TemplateInformation = TemplateInformation
         deriving (Show)
 
 data TemplateYaml = TemplateYaml
-        { variables :: Map Text Text
+        { variables :: InsOrdHashMap Text Text
         , features :: Set Text
         }
         deriving (Show)

@@ -16,6 +16,7 @@ dependencies:
 - path
 - path-io
 - containers
+- insert-ordered-containers
 - exceptions
 - mtl
 - transformers

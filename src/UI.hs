@@ -19,6 +19,8 @@ import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
+import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
 import           Data.Functor
 import           Data.Monoid
@@ -158,9 +160,9 @@ inputVariable (desc, name) = (name, ) <$> ask (text $ desc <> " ") (Just name)
 
 inputVariables
     :: (MonadIO m, MonadMask m, MonadConsole m)
-    => Map Text Text
+    => InsOrdHashMap Text Text
     -> m (Map Text Text)
-inputVariables v = Map.fromList <$> traverse inputVariable (Map.assocs v)
+inputVariables v = Map.fromList <$> traverse inputVariable (InsOrdHashMap.toList v)
 
 inputProjectConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)
