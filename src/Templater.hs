@@ -114,6 +114,7 @@ copyRelFile
 copyRelFile settings src dst srcFile = do
     dstFile <- translateFile settings srcFile
     copyAbsFile settings (src </> srcFile) (dst </> dstFile)
+    copyPermissions (src </> srcFile) (dst </> dstFile)
 
 copy
     :: (MonadIO m, MonadThrow m, MonadLog m)
