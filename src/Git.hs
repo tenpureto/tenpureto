@@ -15,4 +15,5 @@ class Monad m => MonadGit m where
     mergeBranch :: GitRepository -> Text -> ([Path Rel File] -> m ()) -> m ()
     runMergeTool :: GitRepository -> m ()
     getBranchFile :: GitRepository -> Text -> Path Rel File -> m (Maybe ByteString)
-    addFile :: GitRepository -> Path Rel File -> ByteString -> m ()
+    writeAddFile :: GitRepository -> Path Rel File -> ByteString -> m ()
+    addFiles :: GitRepository -> [Path Rel File] -> m ()

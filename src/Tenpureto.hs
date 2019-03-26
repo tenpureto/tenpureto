@@ -80,7 +80,8 @@ createProject projectConfiguration unattended = do
                   templaterSettings = buildTemplaterSettings mergedTemplateYaml finalProjectConfiguration in do
                 createDir dst
                 project <- initRepository dst
-                copy templaterSettings (repositoryPath repository) (repositoryPath project)
+                files <- copy templaterSettings (repositoryPath repository) (repositoryPath project)
+                addFiles project files
 
 updateProject
     :: (MonadIO m, MonadMask m, MonadGit m)
@@ -135,7 +136,7 @@ prepareTemplate repository template configuration =
     let branch = "template"
         resolve descriptor conflicts =
             if templateYamlFile `elem` conflicts
-                then addFile repository templateYamlFile (Y.encode descriptor) >> resolve descriptor (delete templateYamlFile conflicts)
+                then writeAddFile repository templateYamlFile (Y.encode descriptor) >> resolve descriptor (delete templateYamlFile conflicts)
                 else inputResolutionStrategy (repositoryPath repository) conflicts >>= \case
                     AlreadyResolved -> return ()
                     MergeTool -> runMergeTool repository >> sayLn "Successfully merged."

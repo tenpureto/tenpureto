@@ -4,7 +4,9 @@
 
 module Git.Cli where
 
-import           Git
+import           Git                            ( RepositoryUrl(..)
+                                                , GitRepository(..)
+                                                )
 import           Logging
 import           Data.ByteString                ( ByteString )
 import qualified Data.ByteString               as BS
@@ -160,17 +162,26 @@ mergeBranch repo branch resolve = do
         ExitFailure code -> listConflicts repo >>= resolve
     gitRepoCmd repo ["commit", "--message", "Merge " <> branch] >>= unitOrThrow
 
-addFile
+writeAddFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
     -> Path Rel File
     -> ByteString
     -> m ()
-addFile repo file content = do
+writeAddFile repo file content = do
     logInfo $ "Writing to " <+> pretty file
     logDebug $ prefixed "file> " (E.decodeUtf8 content)
     liftIO $ (BS.writeFile . toFilePath) (repositoryPath repo </> file) content
-    gitRepoCmd repo ["add", "--", T.pack (toFilePath file)] >>= unitOrThrow
+    addFiles repo [file]
+
+addFiles
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> [Path Rel File]
+    -> m ()
+addFiles repo files =
+    gitRepoCmd repo (["add", "-f", "--"] ++ map (T.pack . toFilePath) files)
+        >>= unitOrThrow
 
 runMergeTool :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> m ()
 runMergeTool repo = gitRepoCmd repo ["mergetool"] >>= unitOrThrow

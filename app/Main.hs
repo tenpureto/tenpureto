@@ -31,7 +31,8 @@ instance MonadGit AppM where
     mergeBranch          = GC.mergeBranch
     runMergeTool         = GC.runMergeTool
     getBranchFile        = GC.getBranchFile
-    addFile              = GC.addFile
+    writeAddFile         = GC.writeAddFile
+    addFiles             = GC.addFiles
 
 instance MonadConsole AppM where
     ask = B.ask

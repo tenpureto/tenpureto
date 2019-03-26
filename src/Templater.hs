@@ -121,7 +121,7 @@ copy
     => TemplaterSettings
     -> Path Abs Dir
     -> Path Abs Dir
-    -> m ()
+    -> m [Path Rel File]
 copy settings src dst = do
     compiledSettings <- compileSettings settings
     let
@@ -129,5 +129,6 @@ copy settings src dst = do
             traverse_ (\f -> fileWalker (dir </> f)) files
             return $ WalkExclude (exclude subdirs)
         fileWalker = copyRelFile compiledSettings src dst
+        fileWriter dir _ files = return $ map (dir </>) files
         exclude    = filter ((==) ".git/" . fromRelDir)
-        in walkDirRel dirWalker src
+        in walkDirAccumRel (Just dirWalker) fileWriter src
