@@ -12,7 +12,9 @@ import           Data.Yaml                      ( FromJSON(..)
                                                 , (.=)
                                                 )
 import qualified Data.Yaml                     as Y
+import           Data.Semigroup
 import           Path
+import           Logging
 
 data PreliminaryProjectConfiguration    = PreliminaryProjectConfiguration
         { preSelectedTemplate :: Maybe Text
@@ -54,6 +56,41 @@ data TemplateYaml = TemplateYaml
         , features :: Set Text
         }
         deriving (Show)
+
+instance Semigroup PreliminaryProjectConfiguration where
+        (<>) a b = PreliminaryProjectConfiguration
+                { preSelectedTemplate = fmap getLast
+                                        $  fmap Last (preSelectedTemplate a)
+                                        <> fmap Last (preSelectedTemplate b)
+                , preTargetDirectory  = fmap getLast
+                                        $  fmap Last (preTargetDirectory a)
+                                        <> fmap Last (preTargetDirectory b)
+                , preSelectedBranches = fmap getLast
+                                        $  fmap Last (preSelectedBranches a)
+                                        <> fmap Last (preSelectedBranches b)
+                , preVariableValues   = fmap getLast
+                                        $  fmap Last (preVariableValues a)
+                                        <> fmap Last (preVariableValues b)
+                }
+
+instance Pretty PreliminaryProjectConfiguration where
+        pretty cfg = (align . vsep)
+                [ "Template:         "
+                        <+> (align . pretty) (preSelectedTemplate cfg)
+                , "Target directory: "
+                        <+> (align . pretty) (preTargetDirectory cfg)
+                , "Selected branches:"
+                        <+> (align . pretty) (preSelectedBranches cfg)
+                , "Variable values:  "
+                        <+> (align . pretty) (preVariableValues cfg)
+                ]
+
+instance Pretty FinalProjectConfiguration where
+        pretty cfg = (align . vsep)
+                [ "Base branch:     " <+> (align . pretty) (baseBranch cfg)
+                , "Feature branches:" <+> (align . pretty) (featureBranches cfg)
+                , "Variable values: " <+> (align . pretty) (variableValues cfg)
+                ]
 
 instance FromJSON TemplateYaml where
         parseJSON (Y.Object v) =

@@ -14,6 +14,7 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
+import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
@@ -62,22 +63,9 @@ createProject
     => PreliminaryProjectConfiguration
     -> Bool
     -> m ()
-createProject projectConfiguration unattended = do
-    finalTemplateConfiguration <- makeFinalTemplateConfiguration
-        unattended
-        projectConfiguration
-    withClonedRepository
-            (RepositoryUrl $ selectedTemplate finalTemplateConfiguration)
-        $ \repository -> do
-              templateInformation       <- loadTemplateInformation repository
-              finalProjectConfiguration <- makeFinalProjectConfiguration
-                  unattended
-                  templateInformation
-                  projectConfiguration
-                  Nothing
-              mergedTemplateYaml <- prepareTemplate repository templateInformation finalProjectConfiguration
-              let dst = targetDirectory finalTemplateConfiguration
-                  templaterSettings = buildTemplaterSettings mergedTemplateYaml finalProjectConfiguration in do
+createProject projectConfiguration unattended =
+    withPreparedTemplate projectConfiguration unattended $ \repository finalTemplateConfiguration templaterSettings ->
+        let dst = targetDirectory finalTemplateConfiguration in do
                 createDir dst
                 project <- initRepository dst
                 files <- copy templaterSettings (repositoryPath repository) (repositoryPath project)
@@ -85,17 +73,60 @@ createProject projectConfiguration unattended = do
                 commit project (commitCreateMessage finalTemplateConfiguration)
 
 updateProject
-    :: (MonadIO m, MonadMask m, MonadGit m)
+    :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
     => PreliminaryProjectConfiguration
     -> Bool
     -> m ()
-updateProject projectConfiguration unattended = return ()
+updateProject projectConfiguration unattended =
+    withPreparedTemplate projectConfiguration unattended $ \repository finalTemplateConfiguration templaterSettings ->
+        return ()
+
+withPreparedTemplate :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
+                => PreliminaryProjectConfiguration
+                -> Bool
+                -> (GitRepository -> FinalTemplateConfiguration -> TemplaterSettings -> m())
+                -> m ()
+withPreparedTemplate projectConfiguration unattended block = do
+    logDebug $ "Preliminary project configuration:" <> line <> (indent 4 . pretty) projectConfiguration
+    finalTemplateConfiguration <- makeFinalTemplateConfiguration
+        unattended
+        projectConfiguration
+    withClonedRepository
+            (RepositoryUrl $ selectedTemplate finalTemplateConfiguration)
+        $ \repository -> do
+                templateInformation       <- loadTemplateInformation repository
+                finalProjectConfiguration <- makeFinalProjectConfiguration
+                    unattended
+                    templateInformation
+                    projectConfiguration
+                    Nothing
+                logDebug $ "Final project configuration" <> line <> (indent 4 . pretty) finalProjectConfiguration
+                mergedTemplateYaml <- prepareTemplate repository templateInformation finalProjectConfiguration
+                let templaterSettings = buildTemplaterSettings mergedTemplateYaml finalProjectConfiguration in
+                    block repository finalTemplateConfiguration templaterSettings
 
 parseTemplateYaml :: ByteString -> Maybe TemplateYaml
 parseTemplateYaml yaml =
     let templateYaml :: Either Y.ParseException TemplateYaml
         templateYaml = Y.decodeEither' yaml
     in  rightToMaybe templateYaml
+
+loadExistingProjectConfiguration :: (MonadIO m, MonadLog m) => Path Abs Dir -> m PreliminaryProjectConfiguration
+loadExistingProjectConfiguration project = let yamlFile = project </> templateYamlFile in do
+    logInfo $ "Loading template configuration from" <+> pretty yamlFile
+    templateYamlResult <- liftIO $ try $ BS.readFile (toFilePath yamlFile)
+    templateYamlContent <- case (templateYamlResult :: Either SomeException ByteString) of
+        Right c -> return (Just c)
+        Left e  -> do
+            logInfo $ "Could not read" <+> pretty yamlFile <> ":" <+> (pretty . show) e
+            return Nothing
+    let yaml = templateYamlContent >>= parseTemplateYaml in
+        return PreliminaryProjectConfiguration
+                { preSelectedTemplate = Nothing
+                , preTargetDirectory  = Just project
+                , preSelectedBranches = fmap features yaml
+                , preVariableValues   = fmap (Map.fromList . InsOrdHashMap.toList . variables) yaml
+                }
 
 loadBranchConfiguration
     :: (MonadThrow m, MonadGit m)

@@ -12,6 +12,10 @@ import           Control.Monad.Log       hiding ( MonadLog
                                                 , LoggingT
                                                 )
 import qualified Control.Monad.Log             as L
+import           Data.Set                       ( Set )
+import qualified Data.Set                      as Set
+import           Data.Map                       ( Map )
+import qualified Data.Map                      as Map
 import           Data.Text.Prettyprint.Doc
 import           Data.Text.Prettyprint.Doc.Render.Terminal
 import           System.IO
@@ -39,3 +43,9 @@ printToTerminal width message =
 
 instance Pretty (Path a t) where
     pretty = pretty . toFilePath
+
+instance Pretty a => Pretty (Set a) where
+    pretty s = group . encloseSep "[ " " ]" ", " $ pretty <$> Set.toList s
+
+instance (Pretty a, Pretty b) => Pretty (Map a b) where
+    pretty s = group . encloseSep "{ " " }" ", " $ pretty <$> Map.toList s

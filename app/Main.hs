@@ -92,14 +92,14 @@ run Create { templateName = t, maybeTargetDirectory = td, runUnattended = u, ena
 run Update { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
     = runAppM d $ do
         resolvedTd <- resolveTargetDir (fromMaybe "." td)
-        updateProject
-            PreliminaryProjectConfiguration
-                { preSelectedTemplate = t
-                , preTargetDirectory  = Just resolvedTd
-                , preSelectedBranches = Nothing
-                , preVariableValues   = Nothing
-                }
-            u
+        currentConfig <- loadExistingProjectConfiguration resolvedTd
+        let inputConfig  = PreliminaryProjectConfiguration
+                                { preSelectedTemplate = t
+                                , preTargetDirectory  = Just resolvedTd
+                                , preSelectedBranches = Nothing
+                                , preVariableValues   = Nothing
+                                } in
+            updateProject (currentConfig <> inputConfig) u
 
 main :: IO ()
 main = run =<< customExecParser p opts
