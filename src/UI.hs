@@ -30,8 +30,8 @@ import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Console
-import Path
-import Path.IO
+import           Path
+import           Path.IO
 
 data UIException = UnattendedNotPossibleException | InvalidInputException | InterruptedInputException deriving (Exception)
 
@@ -69,18 +69,11 @@ unattendedProjectConfiguration
     :: (MonadThrow m)
     => TemplateInformation
     -> PreliminaryProjectConfiguration
-    -> Maybe FinalProjectConfiguration
     -> m FinalProjectConfiguration
-unattendedProjectConfiguration templateInformation providedConfiguration currentConfiguration =
-    let bb =
-                preSelectedBaseBranch templateInformation providedConfiguration
-                    `mplus` fmap baseBranch currentConfiguration
-        fb =
-                preSelectedFeatureBranches templateInformation providedConfiguration
-                    `mplus` fmap featureBranches currentConfiguration
-        v =
-                preVariableValues providedConfiguration
-                    `mplus` fmap variableValues currentConfiguration
+unattendedProjectConfiguration templateInformation providedConfiguration =
+    let bb = preSelectedBaseBranch templateInformation providedConfiguration
+        fb = preSelectedFeatureBranches templateInformation providedConfiguration
+        v = preVariableValues providedConfiguration
         cfg = FinalProjectConfiguration <$> bb <*> fb <*> v
     in  maybe (throwM UnattendedNotPossibleException) return cfg
 
@@ -168,7 +161,7 @@ inputFeatureBranches branches selected = do
         Nothing     -> return selected
 
 inputVariable
-    :: (MonadIO m, MonadMask m, MonadConsole m)
+    :: (MonadIO m, MonadConsole m)
     => (Text, Text)
     -> m (Text, Text)
 inputVariable (desc, name) = (name, ) <$> ask (text $ desc <> " ") (Just name)
@@ -183,9 +176,8 @@ inputProjectConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)
     => TemplateInformation
     -> PreliminaryProjectConfiguration
-    -> Maybe FinalProjectConfiguration
     -> m FinalProjectConfiguration
-inputProjectConfiguration templateInformation providedConfiguration currentConfiguration
+inputProjectConfiguration templateInformation providedConfiguration
     = let bi = branchesInformation templateInformation
           bases = filter isBaseBranch bi
           child base branch = Set.member base (requiredBranches branch) && not (isBaseBranch branch) in do
@@ -194,7 +186,10 @@ inputProjectConfiguration templateInformation providedConfiguration currentConfi
             preSelectedFeatures = preSelectedFeatureBranches templateInformation providedConfiguration in do
             branches <- inputFeatureBranches fbi (fromMaybe Set.empty preSelectedFeatures)
             let sbi = filter (flip Set.member branches . branchName) bi
-                vars = mconcat (map branchVariables sbi) in do
+                sbvars = mconcat (map branchVariables sbi)
+                cvars = fromMaybe Map.empty (preVariableValues providedConfiguration)
+                updateDefault k v = fromMaybe v (Map.lookup k cvars)
+                vars = InsOrdHashMap.mapWithKey updateDefault sbvars in do
                 varVals <- inputVariables vars
                 return FinalProjectConfiguration
                     { baseBranch = base

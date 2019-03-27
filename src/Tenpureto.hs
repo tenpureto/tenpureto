@@ -34,7 +34,7 @@ templateYamlFile :: Path Rel File
 templateYamlFile = [relfile|.template.yaml|]
 
 makeFinalTemplateConfiguration
-    :: (MonadThrow m, MonadMask m, MonadIO m, MonadConsole m)
+    :: (MonadMask m, MonadIO m, MonadConsole m)
     => Bool
     -> PreliminaryProjectConfiguration
     -> m FinalTemplateConfiguration
@@ -42,11 +42,10 @@ makeFinalTemplateConfiguration True  = unattendedTemplateConfiguration
 makeFinalTemplateConfiguration False = inputTemplateConfiguration
 
 makeFinalProjectConfiguration
-    :: (MonadThrow m, MonadMask m, MonadIO m, MonadConsole m)
+    :: (MonadMask m, MonadIO m, MonadConsole m)
     => Bool
     -> TemplateInformation
     -> PreliminaryProjectConfiguration
-    -> Maybe FinalProjectConfiguration
     -> m FinalProjectConfiguration
 makeFinalProjectConfiguration True  = unattendedProjectConfiguration
 makeFinalProjectConfiguration False = inputProjectConfiguration
@@ -99,7 +98,6 @@ withPreparedTemplate projectConfiguration unattended block = do
                     unattended
                     templateInformation
                     projectConfiguration
-                    Nothing
                 logDebug $ "Final project configuration" <> line <> (indent 4 . pretty) finalProjectConfiguration
                 mergedTemplateYaml <- prepareTemplate repository templateInformation finalProjectConfiguration
                 let templaterSettings = buildTemplaterSettings mergedTemplateYaml finalProjectConfiguration in
