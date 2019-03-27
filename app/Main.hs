@@ -83,24 +83,21 @@ run Create { templateName = t, maybeTargetDirectory = td, runUnattended = u, ena
     = runAppM d $ do
         resolvedTd <- traverse resolveTargetDir td
         createProject
-            PreliminaryProjectConfiguration
-                { preSelectedTemplate        = t
-                , preTargetDirectory         = resolvedTd
-                , preSelectedBaseBranch      = Nothing
-                , preSelectedFeatureBranches = Nothing
-                , preVariableValues          = Nothing
-                }
+            PreliminaryProjectConfiguration { preSelectedTemplate = t
+                                            , preTargetDirectory  = resolvedTd
+                                            , preSelectedBranches = Nothing
+                                            , preVariableValues   = Nothing
+                                            }
             u
 run Update { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
     = runAppM d $ do
         resolvedTd <- resolveTargetDir (fromMaybe "." td)
         updateProject
             PreliminaryProjectConfiguration
-                { preSelectedTemplate        = t
-                , preTargetDirectory         = Just resolvedTd
-                , preSelectedBaseBranch      = Nothing
-                , preSelectedFeatureBranches = Nothing
-                , preVariableValues          = Nothing
+                { preSelectedTemplate = t
+                , preTargetDirectory  = Just resolvedTd
+                , preSelectedBranches = Nothing
+                , preVariableValues   = Nothing
                 }
             u
 

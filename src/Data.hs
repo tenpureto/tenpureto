@@ -17,8 +17,7 @@ import           Path
 data PreliminaryProjectConfiguration    = PreliminaryProjectConfiguration
         { preSelectedTemplate :: Maybe Text
         , preTargetDirectory :: Maybe (Path Abs Dir)
-        , preSelectedBaseBranch :: Maybe Text
-        , preSelectedFeatureBranches :: Maybe (Set Text)
+        , preSelectedBranches :: Maybe (Set Text)
         , preVariableValues :: Maybe (Map Text Text)
         }
         deriving (Show)

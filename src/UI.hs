@@ -41,6 +41,21 @@ instance Show UIException where
     show InvalidInputException     = "Invalid input"
     show InterruptedInputException = "Interrupted"
 
+
+preSelectedBaseBranch :: TemplateInformation -> PreliminaryProjectConfiguration -> Maybe Text
+preSelectedBaseBranch templateInformation providedConfiguration =
+    let baseBranches = Set.fromList $ map branchName $ filter isBaseBranch (branchesInformation templateInformation)
+        selected = fromMaybe Set.empty (preSelectedBranches providedConfiguration)
+        selectedBaseBranches = Set.intersection baseBranches selected
+        minSelectedBaseBranch = Set.lookupMin selectedBaseBranches
+        maxSelectedBaseBranch = Set.lookupMax selectedBaseBranches
+    in if minSelectedBaseBranch == maxSelectedBaseBranch then minSelectedBaseBranch else Nothing
+
+preSelectedFeatureBranches :: TemplateInformation -> PreliminaryProjectConfiguration -> Maybe (Set Text)
+preSelectedFeatureBranches templateInformation providedConfiguration =
+    let featureBranches = Set.fromList $ map branchName $ filter (not . isBaseBranch) (branchesInformation templateInformation)
+    in  fmap (Set.intersection featureBranches) (preSelectedBranches providedConfiguration)
+
 unattendedTemplateConfiguration
     :: (MonadThrow m)
     => PreliminaryProjectConfiguration
@@ -56,12 +71,12 @@ unattendedProjectConfiguration
     -> PreliminaryProjectConfiguration
     -> Maybe FinalProjectConfiguration
     -> m FinalProjectConfiguration
-unattendedProjectConfiguration _ providedConfiguration currentConfiguration =
+unattendedProjectConfiguration templateInformation providedConfiguration currentConfiguration =
     let bb =
-                preSelectedBaseBranch providedConfiguration
+                preSelectedBaseBranch templateInformation providedConfiguration
                     `mplus` fmap baseBranch currentConfiguration
         fb =
-                preSelectedFeatureBranches providedConfiguration
+                preSelectedFeatureBranches templateInformation providedConfiguration
                     `mplus` fmap featureBranches currentConfiguration
         v =
                 preVariableValues providedConfiguration
@@ -174,9 +189,10 @@ inputProjectConfiguration templateInformation providedConfiguration currentConfi
     = let bi = branchesInformation templateInformation
           bases = filter isBaseBranch bi
           child base branch = Set.member base (requiredBranches branch) && not (isBaseBranch branch) in do
-        base <- inputBaseBranch bases Nothing
-        let fbi = filter (child base) bi in do
-            branches <- inputFeatureBranches fbi Set.empty
+        base <- inputBaseBranch bases (preSelectedBaseBranch templateInformation providedConfiguration)
+        let fbi = filter (child base) bi
+            preSelectedFeatures = preSelectedFeatureBranches templateInformation providedConfiguration in do
+            branches <- inputFeatureBranches fbi (fromMaybe Set.empty preSelectedFeatures)
             let sbi = filter (flip Set.member branches . branchName) bi
                 vars = mconcat (map branchVariables sbi) in do
                 varVals <- inputVariables vars
