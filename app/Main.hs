@@ -33,6 +33,7 @@ instance MonadGit AppM where
     getBranchFile        = GC.getBranchFile
     writeAddFile         = GC.writeAddFile
     addFiles             = GC.addFiles
+    commit               = GC.commit
 
 instance MonadConsole AppM where
     ask = B.ask

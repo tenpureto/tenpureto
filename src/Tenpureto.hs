@@ -82,6 +82,7 @@ createProject projectConfiguration unattended = do
                 project <- initRepository dst
                 files <- copy templaterSettings (repositoryPath repository) (repositoryPath project)
                 addFiles project files
+                commit project (commitCreateMessage finalTemplateConfiguration)
 
 updateProject
     :: (MonadIO m, MonadMask m, MonadGit m)
@@ -148,3 +149,9 @@ prepareTemplate repository template configuration =
         in do
             checkoutBranch repository (baseBranch configuration) branch
             foldlM mergeTemplateBranch mempty (featureBranches configuration)
+
+commitCreateMessage :: FinalTemplateConfiguration -> Text
+commitCreateMessage cfg = "Create from a template\n\nTemplate: " <> selectedTemplate cfg
+
+commitUpdateMessage :: FinalTemplateConfiguration -> Text
+commitUpdateMessage cfg = "Update from a template\n\nTemplate: " <> selectedTemplate cfg

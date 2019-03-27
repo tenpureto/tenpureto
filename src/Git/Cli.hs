@@ -160,7 +160,7 @@ mergeBranch repo branch resolve = do
     case mergeResult of
         ExitSuccess      -> return ()
         ExitFailure code -> listConflicts repo >>= resolve
-    gitRepoCmd repo ["commit", "--message", "Merge " <> branch] >>= unitOrThrow
+    commit repo ("Merge " <> branch)
 
 writeAddFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -180,8 +180,13 @@ addFiles
     -> [Path Rel File]
     -> m ()
 addFiles repo files =
-    gitRepoCmd repo (["add", "-f", "--"] ++ map (T.pack . toFilePath) files)
+    gitRepoCmd repo
+               (["add", "--force", "--"] ++ map (T.pack . toFilePath) files)
         >>= unitOrThrow
 
 runMergeTool :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> m ()
 runMergeTool repo = gitRepoCmd repo ["mergetool"] >>= unitOrThrow
+
+commit :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> Text -> m ()
+commit repo message =
+    gitRepoCmd repo ["commit", "--message", message] >>= unitOrThrow
