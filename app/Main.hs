@@ -6,6 +6,7 @@ import           Options.Applicative
 import           Data.Semigroup                 ( (<>) )
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
+import           Data.Maybe
 import           Data.Text                      ( Text )
 import           Console
 import qualified Console.Byline                as B
@@ -92,11 +93,11 @@ run Create { templateName = t, maybeTargetDirectory = td, runUnattended = u, ena
             u
 run Update { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
     = runAppM d $ do
-        resolvedTd <- traverse resolveTargetDir td
+        resolvedTd <- resolveTargetDir (fromMaybe "." td)
         updateProject
             PreliminaryProjectConfiguration
                 { preSelectedTemplate        = t
-                , preTargetDirectory         = resolvedTd
+                , preTargetDirectory         = Just resolvedTd
                 , preSelectedBaseBranch      = Nothing
                 , preSelectedFeatureBranches = Nothing
                 , preVariableValues          = Nothing
