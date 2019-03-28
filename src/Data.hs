@@ -12,6 +12,7 @@ import           Data.Yaml                      ( FromJSON(..)
                                                 , (.=)
                                                 )
 import qualified Data.Yaml                     as Y
+import           Control.Applicative
 import           Data.Semigroup
 import           Path
 import           Logging
@@ -59,18 +60,14 @@ data TemplateYaml = TemplateYaml
 
 instance Semigroup PreliminaryProjectConfiguration where
         (<>) a b = PreliminaryProjectConfiguration
-                { preSelectedTemplate = fmap getLast
-                                        $  fmap Last (preSelectedTemplate a)
-                                        <> fmap Last (preSelectedTemplate b)
-                , preTargetDirectory  = fmap getLast
-                                        $  fmap Last (preTargetDirectory a)
-                                        <> fmap Last (preTargetDirectory b)
-                , preSelectedBranches = fmap getLast
-                                        $  fmap Last (preSelectedBranches a)
-                                        <> fmap Last (preSelectedBranches b)
-                , preVariableValues   = fmap getLast
-                                        $  fmap Last (preVariableValues a)
-                                        <> fmap Last (preVariableValues b)
+                { preSelectedTemplate = preSelectedTemplate b
+                                                <|> preSelectedTemplate a
+                , preTargetDirectory  = preTargetDirectory b
+                                                <|> preTargetDirectory a
+                , preSelectedBranches = preSelectedBranches b
+                                                <|> preSelectedBranches a
+                , preVariableValues   = preVariableValues b
+                                                <|> preVariableValues a
                 }
 
 instance Pretty PreliminaryProjectConfiguration where
