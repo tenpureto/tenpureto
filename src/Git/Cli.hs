@@ -17,6 +17,7 @@ import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import           Data.Foldable
+import           Data.Either.Combinators
 import           Path
 import           Path.IO
 import           System.Exit
@@ -85,6 +86,9 @@ withClonedRepository
 withClonedRepository url f =
     withSystemTempDir "tenpureto" $ cloneReporitory url >=> f
 
+withRepository :: Path Abs Dir -> (GitRepository -> m a) -> m a
+withRepository path f = f (GitRepository path)
+
 initRepository
     :: (MonadIO m, MonadMask m, MonadLog m) => Path Abs Dir -> m GitRepository
 initRepository dir =
@@ -126,6 +130,15 @@ getBranchFile
     -> m (Maybe ByteString)
 getBranchFile repo branch file = stdoutOrNothing
     <$> gitRepoCmd repo ["show", branch <> ":" <> T.pack (toFilePath file)]
+
+getWorkingCopyFile
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> Path Rel File
+    -> m (Maybe ByteString)
+getWorkingCopyFile (GitRepository repoPath) file = do
+    result <- liftIO $ try $ BS.readFile (toFilePath (repoPath </> file))
+    return $ rightToMaybe (result :: Either SomeException ByteString)
 
 checkoutBranch
     :: (MonadIO m, MonadThrow m, MonadLog m)

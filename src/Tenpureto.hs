@@ -105,23 +105,18 @@ withPreparedTemplate projectConfiguration unattended block = do
 
 parseTemplateYaml :: ByteString -> Maybe TemplateYaml
 parseTemplateYaml yaml =
-    let templateYaml :: Either Y.ParseException TemplateYaml
-        templateYaml = Y.decodeEither' yaml
-    in  rightToMaybe templateYaml
+    let info :: Either Y.ParseException TemplateYaml
+        info = Y.decodeEither' yaml
+    in  rightToMaybe info
 
-loadExistingProjectConfiguration :: (MonadIO m, MonadLog m) => Path Abs Dir -> m PreliminaryProjectConfiguration
-loadExistingProjectConfiguration project = let yamlFile = project </> templateYamlFile in do
-    logInfo $ "Loading template configuration from" <+> pretty yamlFile
-    templateYamlResult <- liftIO $ try $ BS.readFile (toFilePath yamlFile)
-    templateYamlContent <- case (templateYamlResult :: Either SomeException ByteString) of
-        Right c -> return (Just c)
-        Left e  -> do
-            logInfo $ "Could not read" <+> pretty yamlFile <> ":" <+> (pretty . show) e
-            return Nothing
+loadExistingProjectConfiguration :: (MonadGit m, MonadLog m) => Path Abs Dir -> m PreliminaryProjectConfiguration
+loadExistingProjectConfiguration projectPath = withRepository projectPath $ \project -> do
+    logInfo $ "Loading template configuration from" <+> pretty templateYamlFile
+    templateYamlContent <- getWorkingCopyFile project templateYamlFile
     let yaml = templateYamlContent >>= parseTemplateYaml in
         return PreliminaryProjectConfiguration
                 { preSelectedTemplate = Nothing
-                , preTargetDirectory  = Just project
+                , preTargetDirectory  = Just projectPath
                 , preSelectedBranches = fmap features yaml
                 , preVariableValues   = fmap (Map.fromList . InsOrdHashMap.toList . variables) yaml
                 }
@@ -136,13 +131,13 @@ loadBranchConfiguration repo branch = runMaybeT $ do
         repo
         (T.pack "remotes/origin/" <> branch)
         templateYamlFile
-    templateYaml <- MaybeT $ return $ parseTemplateYaml descriptor
-    let fb = features templateYaml in return $ TemplateBranchInformation
+    info <- MaybeT $ return $ parseTemplateYaml descriptor
+    let fb = features info in return $ TemplateBranchInformation
         { branchName       = branch
         , isBaseBranch     = Set.size fb <= 1
         , requiredBranches = fb
-        , branchVariables  = variables templateYaml
-        , templateYaml     = templateYaml
+        , branchVariables  = variables info
+        , templateYaml     = info
         }
 
 loadTemplateInformation
@@ -157,7 +152,7 @@ loadTemplateInformation repository = do
         }
 
 prepareTemplate
-    :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m)
+    :: (MonadIO m, MonadGit m, MonadConsole m)
     => GitRepository
     -> TemplateInformation
     -> FinalProjectConfiguration

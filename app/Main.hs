@@ -26,12 +26,14 @@ runAppM withDebug app =
 
 instance MonadGit AppM where
     withClonedRepository = GC.withClonedRepository
+    withRepository       = GC.withRepository
     initRepository       = GC.initRepository
     listBranches         = GC.listBranches
     checkoutBranch       = GC.checkoutBranch
     mergeBranch          = GC.mergeBranch
     runMergeTool         = GC.runMergeTool
     getBranchFile        = GC.getBranchFile
+    getWorkingCopyFile   = GC.getWorkingCopyFile
     writeAddFile         = GC.writeAddFile
     addFiles             = GC.addFiles
     commit               = GC.commit
