@@ -113,10 +113,12 @@ loadExistingProjectConfiguration :: (MonadGit m, MonadLog m) => Path Abs Dir -> 
 loadExistingProjectConfiguration projectPath = withRepository projectPath $ \project -> do
     logInfo $ "Loading template configuration from" <+> pretty templateYamlFile
     templateYamlContent <- getWorkingCopyFile project templateYamlFile
+    previousTemplateCommit <- findCommit project commitMessagePattern
     let yaml = templateYamlContent >>= parseTemplateYaml in
         return PreliminaryProjectConfiguration
                 { preSelectedTemplate = Nothing
                 , preTargetDirectory  = Just projectPath
+                , prePreviousTemplateCommit = previousTemplateCommit
                 , preSelectedBranches = fmap features yaml
                 , preVariableValues   = fmap (Map.fromList . InsOrdHashMap.toList . variables) yaml
                 }
@@ -179,3 +181,6 @@ commitCreateMessage cfg = "Create from a template\n\nTemplate: " <> selectedTemp
 
 commitUpdateMessage :: FinalTemplateConfiguration -> Text
 commitUpdateMessage cfg = "Update from a template\n\nTemplate: " <> selectedTemplate cfg
+
+commitMessagePattern :: Text
+commitMessagePattern = "^Template: .*$"

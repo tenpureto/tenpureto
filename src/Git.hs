@@ -20,3 +20,4 @@ class Monad m => MonadGit m where
     writeAddFile :: GitRepository -> Path Rel File -> ByteString -> m ()
     addFiles :: GitRepository -> [Path Rel File] -> m ()
     commit :: GitRepository -> Text -> m ()
+    findCommit :: GitRepository -> Text -> m (Maybe Text)

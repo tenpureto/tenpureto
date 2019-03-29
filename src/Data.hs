@@ -20,6 +20,7 @@ import           Logging
 data PreliminaryProjectConfiguration    = PreliminaryProjectConfiguration
         { preSelectedTemplate :: Maybe Text
         , preTargetDirectory :: Maybe (Path Abs Dir)
+        , prePreviousTemplateCommit :: Maybe Text
         , preSelectedBranches :: Maybe (Set Text)
         , preVariableValues :: Maybe (Map Text Text)
         }
@@ -28,6 +29,7 @@ data PreliminaryProjectConfiguration    = PreliminaryProjectConfiguration
 data FinalTemplateConfiguration = FinalTemplateConfiguration
         { selectedTemplate :: Text
         , targetDirectory :: Path Abs Dir
+        , previousTemplateCommit :: Maybe Text
         }
         deriving (Show)
 
@@ -60,25 +62,30 @@ data TemplateYaml = TemplateYaml
 
 instance Semigroup PreliminaryProjectConfiguration where
         (<>) a b = PreliminaryProjectConfiguration
-                { preSelectedTemplate = preSelectedTemplate b
-                                                <|> preSelectedTemplate a
-                , preTargetDirectory  = preTargetDirectory b
-                                                <|> preTargetDirectory a
-                , preSelectedBranches = preSelectedBranches b
-                                                <|> preSelectedBranches a
-                , preVariableValues   = preVariableValues b
-                                                <|> preVariableValues a
+                { preSelectedTemplate       = preSelectedTemplate a
+                                                      <|> preSelectedTemplate b
+                , preTargetDirectory        = preTargetDirectory a
+                                                      <|> preTargetDirectory b
+                , prePreviousTemplateCommit =
+                        prePreviousTemplateCommit a
+                                <|> prePreviousTemplateCommit b
+                , preSelectedBranches       = preSelectedBranches a
+                                                      <|> preSelectedBranches b
+                , preVariableValues         = preVariableValues a
+                                                      <|> preVariableValues b
                 }
 
 instance Pretty PreliminaryProjectConfiguration where
         pretty cfg = (align . vsep)
-                [ "Template:         "
+                [ "Template:                 "
                         <+> (align . pretty) (preSelectedTemplate cfg)
-                , "Target directory: "
+                , "Target directory:         "
                         <+> (align . pretty) (preTargetDirectory cfg)
-                , "Selected branches:"
+                , "Previous template commit: "
+                        <+> (align . pretty) (prePreviousTemplateCommit cfg)
+                , "Selected branches:        "
                         <+> (align . pretty) (preSelectedBranches cfg)
-                , "Variable values:  "
+                , "Variable values:          "
                         <+> (align . pretty) (preVariableValues cfg)
                 ]
 

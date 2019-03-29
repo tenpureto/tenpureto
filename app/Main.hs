@@ -37,6 +37,7 @@ instance MonadGit AppM where
     writeAddFile         = GC.writeAddFile
     addFiles             = GC.addFiles
     commit               = GC.commit
+    findCommit           = GC.findCommit
 
 instance MonadConsole AppM where
     ask = B.ask
@@ -87,6 +88,7 @@ run Create { templateName = t, maybeTargetDirectory = td, runUnattended = u, ena
         createProject
             PreliminaryProjectConfiguration { preSelectedTemplate = t
                                             , preTargetDirectory  = resolvedTd
+                                            , prePreviousTemplateCommit = Nothing
                                             , preSelectedBranches = Nothing
                                             , preVariableValues   = Nothing
                                             }
@@ -96,12 +98,13 @@ run Update { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u
         resolvedTd <- resolveTargetDir (fromMaybe "." td)
         currentConfig <- loadExistingProjectConfiguration resolvedTd
         let inputConfig  = PreliminaryProjectConfiguration
-                                { preSelectedTemplate = t
-                                , preTargetDirectory  = Just resolvedTd
-                                , preSelectedBranches = Nothing
-                                , preVariableValues   = Nothing
+                                { preSelectedTemplate    = t
+                                , preTargetDirectory     = Just resolvedTd
+                                , prePreviousTemplateCommit = Nothing
+                                , preSelectedBranches    = Nothing
+                                , preVariableValues      = Nothing
                                 } in
-            updateProject (currentConfig <> inputConfig) u
+            updateProject (inputConfig <> currentConfig) u
 
 main :: IO ()
 main = run =<< customExecParser p opts

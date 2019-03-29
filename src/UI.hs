@@ -60,8 +60,8 @@ unattendedTemplateConfiguration
     :: (MonadThrow m)
     => PreliminaryProjectConfiguration
     -> m FinalTemplateConfiguration
-unattendedTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = Just t, preTargetDirectory = Just td }
-    = return FinalTemplateConfiguration { selectedTemplate = t, targetDirectory = td }
+unattendedTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = Just t, preTargetDirectory = Just td, prePreviousTemplateCommit = mbptc }
+    = return FinalTemplateConfiguration { selectedTemplate = t, targetDirectory = td, previousTemplateCommit = mbptc }
 unattendedTemplateConfiguration _
     = throwM UnattendedNotPossibleException
 
@@ -80,7 +80,7 @@ unattendedProjectConfiguration templateInformation providedConfiguration =
 required :: (Monad m) => m (Maybe a) -> m a
 required input = input >>= maybe (required input) return
 
-inputTemplate :: (MonadIO m, MonadMask m, MonadConsole m) => m Text
+inputTemplate :: MonadConsole m => m Text
 inputTemplate = ask "Template URL " Nothing
 
 inputTarget :: (MonadIO m, MonadMask m, MonadConsole m) => m (Path Abs Dir)
@@ -93,8 +93,11 @@ inputTemplateConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)
     => PreliminaryProjectConfiguration
     -> m FinalTemplateConfiguration
-inputTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = mbt, preTargetDirectory = mbtd }
-    = FinalTemplateConfiguration <$> maybe inputTemplate return mbt <*> maybe inputTarget return mbtd
+inputTemplateConfiguration PreliminaryProjectConfiguration
+    { preSelectedTemplate = mbt
+    , preTargetDirectory = mbtd
+    , prePreviousTemplateCommit = mbptc }
+    = FinalTemplateConfiguration <$> maybe inputTemplate return mbt <*> maybe inputTarget return mbtd <*> return mbptc
 
 inputBranch
     :: (MonadIO m, MonadMask m, MonadConsole m)

@@ -8,6 +8,7 @@ import           Git                            ( RepositoryUrl(..)
                                                 , GitRepository(..)
                                                 )
 import           Logging
+import           Data.Maybe
 import           Data.ByteString                ( ByteString )
 import qualified Data.ByteString               as BS
 import           Data.Text                      ( Text )
@@ -16,6 +17,7 @@ import           Data.Text.Encoding            as E
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
+import           Data.Functor
 import           Data.Foldable
 import           Data.Either.Combinators
 import           Path
@@ -203,3 +205,23 @@ runMergeTool repo = gitRepoCmd repo ["mergetool"] >>= unitOrThrow
 commit :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> Text -> m ()
 commit repo message =
     gitRepoCmd repo ["commit", "--message", message] >>= unitOrThrow
+
+findCommit
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> Text
+    -> m (Maybe Text)
+findCommit repo pattern =
+    gitcmdStdout
+            repo
+            [ "rev-list"
+            , "--max-count=1"
+            , "--date-order"
+            , "--grep"
+            , pattern
+            , "HEAD"
+            ]
+        <&> listToMaybe
+        .   T.lines
+        .   E.decodeUtf8
+        <&> mfilter (not . T.null)
