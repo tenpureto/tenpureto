@@ -8,8 +8,8 @@ module Tenpureto where
 import           Data.List
 import           Data.Maybe
 import           Data.Either.Combinators
-import           Data.ByteString                ( ByteString )
-import qualified Data.ByteString                     as BS
+import           Data.ByteString.Lazy           ( ByteString )
+import qualified Data.ByteString.Lazy          as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Set                      as Set
@@ -135,7 +135,7 @@ withPreparedTemplate projectConfiguration unattended block = do
 parseTemplateYaml :: ByteString -> Maybe TemplateYaml
 parseTemplateYaml yaml =
     let info :: Either Y.ParseException TemplateYaml
-        info = Y.decodeEither' yaml
+        info = Y.decodeEither' (BS.toStrict yaml)
     in  rightToMaybe info
 
 loadExistingProjectConfiguration :: (MonadGit m, MonadLog m) => Path Abs Dir -> m PreliminaryProjectConfiguration
@@ -192,7 +192,7 @@ prepareTemplate repository template configuration =
     let branch = "template"
         resolve descriptor conflicts =
             if templateYamlFile `elem` conflicts
-                then writeAddFile repository templateYamlFile (Y.encode descriptor) >> resolve descriptor (delete templateYamlFile conflicts)
+                then writeAddFile repository templateYamlFile ((BS.fromStrict . Y.encode) descriptor) >> resolve descriptor (delete templateYamlFile conflicts)
                 else inputResolutionStrategy (repositoryPath repository) conflicts >>= \case
                     AlreadyResolved -> return ()
                     MergeTool -> runMergeTool repository >> sayLn "Successfully merged."

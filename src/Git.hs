@@ -1,6 +1,6 @@
 module Git where
 
-import           Data.ByteString
+import           Data.ByteString.Lazy           ( ByteString )
 import           Data.Text                      ( Text )
 import           Path
 import           Logging

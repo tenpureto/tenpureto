@@ -25,7 +25,7 @@ dependencies:
 - prettyprinter-ansi-terminal
 - terminal-size
 - process
-- process-extras
+- typed-process
 - optparse-applicative
 - byline
 - yaml

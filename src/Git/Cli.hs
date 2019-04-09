@@ -10,11 +10,11 @@ import           Git                            ( RepositoryUrl(..)
                                                 )
 import           Logging
 import           Data.Maybe
-import           Data.ByteString                ( ByteString )
-import qualified Data.ByteString               as BS
+import           Data.ByteString.Lazy           ( ByteString )
+import qualified Data.ByteString.Lazy          as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
-import           Data.Text.Encoding            as E
+import qualified Data.Text.Encoding            as E
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
@@ -24,8 +24,7 @@ import           Data.Either.Combinators
 import           Path
 import           Path.IO
 import           System.Exit
-import           System.Process
-import qualified System.Process.ByteString     as BP
+import           System.Process.Typed
 
 data GitException = GitCallException
     { exitCode :: Int
@@ -40,11 +39,15 @@ prefixed prefix =
         . map ((<>) prefix . pretty)
         . T.lines
 
+
+decodeUtf8 :: ByteString -> Text
+decodeUtf8 = E.decodeUtf8 . BS.toStrict
+
 stdoutOrThrow
     :: MonadThrow m => (ExitCode, ByteString, ByteString) -> m ByteString
 stdoutOrThrow (ExitSuccess, out, err) = return out
 stdoutOrThrow (ExitFailure code, out, err) =
-    throwM $ GitCallException code (E.decodeUtf8 err)
+    throwM $ GitCallException code (decodeUtf8 err)
 
 stdoutOrNothing :: (ExitCode, ByteString, ByteString) -> Maybe ByteString
 stdoutOrNothing (ExitSuccess     , out, err) = Just out
@@ -53,17 +56,21 @@ stdoutOrNothing (ExitFailure code, out, err) = Nothing
 unitOrThrow :: MonadThrow m => (ExitCode, ByteString, ByteString) -> m ()
 unitOrThrow a = void (stdoutOrThrow a)
 
+throwIfFailed :: MonadThrow m => ExitCode -> m ()
+throwIfFailed ExitSuccess = return ()
+throwIfFailed (ExitFailure code) = throwM $ GitCallException code ""
+
 gitCmd
-    :: (MonadIO m, MonadThrow m, MonadLog m)
-    => [Text]
-    -> m (ExitCode, ByteString, ByteString)
+        :: (MonadIO m, MonadThrow m, MonadLog m)
+        => [Text]
+        -> m (ExitCode, ByteString, ByteString)
 gitCmd cmd = do
-    logInfo $ "Running git" <+> fillSep (map pretty cmd)
-    (exitCode, out, err) <- liftIO
-        $ BP.readProcessWithExitCode "git" (map T.unpack cmd) BS.empty
-    logDebug $ prefixed "err> " (E.decodeUtf8 err)
-    logDebug $ prefixed "out> " (E.decodeUtf8 out)
-    return (exitCode, out, err)
+        logInfo $ "Running interactively git" <+> fillSep (map pretty cmd)
+        let process = setStdin closed $ setStdout byteStringOutput $ setStderr byteStringOutput $ proc "git" (map T.unpack cmd) in do
+            (exitCode, out, err) <- liftIO $ readProcess process
+            logDebug $ prefixed "err> " (decodeUtf8 err)
+            logDebug $ prefixed "out> " (decodeUtf8 out)
+            return (exitCode, out, err)
 
 gitRepoCmd
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -72,6 +79,24 @@ gitRepoCmd
     -> m (ExitCode, ByteString, ByteString)
 gitRepoCmd (GitRepository path) cmd =
     gitCmd (map T.pack ["-C", toFilePath path] ++ cmd)
+
+gitInteractiveCmd
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => [Text]
+    -> m ExitCode
+gitInteractiveCmd cmd = do
+    logInfo $ "Running git" <+> fillSep (map pretty cmd)
+    let process = setStdin inherit $ setStdout inherit $ setStderr inherit $ proc "git" (map T.unpack cmd) in do
+        exitCode <- liftIO $ runProcess process
+        return exitCode
+
+gitInteractiveRepoCmd
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> [Text]
+    -> m ExitCode
+gitInteractiveRepoCmd (GitRepository path) cmd =
+    gitInteractiveCmd (map T.pack ["-C", toFilePath path] ++ cmd)
 
 gitcmdStdout
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -143,7 +168,7 @@ listBranches
     => GitRepository
     -> Text
     -> m [Text]
-listBranches repo prefix = T.lines . E.decodeUtf8 <$> gitcmdStdout
+listBranches repo prefix = T.lines . decodeUtf8 <$> gitcmdStdout
     repo
     [ "for-each-ref"
     , "--format=%(refname:strip=3)"
@@ -156,8 +181,7 @@ getBranchFile
     -> Text
     -> Path Rel File
     -> m (Maybe ByteString)
-getBranchFile repo branch file = stdoutOrNothing
-    <$> gitRepoCmd repo ["show", branch <> ":" <> T.pack (toFilePath file)]
+getBranchFile repo branch file = stdoutOrNothing <$> gitRepoCmd repo ["show", branch <> ":" <> T.pack (toFilePath file)]
 
 getWorkingCopyFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -186,7 +210,7 @@ listConflicts repo =
     gitRepoCmd repo ["diff", "--name-only", "--diff-filter=U"]
         >>= stdoutOrThrow
         >>= traverse (parseRelFile . T.unpack)
-        .   (T.lines . E.decodeUtf8)
+        .   (T.lines . decodeUtf8)
 
 listStaged
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -196,7 +220,7 @@ listStaged repo =
     gitRepoCmd repo ["diff", "--cached", "--name-only"]
         >>= stdoutOrThrow
         >>= traverse (parseRelFile . T.unpack)
-        .   (T.lines . E.decodeUtf8)
+        .   (T.lines . decodeUtf8)
 
 mergeBranch
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -220,7 +244,7 @@ writeAddFile
     -> m ()
 writeAddFile repo file content = do
     logInfo $ "Writing to " <+> pretty file
-    logDebug $ prefixed "file> " (E.decodeUtf8 content)
+    logDebug $ prefixed "file> " (decodeUtf8 content)
     liftIO $ (BS.writeFile . toFilePath) (repositoryPath repo </> file) content
     addFiles repo [file]
 
@@ -235,7 +259,7 @@ addFiles repo files =
         >>= unitOrThrow
 
 runMergeTool :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> m ()
-runMergeTool repo = gitRepoCmd repo ["mergetool"] >>= unitOrThrow
+runMergeTool repo = gitInteractiveRepoCmd repo ["mergetool"] >>= throwIfFailed
 
 outputToCommittish :: ByteString -> Maybe Committish
 outputToCommittish =
@@ -243,7 +267,7 @@ outputToCommittish =
         . mfilter (not . T.null)
         . listToMaybe
         . T.lines
-        . E.decodeUtf8
+        . decodeUtf8
 
 commit
     :: (MonadIO m, MonadThrow m, MonadLog m)
