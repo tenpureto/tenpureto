@@ -230,3 +230,6 @@ inputResolutionStrategy repo conflicts = let
         sayLn $ text $ "Repository path: " <> T.pack (toFilePath repo)
         result <- askUntil "Run \"git mergetool\" (y/n)? " (Just "y") mapAnswer
         return $ bool AlreadyResolved MergeTool (result == "y")
+
+outputNoUpdates :: MonadConsole m => m ()
+outputNoUpdates = sayLn "There are no relevant changes in the template."

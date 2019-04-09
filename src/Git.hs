@@ -22,7 +22,7 @@ class Monad m => MonadGit m where
     getWorkingCopyFile :: GitRepository -> Path Rel File -> m (Maybe ByteString)
     writeAddFile :: GitRepository -> Path Rel File -> ByteString -> m ()
     addFiles :: GitRepository -> [Path Rel File] -> m ()
-    commit :: GitRepository -> Text -> m ()
+    commit :: GitRepository -> Text -> m (Maybe Committish)
     findCommit :: GitRepository -> Text -> m (Maybe Committish)
 
 instance Pretty Committish where

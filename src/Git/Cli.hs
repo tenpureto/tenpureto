@@ -188,6 +188,16 @@ listConflicts repo =
         >>= traverse (parseRelFile . T.unpack)
         .   (T.lines . E.decodeUtf8)
 
+listStaged
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> m [Path Rel File]
+listStaged repo =
+    gitRepoCmd repo ["diff", "--cached", "--name-only"]
+        >>= stdoutOrThrow
+        >>= traverse (parseRelFile . T.unpack)
+        .   (T.lines . E.decodeUtf8)
+
 mergeBranch
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
@@ -201,7 +211,6 @@ mergeBranch repo branch resolve = do
     case mergeResult of
         ExitSuccess      -> return ()
         ExitFailure code -> listConflicts repo >>= resolve
-    commit repo ("Merge " <> branch)
 
 writeAddFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -228,9 +237,27 @@ addFiles repo files =
 runMergeTool :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> m ()
 runMergeTool repo = gitRepoCmd repo ["mergetool"] >>= unitOrThrow
 
-commit :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> Text -> m ()
+outputToCommittish :: ByteString -> Maybe Committish
+outputToCommittish =
+    fmap Committish
+        . mfilter (not . T.null)
+        . listToMaybe
+        . T.lines
+        . E.decodeUtf8
+
+commit
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> Text
+    -> m (Maybe Committish)
 commit repo message = do
-    gitRepoCmd repo ["commit", "--message", message] >>= unitOrThrow
+    staged <- listStaged repo
+    if null staged
+        then return Nothing
+        else do
+            gitRepoCmd repo ["commit", "--message", message] >>= unitOrThrow
+            gitcmdStdout repo ["rev-parse", "--verify", "HEAD"]
+                <&> outputToCommittish
 
 findCommit
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -247,8 +274,4 @@ findCommit repo pattern =
             , pattern
             , "HEAD"
             ]
-        <&> listToMaybe
-        .   T.lines
-        .   E.decodeUtf8
-        <&> mfilter (not . T.null)
-        <&> fmap Committish
+        <&> outputToCommittish

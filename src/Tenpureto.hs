@@ -81,6 +81,7 @@ createProject projectConfiguration unattended =
                 files <- copy templaterSettings (repositoryPath template) (repositoryPath project)
                 addFiles project files
                 commit project (commitCreateMessage finalTemplateConfiguration)
+                return ()
 
 updateProject
     :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
@@ -95,8 +96,15 @@ updateProject projectConfiguration unattended = do
             withNewWorktree project (previousTemplateCommit finalUpdateConfiguration) $ \staging -> do
                 files <- copy templaterSettings (repositoryPath template) (repositoryPath staging)
                 addFiles staging files
-                commit staging (commitUpdateMessage finalTemplateConfiguration)
-                return ()
+                result <- commit staging (commitUpdateMessage finalTemplateConfiguration)
+                case result of
+                    Just (Committish c) -> do
+                        logInfo $ "Updated template commit:" <+> pretty c
+                        mergeBranch project c (const (return ()))
+                        commit project (commitUpdateMergeMessage finalTemplateConfiguration)
+                        return ()
+                    Nothing ->
+                        outputNoUpdates
 
 withPreparedTemplate
     :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
@@ -192,6 +200,7 @@ prepareTemplate repository template configuration =
             bi = find ((==) b . branchName) (branchesInformation template)
             d = maybe a ((<>) a . templateYaml) bi in do
                 mergeBranch repository ("origin/" <> b) (resolve d)
+                commit repository ("Merge " <> b)
                 return d
         in do
             checkoutBranch repository (baseBranch configuration) branch
@@ -202,6 +211,9 @@ commitCreateMessage cfg = "Create from a template\n\nTemplate: " <> selectedTemp
 
 commitUpdateMessage :: FinalTemplateConfiguration -> Text
 commitUpdateMessage cfg = "Update from a template\n\nTemplate: " <> selectedTemplate cfg
+
+commitUpdateMergeMessage :: FinalTemplateConfiguration -> Text
+commitUpdateMergeMessage cfg = "Merge " <> selectedTemplate cfg
 
 commitMessagePattern :: Text
 commitMessagePattern = "^Template: .*$"
