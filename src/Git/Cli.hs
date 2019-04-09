@@ -86,9 +86,8 @@ gitInteractiveCmd
     -> m ExitCode
 gitInteractiveCmd cmd = do
     logInfo $ "Running git" <+> fillSep (map pretty cmd)
-    let process = setStdin inherit $ setStdout inherit $ setStderr inherit $ proc "git" (map T.unpack cmd) in do
-        exitCode <- liftIO $ runProcess process
-        return exitCode
+    let process = setStdin inherit $ setStdout inherit $ setStderr inherit $ proc "git" (map T.unpack cmd) in
+        liftIO $ runProcess process
 
 gitInteractiveRepoCmd
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -130,8 +129,8 @@ withNewWorktree
     -> (GitRepository -> m a)
     -> m a
 withNewWorktree repo c f =
-    (withSystemTempDir "tenpureto" $ initWorktree repo c >=> f)
-        `finally` (pruneWorktrees repo)
+    withSystemTempDir "tenpureto" (initWorktree repo c >=> f)
+        `finally` pruneWorktrees repo
 
 initWorktree
     :: (MonadIO m, MonadMask m, MonadLog m)
@@ -147,8 +146,7 @@ initWorktree repo (Committish c) dir = do
     return $ GitRepository dir
 
 pruneWorktrees :: (MonadIO m, MonadMask m, MonadLog m) => GitRepository -> m ()
-pruneWorktrees repo = do
-    gitRepoCmd repo ["worktree", "prune"] >>= unitOrThrow
+pruneWorktrees repo = gitRepoCmd repo ["worktree", "prune"] >>= unitOrThrow
 
 cloneReporitory
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -288,14 +286,4 @@ findCommit
     => GitRepository
     -> Text
     -> m (Maybe Committish)
-findCommit repo pattern =
-    gitcmdStdout
-            repo
-            [ "rev-list"
-            , "--max-count=1"
-            , "--date-order"
-            , "--grep"
-            , pattern
-            , "HEAD"
-            ]
-        <&> outputToCommittish
+findCommit repo pat = gitcmdStdout repo ["rev-list", "--max-count=1", "--date-order", "--grep", pat, "HEAD"] <&> outputToCommittish

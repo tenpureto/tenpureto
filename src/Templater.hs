@@ -32,7 +32,7 @@ data TemplaterSettings = TemplaterSettings
     , templaterExcludes :: Set Text
     }
 
-data CompiledTemplaterSettings = CompiledTemplaterSettings
+newtype CompiledTemplaterSettings = CompiledTemplaterSettings
     { translate :: Text -> Text
     }
 

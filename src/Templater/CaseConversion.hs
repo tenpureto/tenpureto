@@ -26,7 +26,7 @@ data TemplateValue = MultiWordTemplateValue WordCase WordCase WordSeparator [Tex
 allWordCases :: [WordCase]
 allWordCases = [LowerCase, UpperCase, TitleCase, MixedCase]
 
-validSeparators :: [Char]
+validSeparators :: String
 validSeparators = [' ', '-', '_', '/', '\\', '.']
 
 allWordSeparators :: [WordSeparator]

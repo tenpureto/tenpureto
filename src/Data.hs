@@ -32,7 +32,7 @@ data FinalTemplateConfiguration = FinalTemplateConfiguration
         }
         deriving (Show)
 
-data FinalUpdateConfiguration = FinalUpdateConfiguration
+newtype FinalUpdateConfiguration = FinalUpdateConfiguration
         { previousTemplateCommit :: Committish
         }
         deriving (Show)
