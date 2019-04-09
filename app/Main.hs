@@ -27,6 +27,7 @@ runAppM withDebug app =
 instance MonadGit AppM where
     withClonedRepository = GC.withClonedRepository
     withRepository       = GC.withRepository
+    withNewWorktree      = GC.withNewWorktree
     initRepository       = GC.initRepository
     listBranches         = GC.listBranches
     checkoutBranch       = GC.checkoutBranch

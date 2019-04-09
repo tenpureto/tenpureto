@@ -13,7 +13,9 @@ import qualified Data.ByteString                     as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Set                      as Set
+import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
 import           Control.Monad.IO.Class
@@ -50,10 +52,19 @@ makeFinalProjectConfiguration
 makeFinalProjectConfiguration True  = unattendedProjectConfiguration
 makeFinalProjectConfiguration False = inputProjectConfiguration
 
+makeFinalUpdateConfiguration
+    :: (MonadMask m, MonadIO m, MonadConsole m)
+    => Bool
+    -> PreliminaryProjectConfiguration
+    -> m FinalUpdateConfiguration
+makeFinalUpdateConfiguration True  = unattendedUpdateConfiguration
+makeFinalUpdateConfiguration False = inputUpdateConfiguration
+
 buildTemplaterSettings :: TemplateYaml -> FinalProjectConfiguration -> TemplaterSettings
-buildTemplaterSettings TemplateYaml {}
+buildTemplaterSettings TemplateYaml { variables = templateValues }
                        FinalProjectConfiguration { variableValues = values } = TemplaterSettings
-        { templaterVariables = Map.toList values
+        { templaterFromVariables = templateValues
+        , templaterToVariables = (InsOrdHashMap.fromList . Map.toList) values
         , templaterExcludes = Set.empty
         }
 
@@ -63,11 +74,11 @@ createProject
     -> Bool
     -> m ()
 createProject projectConfiguration unattended =
-    withPreparedTemplate projectConfiguration unattended $ \repository finalTemplateConfiguration templaterSettings ->
+    withPreparedTemplate projectConfiguration unattended $ \template finalTemplateConfiguration templaterSettings ->
         let dst = targetDirectory finalTemplateConfiguration in do
                 createDir dst
                 project <- initRepository dst
-                files <- copy templaterSettings (repositoryPath repository) (repositoryPath project)
+                files <- copy templaterSettings (repositoryPath template) (repositoryPath project)
                 addFiles project files
                 commit project (commitCreateMessage finalTemplateConfiguration)
 
@@ -76,15 +87,23 @@ updateProject
     => PreliminaryProjectConfiguration
     -> Bool
     -> m ()
-updateProject projectConfiguration unattended =
-    withPreparedTemplate projectConfiguration unattended $ \repository finalTemplateConfiguration templaterSettings ->
-        return ()
+updateProject projectConfiguration unattended = do
+    finalUpdateConfiguration <- makeFinalUpdateConfiguration unattended projectConfiguration
+    logDebug $ "Final update configuration" <> line <> (indent 4 . pretty) finalUpdateConfiguration
+    withPreparedTemplate projectConfiguration unattended $ \template finalTemplateConfiguration templaterSettings ->
+        withRepository (targetDirectory finalTemplateConfiguration) $ \project ->
+            withNewWorktree project (previousTemplateCommit finalUpdateConfiguration) $ \staging -> do
+                files <- copy templaterSettings (repositoryPath template) (repositoryPath staging)
+                addFiles staging files
+                commit staging (commitUpdateMessage finalTemplateConfiguration)
+                return ()
 
-withPreparedTemplate :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
-                => PreliminaryProjectConfiguration
-                -> Bool
-                -> (GitRepository -> FinalTemplateConfiguration -> TemplaterSettings -> m())
-                -> m ()
+withPreparedTemplate
+    :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
+    => PreliminaryProjectConfiguration
+    -> Bool
+    -> (GitRepository -> FinalTemplateConfiguration -> TemplaterSettings -> m())
+    -> m ()
 withPreparedTemplate projectConfiguration unattended block = do
     logDebug $ "Preliminary project configuration:" <> line <> (indent 4 . pretty) projectConfiguration
     finalTemplateConfiguration <- makeFinalTemplateConfiguration
@@ -93,13 +112,15 @@ withPreparedTemplate projectConfiguration unattended block = do
     withClonedRepository
             (RepositoryUrl $ selectedTemplate finalTemplateConfiguration)
         $ \repository -> do
-                templateInformation       <- loadTemplateInformation repository
+                templateInformation <- loadTemplateInformation repository
+                logDebug $ "Template information" <> line <> (indent 4 . pretty) templateInformation
                 finalProjectConfiguration <- makeFinalProjectConfiguration
                     unattended
                     templateInformation
                     projectConfiguration
                 logDebug $ "Final project configuration" <> line <> (indent 4 . pretty) finalProjectConfiguration
                 mergedTemplateYaml <- prepareTemplate repository templateInformation finalProjectConfiguration
+                logDebug $ "Merged template YAML" <> line <> (indent 4 . pretty) mergedTemplateYaml
                 let templaterSettings = buildTemplaterSettings mergedTemplateYaml finalProjectConfiguration in
                     block repository finalTemplateConfiguration templaterSettings
 

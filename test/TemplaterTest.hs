@@ -10,13 +10,15 @@ import qualified Data.Set                      as Set
 import           Data.Bifunctor
 import           Control.Monad.Log
 import           Path
+import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 
 import           Templater
 
 test_translateFile :: IO [TestTree]
 test_translateFile = discardLogging $ do
     settings <- compileSettings TemplaterSettings
-        { templaterVariables = [("bbb-ccc-ddd", "xxx-yyy")]
+        { templaterFromVariables = InsOrdHashMap.singleton "A" "bbb-ccc-ddd"
+        , templaterToVariables = InsOrdHashMap.singleton "A" "xxx-yyy"
         , templaterExcludes  = Set.empty
         }
     let move = first show . translateFile settings in return

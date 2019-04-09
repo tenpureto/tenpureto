@@ -60,9 +60,18 @@ unattendedTemplateConfiguration
     :: (MonadThrow m)
     => PreliminaryProjectConfiguration
     -> m FinalTemplateConfiguration
-unattendedTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = Just t, preTargetDirectory = Just td, prePreviousTemplateCommit = mbptc }
-    = return FinalTemplateConfiguration { selectedTemplate = t, targetDirectory = td, previousTemplateCommit = mbptc }
+unattendedTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = Just t, preTargetDirectory = Just td }
+    = return FinalTemplateConfiguration { selectedTemplate = t, targetDirectory = td }
 unattendedTemplateConfiguration _
+    = throwM UnattendedNotPossibleException
+
+unattendedUpdateConfiguration
+    :: (MonadThrow m)
+    => PreliminaryProjectConfiguration
+    -> m FinalUpdateConfiguration
+unattendedUpdateConfiguration PreliminaryProjectConfiguration { prePreviousTemplateCommit = Just c }
+    = return FinalUpdateConfiguration { previousTemplateCommit = c }
+unattendedUpdateConfiguration _
     = throwM UnattendedNotPossibleException
 
 unattendedProjectConfiguration
@@ -89,18 +98,26 @@ inputTarget = T.unpack <$> ask "Target directory  " Nothing >>= resolveTargetDir
 resolveTargetDir :: (MonadIO m, MonadCatch m) => FilePath -> m (Path Abs Dir)
 resolveTargetDir path = catch (resolveDir' path) (\e -> let _ = (e :: PathException) in parseAbsDir path)
 
+withDefaults :: Ord a => InsOrdHashMap a b -> Map a b -> InsOrdHashMap a b
+withDefaults variables defaults = InsOrdHashMap.mapWithKey (\k v -> fromMaybe v (Map.lookup k defaults)) variables
+
 inputTemplateConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)
     => PreliminaryProjectConfiguration
     -> m FinalTemplateConfiguration
 inputTemplateConfiguration PreliminaryProjectConfiguration
     { preSelectedTemplate = mbt
-    , preTargetDirectory = mbtd
-    , prePreviousTemplateCommit = mbptc }
-    = FinalTemplateConfiguration <$> maybe inputTemplate return mbt <*> maybe inputTarget return mbtd <*> return mbptc
+    , preTargetDirectory = mbtd }
+    = FinalTemplateConfiguration <$> maybe inputTemplate return mbt <*> maybe inputTarget return mbtd
+
+inputUpdateConfiguration
+    :: (MonadThrow m)
+    => PreliminaryProjectConfiguration
+    -> m FinalUpdateConfiguration
+inputUpdateConfiguration = unattendedUpdateConfiguration
 
 inputBranch
-    :: (MonadIO m, MonadMask m, MonadConsole m)
+    :: (MonadIO m, MonadConsole m)
     => Stylized
     -> Stylized
     -> [TemplateBranchInformation]
@@ -167,13 +184,13 @@ inputVariable
     :: (MonadIO m, MonadConsole m)
     => (Text, Text)
     -> m (Text, Text)
-inputVariable (desc, name) = (name, ) <$> ask (text $ desc <> " ") (Just name)
+inputVariable (desc, name) = (desc, ) <$> ask (text $ desc <> " ") (Just name)
 
 inputVariables
     :: (MonadIO m, MonadMask m, MonadConsole m)
     => InsOrdHashMap Text Text
     -> m (Map Text Text)
-inputVariables v = Map.fromList <$> traverse inputVariable (InsOrdHashMap.toList v)
+inputVariables variables = Map.fromList <$> traverse inputVariable (InsOrdHashMap.toList variables)
 
 inputProjectConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)
@@ -191,13 +208,12 @@ inputProjectConfiguration templateInformation providedConfiguration
             let sbi = filter (flip Set.member branches . branchName) bi
                 sbvars = mconcat (map branchVariables sbi)
                 cvars = fromMaybe Map.empty (preVariableValues providedConfiguration)
-                updateDefault k v = fromMaybe v (Map.lookup k cvars)
-                vars = InsOrdHashMap.mapWithKey updateDefault sbvars in do
+                vars = withDefaults sbvars cvars in do
                 varVals <- inputVariables vars
                 return FinalProjectConfiguration
-                    { baseBranch = base
+                    { baseBranch      = base
                     , featureBranches = branches
-                    , variableValues   = varVals
+                    , variableValues  = varVals
                     }
 
 data ConflictResolutionStrategy = AlreadyResolved | MergeTool

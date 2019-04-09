@@ -6,6 +6,7 @@ module Git.Cli where
 
 import           Git                            ( RepositoryUrl(..)
                                                 , GitRepository(..)
+                                                , Committish(..)
                                                 )
 import           Logging
 import           Data.Maybe
@@ -93,11 +94,36 @@ withRepository path f = f (GitRepository path)
 
 initRepository
     :: (MonadIO m, MonadMask m, MonadLog m) => Path Abs Dir -> m GitRepository
-initRepository dir =
-    GitRepository
-        <$> (gitCmd ["init", T.pack (toFilePath dir)] >>= unitOrThrow >> liftIO
-                (makeAbsolute dir)
-            )
+initRepository dir = do
+    gitCmd ["init", T.pack (toFilePath dir)] >>= unitOrThrow
+    return $ GitRepository dir
+
+withNewWorktree
+    :: (MonadIO m, MonadMask m, MonadLog m)
+    => GitRepository
+    -> Committish
+    -> (GitRepository -> m a)
+    -> m a
+withNewWorktree repo c f =
+    (withSystemTempDir "tenpureto" $ initWorktree repo c >=> f)
+        `finally` (pruneWorktrees repo)
+
+initWorktree
+    :: (MonadIO m, MonadMask m, MonadLog m)
+    => GitRepository
+    -> Committish
+    -> Path Abs Dir
+    -> m GitRepository
+initWorktree repo (Committish c) dir = do
+    gitRepoCmd
+            repo
+            ["worktree", "add", "--no-checkout", T.pack (toFilePath dir), c]
+        >>= unitOrThrow
+    return $ GitRepository dir
+
+pruneWorktrees :: (MonadIO m, MonadMask m, MonadLog m) => GitRepository -> m ()
+pruneWorktrees repo = do
+    gitRepoCmd repo ["worktree", "prune"] >>= unitOrThrow
 
 cloneReporitory
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -203,14 +229,14 @@ runMergeTool :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> m ()
 runMergeTool repo = gitRepoCmd repo ["mergetool"] >>= unitOrThrow
 
 commit :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> Text -> m ()
-commit repo message =
+commit repo message = do
     gitRepoCmd repo ["commit", "--message", message] >>= unitOrThrow
 
 findCommit
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
     -> Text
-    -> m (Maybe Text)
+    -> m (Maybe Committish)
 findCommit repo pattern =
     gitcmdStdout
             repo
@@ -225,3 +251,4 @@ findCommit repo pattern =
         .   T.lines
         .   E.decodeUtf8
         <&> mfilter (not . T.null)
+        <&> fmap Committish

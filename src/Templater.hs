@@ -12,6 +12,8 @@ import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
+import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
+import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Maybe
 import           Data.Foldable
 import           Control.Monad.IO.Class
@@ -25,7 +27,8 @@ import           Data.Text.ICU.Replace
 import           Templater.CaseConversion
 
 data TemplaterSettings = TemplaterSettings
-    { templaterVariables :: [(Text, Text)]
+    { templaterFromVariables :: InsOrdHashMap Text Text
+    , templaterToVariables :: InsOrdHashMap Text Text
     , templaterExcludes :: Set Text
     }
 
@@ -45,13 +48,14 @@ expandReplacement (a, b) =
     ]
     where variations text = Set.toList . Set.fromList $ concatMap styleVariations (textToTemplateValues text)
 
-expandReplacements :: [(Text, Text)] -> [(Text, Text)]
-expandReplacements = concatMap expandReplacement
+expandReplacements :: InsOrdHashMap Text Text -> InsOrdHashMap Text Text -> [(Text, Text)]
+expandReplacements fv tv = concatMap expandReplacement $ InsOrdHashMap.elems (InsOrdHashMap.intersectionWith (,) fv tv)
 
 compileSettings :: MonadLog m => TemplaterSettings -> m CompiledTemplaterSettings
-compileSettings TemplaterSettings { templaterVariables = tv, templaterExcludes = _ }
-    = let replacements = expandReplacements tv in do
-        logDebug $ "Veriables:" <+> align (sep [ pretty f <+> "->" <+> pretty t | (f, t) <- tv ])
+compileSettings TemplaterSettings { templaterFromVariables = tfv, templaterToVariables = ttv, templaterExcludes = _ }
+    = let replacements = expandReplacements tfv ttv in do
+        logDebug $ "From variables:" <+> align (sep [ pretty f <+> "->" <+> pretty t | (f, t) <- InsOrdHashMap.toList tfv ])
+        logDebug $ "To variables:" <+> align (sep [ pretty f <+> "->" <+> pretty t | (f, t) <- InsOrdHashMap.toList ttv ])
         logDebug $ "Replacements:" <+> align (sep [ pretty f <+> "->" <+> pretty t | (f, t) <- replacements ])
         return CompiledTemplaterSettings { translate = replaceVariables replacements }
 

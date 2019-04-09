@@ -3,12 +3,15 @@ module Git where
 import           Data.ByteString
 import           Data.Text                      ( Text )
 import           Path
+import           Logging
 
 newtype RepositoryUrl = RepositoryUrl Text
 newtype GitRepository = GitRepository { repositoryPath :: Path Abs Dir }
+newtype Committish = Committish Text deriving (Show)
 
 class Monad m => MonadGit m where
     withClonedRepository :: RepositoryUrl -> (GitRepository -> m a) -> m a
+    withNewWorktree :: GitRepository -> Committish -> (GitRepository -> m a) -> m a
     withRepository :: Path Abs Dir -> (GitRepository -> m a) -> m a
     initRepository :: Path Abs Dir -> m GitRepository
     listBranches :: GitRepository -> Text -> m [Text]
@@ -20,4 +23,7 @@ class Monad m => MonadGit m where
     writeAddFile :: GitRepository -> Path Rel File -> ByteString -> m ()
     addFiles :: GitRepository -> [Path Rel File] -> m ()
     commit :: GitRepository -> Text -> m ()
-    findCommit :: GitRepository -> Text -> m (Maybe Text)
+    findCommit :: GitRepository -> Text -> m (Maybe Committish)
+
+instance Pretty Committish where
+    pretty (Committish c) = pretty c
