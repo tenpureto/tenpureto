@@ -83,7 +83,7 @@ createProject projectConfiguration unattended =
                       createDir dst
                       project <- initRepository dst
                       files   <- copy templaterSettings
-                                      (repositoryPath template)
+                                      template
                                       (repositoryPath project)
                       addFiles project files
                       commit
@@ -114,7 +114,7 @@ updateProject projectConfiguration unattended = do
                                 )
                             $ \staging -> do
                                   files <- copy templaterSettings
-                                                (repositoryPath template)
+                                                template
                                                 (repositoryPath staging)
                                   addFiles staging files
                                   result <- commit

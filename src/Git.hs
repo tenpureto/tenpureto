@@ -24,6 +24,7 @@ class Monad m => MonadGit m where
     addFiles :: GitRepository -> [Path Rel File] -> m ()
     commit :: GitRepository -> Text -> m (Maybe Committish)
     findCommit :: GitRepository -> Text -> m (Maybe Committish)
+    listFiles :: GitRepository -> m [Path Rel File]
 
 instance Pretty Committish where
     pretty (Committish c) = pretty c

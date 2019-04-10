@@ -25,6 +25,7 @@ import qualified Data.Text.ICU                 as ICU
 import           Data.Text.Encoding
 import           Data.Text.ICU.Replace
 import           Templater.CaseConversion
+import           Git
 
 data TemplaterSettings = TemplaterSettings
     { templaterFromVariables :: InsOrdHashMap Text Text
@@ -149,15 +150,13 @@ copyRelFile settings src dst srcFile = do
     return dstFile
 
 copy
-    :: (MonadIO m, MonadThrow m, MonadLog m)
+    :: (MonadIO m, MonadThrow m, MonadLog m, MonadGit m)
     => TemplaterSettings
-    -> Path Abs Dir
+    -> GitRepository
     -> Path Abs Dir
     -> m [Path Rel File]
-copy settings src dst = do
+copy settings repo dst = do
     compiledSettings <- compileSettings settings
-    let exclude = filter ((==) ".git/" . fromRelDir)
-        dirWalker dir subdirs files = return $ WalkExclude (exclude subdirs)
-        fileWalker = copyRelFile compiledSettings src dst
-        fileWriter dir _ = traverse (\f -> fileWalker (dir </> f))
-    walkDirAccumRel (Just dirWalker) fileWriter src
+    files            <- listFiles repo
+    let src = repositoryPath repo
+    traverse (copyRelFile compiledSettings src dst) files

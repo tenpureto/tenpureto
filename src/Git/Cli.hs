@@ -297,3 +297,12 @@ findCommit repo pat =
             repo
             ["rev-list", "--max-count=1", "--date-order", "--grep", pat, "HEAD"]
         <&> outputToCommittish
+
+listFiles
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> m [Path Rel File]
+listFiles repo =
+    gitcmdStdout repo ["ls-files"]
+        >>= traverse (parseRelFile . T.unpack)
+        .   (T.lines . decodeUtf8)
