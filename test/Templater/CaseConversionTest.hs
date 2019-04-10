@@ -28,7 +28,8 @@ scprop_wordCasePatternsNotEmpty wc =
   isNothing $ ICU.find (ICU.regex [] $ wordCasePattern wc) ""
 
 test_detectValueStyle :: [TestTree]
-test_detectValueStyle = fmap runTest cases where
+test_detectValueStyle = fmap runTest cases
+ where
   runTest :: (Text, TemplateValue) -> TestTree
   runTest (str, tw) =
     let values = textToTemplateValues str

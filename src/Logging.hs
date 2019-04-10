@@ -53,4 +53,5 @@ instance (Pretty a, Pretty b) => Pretty (Map a b) where
     pretty s = group . encloseSep "{ " " }" ", " $ pretty <$> Map.toList s
 
 instance (Pretty a, Pretty b) => Pretty (InsOrdHashMap a b) where
-    pretty s = group . encloseSep "{ " " }" ", " $ pretty <$> InsOrdHashMap.toList s
+    pretty s =
+        group . encloseSep "{ " " }" ", " $ pretty <$> InsOrdHashMap.toList s

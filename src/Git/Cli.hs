@@ -57,20 +57,24 @@ unitOrThrow :: MonadThrow m => (ExitCode, ByteString, ByteString) -> m ()
 unitOrThrow a = void (stdoutOrThrow a)
 
 throwIfFailed :: MonadThrow m => ExitCode -> m ()
-throwIfFailed ExitSuccess = return ()
+throwIfFailed ExitSuccess        = return ()
 throwIfFailed (ExitFailure code) = throwM $ GitCallException code ""
 
 gitCmd
-        :: (MonadIO m, MonadThrow m, MonadLog m)
-        => [Text]
-        -> m (ExitCode, ByteString, ByteString)
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => [Text]
+    -> m (ExitCode, ByteString, ByteString)
 gitCmd cmd = do
-        logInfo $ "Running interactively git" <+> fillSep (map pretty cmd)
-        let process = setStdin closed $ setStdout byteStringOutput $ setStderr byteStringOutput $ proc "git" (map T.unpack cmd) in do
-            (exitCode, out, err) <- liftIO $ readProcess process
-            logDebug $ prefixed "err> " (decodeUtf8 err)
-            logDebug $ prefixed "out> " (decodeUtf8 out)
-            return (exitCode, out, err)
+    logInfo $ "Running interactively git" <+> fillSep (map pretty cmd)
+    let process =
+            setStdin closed
+                $ setStdout byteStringOutput
+                $ setStderr byteStringOutput
+                $ proc "git" (map T.unpack cmd)
+    (exitCode, out, err) <- liftIO $ readProcess process
+    logDebug $ prefixed "err> " (decodeUtf8 err)
+    logDebug $ prefixed "out> " (decodeUtf8 out)
+    return (exitCode, out, err)
 
 gitRepoCmd
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -81,13 +85,14 @@ gitRepoCmd (GitRepository path) cmd =
     gitCmd (map T.pack ["-C", toFilePath path] ++ cmd)
 
 gitInteractiveCmd
-    :: (MonadIO m, MonadThrow m, MonadLog m)
-    => [Text]
-    -> m ExitCode
+    :: (MonadIO m, MonadThrow m, MonadLog m) => [Text] -> m ExitCode
 gitInteractiveCmd cmd = do
     logInfo $ "Running git" <+> fillSep (map pretty cmd)
-    let process = setStdin inherit $ setStdout inherit $ setStderr inherit $ proc "git" (map T.unpack cmd) in
-        liftIO $ runProcess process
+    let process =
+            setStdin inherit $ setStdout inherit $ setStderr inherit $ proc
+                "git"
+                (map T.unpack cmd)
+    liftIO $ runProcess process
 
 gitInteractiveRepoCmd
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -179,7 +184,8 @@ getBranchFile
     -> Text
     -> Path Rel File
     -> m (Maybe ByteString)
-getBranchFile repo branch file = stdoutOrNothing <$> gitRepoCmd repo ["show", branch <> ":" <> T.pack (toFilePath file)]
+getBranchFile repo branch file = stdoutOrNothing
+    <$> gitRepoCmd repo ["show", branch <> ":" <> T.pack (toFilePath file)]
 
 getWorkingCopyFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -286,4 +292,8 @@ findCommit
     => GitRepository
     -> Text
     -> m (Maybe Committish)
-findCommit repo pat = gitcmdStdout repo ["rev-list", "--max-count=1", "--date-order", "--grep", pat, "HEAD"] <&> outputToCommittish
+findCommit repo pat =
+    gitcmdStdout
+            repo
+            ["rev-list", "--max-count=1", "--date-order", "--grep", pat, "HEAD"]
+        <&> outputToCommittish

@@ -74,7 +74,8 @@ multiWordPatterns =
     , owc <- allWordCases
     , s   <- allWordSeparators
     , spl <- maybeToList $ splitWords fwc owc s
-    ]  where
+    ]
+  where
     build fwc owc s = ICU.regex
         []
         (  "^"

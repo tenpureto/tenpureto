@@ -46,18 +46,45 @@ expandReplacement (a, b) =
     , bv <- variations b
     , sameStyle av bv
     ]
-    where variations text = Set.toList . Set.fromList $ concatMap styleVariations (textToTemplateValues text)
+  where
+    variations text = Set.toList . Set.fromList $ concatMap
+        styleVariations
+        (textToTemplateValues text)
 
-expandReplacements :: InsOrdHashMap Text Text -> InsOrdHashMap Text Text -> [(Text, Text)]
-expandReplacements fv tv = concatMap expandReplacement $ InsOrdHashMap.elems (InsOrdHashMap.intersectionWith (,) fv tv)
+expandReplacements
+    :: InsOrdHashMap Text Text -> InsOrdHashMap Text Text -> [(Text, Text)]
+expandReplacements fv tv = concatMap expandReplacement
+    $ InsOrdHashMap.elems (InsOrdHashMap.intersectionWith (,) fv tv)
 
-compileSettings :: MonadLog m => TemplaterSettings -> m CompiledTemplaterSettings
+compileSettings
+    :: MonadLog m => TemplaterSettings -> m CompiledTemplaterSettings
 compileSettings TemplaterSettings { templaterFromVariables = tfv, templaterToVariables = ttv, templaterExcludes = _ }
-    = let replacements = expandReplacements tfv ttv in do
-        logDebug $ "From variables:" <+> align (sep [ pretty f <+> "->" <+> pretty t | (f, t) <- InsOrdHashMap.toList tfv ])
-        logDebug $ "To variables:" <+> align (sep [ pretty f <+> "->" <+> pretty t | (f, t) <- InsOrdHashMap.toList ttv ])
-        logDebug $ "Replacements:" <+> align (sep [ pretty f <+> "->" <+> pretty t | (f, t) <- replacements ])
-        return CompiledTemplaterSettings { translate = replaceVariables replacements }
+    = let replacements = expandReplacements tfv ttv
+      in
+          do
+              logDebug $ "From variables:" <+> align
+                  (sep
+                      [ pretty f <+> "->" <+> pretty t
+                      | (f, t) <- InsOrdHashMap.toList tfv
+                      ]
+                  )
+              logDebug $ "To variables:" <+> align
+                  (sep
+                      [ pretty f <+> "->" <+> pretty t
+                      | (f, t) <- InsOrdHashMap.toList ttv
+                      ]
+                  )
+              logDebug
+                  $   "Replacements:"
+                  <+> align
+                          (sep
+                              [ pretty f <+> "->" <+> pretty t
+                              | (f, t) <- replacements
+                              ]
+                          )
+              return CompiledTemplaterSettings
+                  { translate = replaceVariables replacements
+                  }
 
 replaceVariables :: [(Text, Text)] -> Text -> Text
 replaceVariables rules = replaceAll regex replace
@@ -74,7 +101,7 @@ data FileContent = BinaryContent ByteString
 
 mapContent :: (Text -> Text) -> FileContent -> FileContent
 mapContent f (TextContent t enc) = TextContent (f t) enc
-mapContent f (BinaryContent b) = BinaryContent b
+mapContent f (BinaryContent b  ) = BinaryContent b
 
 detectEncoding :: ByteString -> FileContent
 detectEncoding bs = case decodeUtf8' bs of
@@ -82,8 +109,8 @@ detectEncoding bs = case decodeUtf8' bs of
     Left  _ -> BinaryContent bs
 
 contentToByteString :: FileContent -> ByteString
-contentToByteString (TextContent t enc)  = enc t
-contentToByteString (BinaryContent bs) = bs
+contentToByteString (TextContent t enc) = enc t
+contentToByteString (BinaryContent bs ) = bs
 
 translateFile
     :: MonadThrow m
@@ -102,11 +129,11 @@ copyAbsFile
 copyAbsFile settings src dst = do
     logDebug $ "Copying" <+> pretty src <+> "to" <+> pretty dst
     byteContent <- liftIO $ BS.readFile (toFilePath src)
-    let content = detectEncoding byteContent
+    let content           = detectEncoding byteContent
         translatedContent = mapContent (translate settings) content
-        translated = contentToByteString translatedContent in do
-        ensureDir (parent dst)
-        liftIO $ BS.writeFile (toFilePath dst) translated
+        translated        = contentToByteString translatedContent
+    ensureDir (parent dst)
+    liftIO $ BS.writeFile (toFilePath dst) translated
 
 copyRelFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -114,11 +141,12 @@ copyRelFile
     -> Path Abs Dir
     -> Path Abs Dir
     -> Path Rel File
-    -> m ()
+    -> m (Path Rel File)
 copyRelFile settings src dst srcFile = do
     dstFile <- translateFile settings srcFile
     copyAbsFile settings (src </> srcFile) (dst </> dstFile)
     copyPermissions (src </> srcFile) (dst </> dstFile)
+    return dstFile
 
 copy
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -128,11 +156,10 @@ copy
     -> m [Path Rel File]
 copy settings src dst = do
     compiledSettings <- compileSettings settings
-    let
-        dirWalker dir subdirs files = do
+    let dirWalker dir subdirs files = do
             traverse_ (\f -> fileWalker (dir </> f)) files
             return $ WalkExclude (exclude subdirs)
         fileWalker = copyRelFile compiledSettings src dst
         fileWriter dir _ files = return $ map (dir </>) files
-        exclude    = filter ((==) ".git/" . fromRelDir)
-        in walkDirAccumRel (Just dirWalker) fileWriter src
+        exclude = filter ((==) ".git/" . fromRelDir)
+    walkDirAccumRel (Just dirWalker) fileWriter src

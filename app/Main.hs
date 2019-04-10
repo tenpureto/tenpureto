@@ -87,25 +87,26 @@ run Create { templateName = t, maybeTargetDirectory = td, runUnattended = u, ena
     = runAppM d $ do
         resolvedTd <- traverse resolveTargetDir td
         createProject
-            PreliminaryProjectConfiguration { preSelectedTemplate = t
-                                            , preTargetDirectory  = resolvedTd
-                                            , prePreviousTemplateCommit = Nothing
-                                            , preSelectedBranches = Nothing
-                                            , preVariableValues   = Nothing
-                                            }
+            PreliminaryProjectConfiguration
+                { preSelectedTemplate       = t
+                , preTargetDirectory        = resolvedTd
+                , prePreviousTemplateCommit = Nothing
+                , preSelectedBranches       = Nothing
+                , preVariableValues         = Nothing
+                }
             u
 run Update { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
     = runAppM d $ do
-        resolvedTd <- resolveTargetDir (fromMaybe "." td)
+        resolvedTd    <- resolveTargetDir (fromMaybe "." td)
         currentConfig <- loadExistingProjectConfiguration resolvedTd
-        let inputConfig  = PreliminaryProjectConfiguration
-                                { preSelectedTemplate    = t
-                                , preTargetDirectory     = Just resolvedTd
-                                , prePreviousTemplateCommit = Nothing
-                                , preSelectedBranches    = Nothing
-                                , preVariableValues      = Nothing
-                                } in
-            updateProject (inputConfig <> currentConfig) u
+        let inputConfig = PreliminaryProjectConfiguration
+                { preSelectedTemplate       = t
+                , preTargetDirectory        = Just resolvedTd
+                , prePreviousTemplateCommit = Nothing
+                , preSelectedBranches       = Nothing
+                , preVariableValues         = Nothing
+                }
+        updateProject (inputConfig <> currentConfig) u
 
 main :: IO ()
 main = run =<< customExecParser p opts
