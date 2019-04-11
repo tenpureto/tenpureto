@@ -38,12 +38,6 @@ executables:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
-    - -Wall
-    - -Wcompat
-    - -Wincomplete-record-updates
-    - -Wincomplete-uni-patterns
-    - -Wredundant-constraints
-    - -Werror
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
@@ -55,12 +49,6 @@ tests:
     main:                Driver.hs
     source-dirs:         test
     ghc-options:
-    - -Wall
-    - -Wcompat
-    - -Wincomplete-record-updates
-    - -Wincomplete-uni-patterns
-    - -Wredundant-constraints
-    - -fno-warn-orphans
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
