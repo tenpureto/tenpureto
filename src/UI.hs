@@ -184,6 +184,7 @@ inputBaseBranch
     => [TemplateBranchInformation]
     -> Maybe Text
     -> m Text
+inputBaseBranch [single] selected = return (branchName single)
 inputBaseBranch branches selected = do
     selection <- inputBranch "Base branches"
                              "Select a base branch"
