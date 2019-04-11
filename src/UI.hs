@@ -49,7 +49,7 @@ preSelectedBaseBranch templateInformation providedConfiguration =
             isBaseBranch
             (branchesInformation templateInformation)
         selected =
-            fromMaybe Set.empty (preSelectedBranches providedConfiguration)
+                fromMaybe Set.empty (preSelectedBranches providedConfiguration)
         selectedBaseBranches  = Set.intersection baseBranches selected
         minSelectedBaseBranch = Set.lookupMin selectedBaseBranches
         maxSelectedBaseBranch = Set.lookupMax selectedBaseBranches
@@ -73,10 +73,9 @@ unattendedTemplateConfiguration
     => PreliminaryProjectConfiguration
     -> m FinalTemplateConfiguration
 unattendedTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate = Just t, preTargetDirectory = Just td }
-    = return FinalTemplateConfiguration
-        { selectedTemplate = t
-        , targetDirectory  = td
-        }
+    = return FinalTemplateConfiguration { selectedTemplate = t
+                                        , targetDirectory  = td
+                                        }
 unattendedTemplateConfiguration _ = throwM UnattendedNotPossibleException
 
 unattendedUpdateConfiguration
@@ -84,7 +83,7 @@ unattendedUpdateConfiguration
     => PreliminaryProjectConfiguration
     -> m FinalUpdateConfiguration
 unattendedUpdateConfiguration PreliminaryProjectConfiguration { prePreviousTemplateCommit = Just c }
-    = return FinalUpdateConfiguration {previousTemplateCommit = c}
+    = return FinalUpdateConfiguration { previousTemplateCommit = c }
 unattendedUpdateConfiguration _ = throwM UnattendedNotPossibleException
 
 unattendedProjectConfiguration
@@ -142,38 +141,38 @@ inputBranch
     -> [TemplateBranchInformation]
     -> Set Text
     -> m (Maybe Text)
-inputBranch title request availableBranches selected
-    = let
-          indexedBranches :: [(Int, TemplateBranchInformation)]
-          indexedBranches = [1 ..] `zip` availableBranches
-          branchLineIndex :: Int -> Stylized
-          branchLineIndex = text . T.pack . printf "%2d) "
-          branchLineSelected :: TemplateBranchInformation -> Stylized
-          branchLineSelected branch =
-              let isSelected = Set.member (branchName branch) selected
-              in  text $ T.pack $ bool "  " " *" isSelected
-          branchLineName :: TemplateBranchInformation -> Stylized
-          branchLineName = text . branchName
-          branchLine :: (Int, TemplateBranchInformation) -> Stylized
-          branchLine (index, branch) =
-              (branchLineSelected branch <> fg green)
-                  <> branchLineIndex index
-                  <> (branchLineName branch <> fg white)
-          branchByIndex :: Text -> Maybe TemplateBranchInformation
-          branchByIndex index =
-              find (\x -> T.unpack index == (show . fst) x) indexedBranches
-                  <&> snd
-          validateInput :: Text -> Either Stylized Text
-          validateInput input = if T.null input || isJust (branchByIndex input)
-              then Right input
-              else Left (text input <> " is not a valid branch number.")
-          indexToBranch :: Text -> Maybe Text
-          indexToBranch index = branchByIndex index <&> branchName
-      in
-          do
-              sayLn title
-              traverse_ (sayLn . branchLine) indexedBranches
-              askUntil (request <> ": ") Nothing validateInput <&> indexToBranch
+inputBranch title request availableBranches selected =
+    let
+        indexedBranches :: [(Int, TemplateBranchInformation)]
+        indexedBranches = [1 ..] `zip` availableBranches
+        branchLineIndex :: Int -> Stylized
+        branchLineIndex = text . T.pack . printf "%2d) "
+        branchLineSelected :: TemplateBranchInformation -> Stylized
+        branchLineSelected branch =
+            let isSelected = Set.member (branchName branch) selected
+            in  text $ T.pack $ bool "  " " *" isSelected
+        branchLineName :: TemplateBranchInformation -> Stylized
+        branchLineName = text . branchName
+        branchLine :: (Int, TemplateBranchInformation) -> Stylized
+        branchLine (index, branch) =
+            (branchLineSelected branch <> fg green)
+                <> branchLineIndex index
+                <> (branchLineName branch <> fg white)
+        branchByIndex :: Text -> Maybe TemplateBranchInformation
+        branchByIndex index =
+            find (\x -> T.unpack index == (show . fst) x) indexedBranches
+                <&> snd
+        validateInput :: Text -> Either Stylized Text
+        validateInput input = if T.null input || isJust (branchByIndex input)
+            then Right input
+            else Left (text input <> " is not a valid branch number.")
+        indexToBranch :: Text -> Maybe Text
+        indexToBranch index = branchByIndex index <&> branchName
+    in
+        do
+            sayLn title
+            traverse_ (sayLn . branchLine) indexedBranches
+            askUntil (request <> ": ") Nothing validateInput <&> indexToBranch
 
 toggleBranch :: Text -> Set Text -> Set Text
 toggleBranch branch selected = bool (Set.insert branch selected)
@@ -192,7 +191,7 @@ inputBaseBranch branches selected = do
                              (maybe Set.empty Set.singleton selected)
     case selection of
         Just branch -> return branch
-        Nothing     -> inputBaseBranch branches selected
+        Nothing     -> maybe (inputBaseBranch branches selected) return selected
 
 inputFeatureBranches
     :: (MonadIO m, MonadMask m, MonadConsole m)
@@ -243,11 +242,10 @@ inputProjectConfiguration templateInformation providedConfiguration = do
         cvars  = fromMaybe Map.empty (preVariableValues providedConfiguration)
         vars   = withDefaults sbvars cvars
     varVals <- inputVariables vars
-    return FinalProjectConfiguration
-        { baseBranch      = base
-        , featureBranches = branches
-        , variableValues  = varVals
-        }
+    return FinalProjectConfiguration { baseBranch      = base
+                                     , featureBranches = branches
+                                     , variableValues  = varVals
+                                     }
 
 data ConflictResolutionStrategy = AlreadyResolved | MergeTool
 
@@ -256,22 +254,21 @@ inputResolutionStrategy
     => Path Abs Dir
     -> [Path Rel File]
     -> m ConflictResolutionStrategy
-inputResolutionStrategy repo conflicts
-    = let mapAnswer x = case x of
-              "y" -> Right x
-              "n" -> Right x
-              _   -> Left "Please answer \"y\" or \"n\"."
-      in
-          do
-              sayLn "The following files have merge conflicts:"
-              traverse_
-                  (\c -> sayLn ("  " <> (text . T.pack . toFilePath) c))
-                  conflicts
-              sayLn $ text $ "Repository path: " <> T.pack (toFilePath repo)
-              result <- askUntil "Run \"git mergetool\" (y/n)? "
-                                 (Just "y")
-                                 mapAnswer
-              return $ bool AlreadyResolved MergeTool (result == "y")
+inputResolutionStrategy repo conflicts =
+    let mapAnswer x = case x of
+            "y" -> Right x
+            "n" -> Right x
+            _   -> Left "Please answer \"y\" or \"n\"."
+    in
+        do
+            sayLn "The following files have merge conflicts:"
+            traverse_ (\c -> sayLn ("  " <> (text . T.pack . toFilePath) c))
+                      conflicts
+            sayLn $ text $ "Repository path: " <> T.pack (toFilePath repo)
+            result <- askUntil "Run \"git mergetool\" (y/n)? "
+                               (Just "y")
+                               mapAnswer
+            return $ bool AlreadyResolved MergeTool (result == "y")
 
 outputNoUpdates :: MonadConsole m => m ()
 outputNoUpdates = sayLn "There are no relevant changes in the template."
