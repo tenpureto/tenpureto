@@ -270,6 +270,3 @@ inputResolutionStrategy repo conflicts =
                                (Just "y")
                                mapAnswer
             return $ bool AlreadyResolved MergeTool (result == "y")
-
-outputNoUpdates :: MonadConsole m => m ()
-outputNoUpdates = sayLn "There are no relevant changes in the template."

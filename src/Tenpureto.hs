@@ -89,7 +89,7 @@ createProject projectConfiguration unattended =
                       commit
                           project
                           (commitCreateMessage finalTemplateConfiguration)
-                      return ()
+                      sayLn $ "Created " <> (text . T.pack . toFilePath) dst
 
 updateProject
     :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
@@ -135,8 +135,17 @@ updateProject projectConfiguration unattended = do
                                               (commitUpdateMergeMessage
                                                   finalTemplateConfiguration
                                               )
-                                          return ()
-                                      Nothing -> outputNoUpdates
+                                          sayLn
+                                              $  "Updated "
+                                              <> ( text
+                                                 . T.pack
+                                                 . toFilePath
+                                                 . repositoryPath
+                                                 )
+                                                     project
+                                      Nothing ->
+                                          sayLn
+                                              "There are no relevant changes in the template."
 
 withPreparedTemplate
     :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
@@ -256,7 +265,7 @@ prepareTemplate
 prepareTemplate repository template configuration =
     let
         branch = "template"
-        resolve descriptor [] = return ()
+        resolve descriptor []        = return ()
         resolve descriptor conflicts = if templateYamlFile `elem` conflicts
             then
                 writeAddFile repository
