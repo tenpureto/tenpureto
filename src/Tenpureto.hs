@@ -256,6 +256,7 @@ prepareTemplate
 prepareTemplate repository template configuration =
     let
         branch = "template"
+        resolve descriptor [] = return ()
         resolve descriptor conflicts = if templateYamlFile `elem` conflicts
             then
                 writeAddFile repository
