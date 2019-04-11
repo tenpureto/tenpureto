@@ -238,10 +238,9 @@ loadBranchConfiguration repo branch = runMaybeT $ do
 loadTemplateInformation
     :: (MonadThrow m, MonadGit m) => GitRepository -> m TemplateInformation
 loadTemplateInformation repository = do
-    baseBranches         <- listBranches repository "base/"
-    featureBranches      <- listBranches repository "feature/"
+    branches             <- listBranches repository
     branchConfigurations <- traverse (loadBranchConfiguration repository)
-        $ sort (baseBranches ++ featureBranches)
+        $ sort branches
     return $ TemplateInformation
         { branchesInformation = catMaybes branchConfigurations
         }

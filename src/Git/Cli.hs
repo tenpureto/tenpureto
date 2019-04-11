@@ -167,16 +167,10 @@ cloneReporitory (RepositoryUrl url) dst =
             return repo
 
 listBranches
-    :: (MonadIO m, MonadThrow m, MonadLog m)
-    => GitRepository
-    -> Text
-    -> m [Text]
-listBranches repo prefix = T.lines . decodeUtf8 <$> gitcmdStdout
+    :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> m [Text]
+listBranches repo = T.lines . decodeUtf8 <$> gitcmdStdout
     repo
-    [ "for-each-ref"
-    , "--format=%(refname:strip=3)"
-    , "refs/remotes/origin/" <> prefix
-    ]
+    ["for-each-ref", "--format=%(refname:strip=3)", "refs/remotes/origin/"]
 
 getBranchFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
