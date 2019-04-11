@@ -227,13 +227,15 @@ loadBranchConfiguration repo branch = runMaybeT $ do
         (T.pack "remotes/origin/" <> branch)
         templateYamlFile
     info <- MaybeT $ return $ parseTemplateYaml descriptor
-    let fb = features info
-    return $ TemplateBranchInformation { branchName       = branch
-                                       , isBaseBranch     = Set.size fb <= 1
-                                       , requiredBranches = fb
-                                       , branchVariables  = variables info
-                                       , templateYaml     = info
-                                       }
+    let checkFeatures f = if Set.member branch f then Just f else Nothing
+    fb <- MaybeT $ return $ checkFeatures (features info)
+    return $ TemplateBranchInformation
+        { branchName       = branch
+        , isBaseBranch     = fb == Set.singleton branch
+        , requiredBranches = fb
+        , branchVariables  = variables info
+        , templateYaml     = info
+        }
 
 loadTemplateInformation
     :: (MonadThrow m, MonadGit m) => GitRepository -> m TemplateInformation
