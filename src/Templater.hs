@@ -88,6 +88,7 @@ compileSettings TemplaterSettings { templaterFromVariables = tfv, templaterToVar
                   }
 
 replaceVariables :: [(Text, Text)] -> Text -> Text
+replaceVariables []    = id
 replaceVariables rules = replaceAll regex replace
   where
     rulesMap = Map.fromList rules
