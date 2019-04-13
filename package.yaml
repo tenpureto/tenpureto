@@ -1,10 +1,11 @@
 name:                tenpureto
-version:             0.1.0.0
-license:             BSD3
+version:             0.1.0
 author:              "Roman Timushev"
 maintainer:          "rtimush@gmail.com"
+github:              "rtimush/tenpureto"
 copyright:           "2019 Roman Timushev"
-description:         Please see the README on GitHub at <https://github.com/rtimush/tenpureto#readme>
+synopsis:            "Simple and flexible project templates"
+description:         "Please see the README on GitHub at <https://github.com/rtimush/tenpureto#readme>"
 
 dependencies:
 - base >= 4.7 && < 5
