@@ -39,6 +39,7 @@ instance MonadGit AppM where
     addFiles             = GC.addFiles
     commit               = GC.commit
     findCommit           = GC.findCommit
+    getCommitMessage     = GC.getCommitMessage
     listFiles            = GC.listFiles
 
 instance MonadConsole AppM where

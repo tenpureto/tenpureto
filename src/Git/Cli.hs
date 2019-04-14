@@ -292,6 +292,15 @@ findCommit repo pat =
             ["rev-list", "--max-count=1", "--date-order", "--grep", pat, "HEAD"]
         <&> outputToCommittish
 
+getCommitMessage
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> Committish
+    -> m Text
+getCommitMessage repo (Committish c) =
+    gitcmdStdout repo ["rev-list", "--max-count=1", "--format=%B", "HEAD", c]
+        <&> decodeUtf8
+
 listFiles
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository

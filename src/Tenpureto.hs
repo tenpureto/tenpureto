@@ -24,6 +24,8 @@ import           Control.Monad.Trans
 import           Control.Monad.Trans.Maybe
 import qualified Data.Yaml                     as Y
 import           Data
+import qualified Data.Text.ICU                 as ICU
+import           Data.Functor
 import           Git
 import           Console
 import           UI
@@ -211,9 +213,12 @@ loadExistingProjectConfiguration projectPath =
             <+> pretty templateYamlFile
         templateYamlContent    <- getWorkingCopyFile project templateYamlFile
         previousTemplateCommit <- findCommit project commitMessagePattern
+        previousCommitMessage  <- traverse (getCommitMessage project)
+                                           previousTemplateCommit
         let yaml = templateYamlContent >>= parseTemplateYaml
         return PreliminaryProjectConfiguration
-            { preSelectedTemplate       = Nothing
+            { preSelectedTemplate       = extractTemplateName
+                                              =<< previousCommitMessage
             , preTargetDirectory        = Just projectPath
             , prePreviousTemplateCommit = previousTemplateCommit
             , preSelectedBranches       = fmap features yaml
@@ -303,3 +308,9 @@ commitUpdateMergeMessage cfg = "Merge " <> selectedTemplate cfg
 
 commitMessagePattern :: Text
 commitMessagePattern = "^Template: .*$"
+
+extractTemplateNameRegex :: ICU.Regex
+extractTemplateNameRegex = ICU.regex [ICU.Multiline] "^Template: (.*)$"
+
+extractTemplateName :: Text -> Maybe Text
+extractTemplateName msg = ICU.find extractTemplateNameRegex msg >>= ICU.group 1
