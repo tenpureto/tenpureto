@@ -5,7 +5,7 @@ import           Data.Text                      ( Text )
 import           Path
 import           Logging
 
-newtype RepositoryUrl = RepositoryUrl Text
+newtype RepositoryUrl = RepositoryUrl Text deriving (Eq, Show)
 newtype GitRepository = GitRepository { repositoryPath :: Path Abs Dir }
 newtype Committish = Committish Text deriving (Show)
 

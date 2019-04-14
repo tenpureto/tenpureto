@@ -168,7 +168,7 @@ withPreparedTemplate projectConfiguration unattended block = do
         unattended
         projectConfiguration
     withClonedRepository
-            (RepositoryUrl $ selectedTemplate finalTemplateConfiguration)
+            (buildRepositoryUrl $ selectedTemplate finalTemplateConfiguration)
         $ \repository -> do
               templateInformation <- loadTemplateInformation repository
               logDebug
@@ -314,3 +314,13 @@ extractTemplateNameRegex = ICU.regex [ICU.Multiline] "^Template: (.*)$"
 
 extractTemplateName :: Text -> Maybe Text
 extractTemplateName msg = ICU.find extractTemplateNameRegex msg >>= ICU.group 1
+
+orgRepoRegex :: ICU.Regex
+orgRepoRegex = ICU.regex [] "^[\\w-]+/[\\w.-]+$"
+
+buildRepositoryUrl :: Text -> RepositoryUrl
+buildRepositoryUrl url
+    | isJust (ICU.find orgRepoRegex url)
+    = RepositoryUrl $ "git@github.com:" <> url <> ".git"
+    | otherwise
+    = RepositoryUrl url
