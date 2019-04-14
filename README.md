@@ -48,12 +48,12 @@ To create a new project run the following command:
 $ tenpureto create --template <repository> <directory>
 ```
 where
- * `<repository>` — Git URL of a template repository,
+ * `<repository>` — Git URL of a template repository (for GitHub you can just use `organization/repo`),
  * `<directory>` — where to create a project.
 
 You will be asked to choose a subset of template features you want to include, and to provide some variable values, and then the project will be created.
 
 If you want to incorporate changes that were made in a template into a project that you previously created, run
 ```sh
-$ tenpureto update --template <repository> <directory>
+$ tenpureto update <directory>
 ```
