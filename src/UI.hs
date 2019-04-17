@@ -41,7 +41,6 @@ instance Show UIException where
     show InvalidInputException     = "Invalid input"
     show InterruptedInputException = "Interrupted"
 
-
 preSelectedBaseBranch
     :: TemplateInformation -> PreliminaryProjectConfiguration -> Maybe Text
 preSelectedBaseBranch templateInformation providedConfiguration =

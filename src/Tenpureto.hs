@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Tenpureto where
 
@@ -33,6 +34,15 @@ import           Logging
 import           Templater
 import           Path
 import           Path.IO
+
+data TenpuretoException = InvalidTemplateException Text Text deriving (Exception)
+
+instance Show TenpuretoException where
+    show (InvalidTemplateException template reason) =
+        "Template \""
+            <> T.unpack template
+            <> "\" is not valid: "
+            <> T.unpack reason
 
 templateYamlFile :: Path Rel File
 templateYamlFile = [relfile|.template.yaml|]
@@ -170,7 +180,9 @@ withPreparedTemplate projectConfiguration unattended block = do
     withClonedRepository
             (buildRepositoryUrl $ selectedTemplate finalTemplateConfiguration)
         $ \repository -> do
-              templateInformation <- loadTemplateInformation repository
+              templateInformation <- loadTemplateInformation
+                  (selectedTemplate finalTemplateConfiguration)
+                  repository
               logDebug
                   $  "Template information"
                   <> line
@@ -251,15 +263,24 @@ loadBranchConfiguration repo branch = runMaybeT $ do
         , templateYaml     = info
         }
 
+hasBaseBranches :: [TemplateBranchInformation] -> Bool
+hasBaseBranches = any isBaseBranch
+
 loadTemplateInformation
-    :: (MonadThrow m, MonadGit m) => GitRepository -> m TemplateInformation
-loadTemplateInformation repository = do
+    :: (MonadThrow m, MonadGit m)
+    => Text
+    -> GitRepository
+    -> m TemplateInformation
+loadTemplateInformation repositoryName repository = do
     branches             <- listBranches repository
     branchConfigurations <- traverse (loadBranchConfiguration repository)
         $ sort branches
-    return $ TemplateInformation
-        { branchesInformation = catMaybes branchConfigurations
-        }
+    let bi = catMaybes branchConfigurations
+    _ <- if hasBaseBranches bi
+        then return ()
+        else throwM $ InvalidTemplateException repositoryName
+                                               "no base branches found"
+    return $ TemplateInformation { branchesInformation = bi }
 
 prepareTemplate
     :: (MonadIO m, MonadGit m, MonadConsole m)
