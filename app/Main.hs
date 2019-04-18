@@ -9,7 +9,7 @@ import           Control.Monad.Catch
 import           Data.Maybe
 import           Data.Text                      ( Text )
 import           Console
-import qualified Console.Byline                as B
+import qualified Console.Terminal              as Terminal
 import           Git
 import qualified Git.Cli                       as GC
 import           Data
@@ -43,9 +43,9 @@ instance MonadGit AppM where
     listFiles            = GC.listFiles
 
 instance MonadConsole AppM where
-    ask = B.ask
-    askUntil a b c = B.askUntil a b (return . c)
-    sayLn = B.sayLn
+    ask      = Terminal.ask
+    askUntil = Terminal.askUntil
+    sayLn    = Terminal.sayLn
 
 data Command
     = Create

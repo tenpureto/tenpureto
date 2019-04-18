@@ -101,7 +101,7 @@ createProject projectConfiguration unattended =
                       commit
                           project
                           (commitCreateMessage finalTemplateConfiguration)
-                      sayLn $ "Created " <> (text . T.pack . toFilePath) dst
+                      sayLn $ "Created " <> pretty dst
 
 updateProject
     :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
@@ -149,11 +149,7 @@ updateProject projectConfiguration unattended = do
                                               )
                                           sayLn
                                               $  "Updated "
-                                              <> ( text
-                                                 . T.pack
-                                                 . toFilePath
-                                                 . repositoryPath
-                                                 )
+                                              <> (pretty . repositoryPath)
                                                      project
                                       Nothing ->
                                           sayLn

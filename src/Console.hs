@@ -1,17 +1,15 @@
 module Console
   ( module Console
-  , module System.Console.Byline.Stylized
-  , module System.Console.Byline.Modifiers
-  , module System.Console.Byline.Color
+  , module Data.Text.Prettyprint.Doc
+  , module Data.Text.Prettyprint.Doc.Render.Terminal
   )
 where
 
 import           Data.Text                      ( Text )
-import           System.Console.Byline.Stylized
-import           System.Console.Byline.Modifiers
-import           System.Console.Byline.Color
+import           Data.Text.Prettyprint.Doc
+import           Data.Text.Prettyprint.Doc.Render.Terminal
 
 class Monad m => MonadConsole m where
-  ask :: Stylized -> Maybe Text -> m Text
-  askUntil :: Stylized -> Maybe Text -> (Text -> Either Stylized Text) -> m Text
-  sayLn :: Stylized -> m ()
+  ask :: Doc AnsiStyle -> Maybe Text -> m Text
+  askUntil :: Doc AnsiStyle -> Maybe Text -> (Text -> Either (Doc AnsiStyle) Text) -> m Text
+  sayLn :: Doc AnsiStyle -> m ()

@@ -28,7 +28,6 @@ dependencies:
 - process
 - typed-process
 - optparse-applicative
-- byline
 - yaml
 
 library:

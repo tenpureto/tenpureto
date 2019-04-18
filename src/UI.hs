@@ -102,11 +102,10 @@ required :: (Monad m) => m (Maybe a) -> m a
 required input = input >>= maybe (required input) return
 
 inputTemplate :: MonadConsole m => m Text
-inputTemplate = ask "Template URL " Nothing
+inputTemplate = ask "Template URL" Nothing
 
 inputTarget :: (MonadIO m, MonadMask m, MonadConsole m) => m (Path Abs Dir)
-inputTarget =
-    T.unpack <$> ask "Target directory  " Nothing >>= resolveTargetDir
+inputTarget = T.unpack <$> ask "Target directory" Nothing >>= resolveTargetDir
 
 resolveTargetDir :: (MonadIO m, MonadCatch m) => FilePath -> m (Path Abs Dir)
 resolveTargetDir path = catch
@@ -135,8 +134,8 @@ inputUpdateConfiguration = unattendedUpdateConfiguration
 
 inputBranch
     :: (MonadIO m, MonadConsole m)
-    => Stylized
-    -> Stylized
+    => Doc AnsiStyle
+    -> Doc AnsiStyle
     -> [TemplateBranchInformation]
     -> Set Text
     -> m (Maybe Text)
@@ -144,34 +143,34 @@ inputBranch title request availableBranches selected =
     let
         indexedBranches :: [(Int, TemplateBranchInformation)]
         indexedBranches = [1 ..] `zip` availableBranches
-        branchLineIndex :: Int -> Stylized
-        branchLineIndex = text . T.pack . printf "%2d) "
-        branchLineSelected :: TemplateBranchInformation -> Stylized
+        branchLineIndex :: Int -> String
+        branchLineIndex = printf "%2d) "
+        branchLineSelected :: TemplateBranchInformation -> Doc AnsiStyle
         branchLineSelected branch =
             let isSelected = Set.member (branchName branch) selected
-            in  text $ T.pack $ bool "  " " *" isSelected
-        branchLineName :: TemplateBranchInformation -> Stylized
-        branchLineName = text . branchName
-        branchLine :: (Int, TemplateBranchInformation) -> Stylized
+            in  bool "  " " *" isSelected
+        branchLineName :: TemplateBranchInformation -> Doc AnsiStyle
+        branchLineName = pretty . branchName
+        branchLine :: (Int, TemplateBranchInformation) -> Doc AnsiStyle
         branchLine (index, branch) =
-            (branchLineSelected branch <> fg green)
-                <> branchLineIndex index
-                <> (branchLineName branch <> fg white)
+            annotate (color Green) (branchLineSelected branch)
+                <> pretty (branchLineIndex index)
+                <> annotate (color White) (branchLineName branch)
         branchByIndex :: Text -> Maybe TemplateBranchInformation
         branchByIndex index =
             find (\x -> T.unpack index == (show . fst) x) indexedBranches
                 <&> snd
-        validateInput :: Text -> Either Stylized Text
+        validateInput :: Text -> Either (Doc AnsiStyle) Text
         validateInput input = if T.null input || isJust (branchByIndex input)
             then Right input
-            else Left (text input <> " is not a valid branch number.")
+            else Left (pretty input <> " is not a valid branch number.")
         indexToBranch :: Text -> Maybe Text
         indexToBranch index = branchByIndex index <&> branchName
     in
         do
             sayLn title
             traverse_ (sayLn . branchLine) indexedBranches
-            askUntil (request <> ": ") Nothing validateInput <&> indexToBranch
+            askUntil (request <> ":") Nothing validateInput <&> indexToBranch
 
 toggleBranch :: Text -> Set Text -> Set Text
 toggleBranch branch selected = bool (Set.insert branch selected)
@@ -209,7 +208,7 @@ inputFeatureBranches branches selected = do
         Nothing -> return selected
 
 inputVariable :: (MonadIO m, MonadConsole m) => (Text, Text) -> m (Text, Text)
-inputVariable (desc, name) = (desc, ) <$> ask (text $ desc <> " ") (Just name)
+inputVariable (desc, name) = (desc, ) <$> ask (pretty desc) (Just name)
 
 inputVariables
     :: (MonadIO m, MonadMask m, MonadConsole m)
@@ -262,10 +261,9 @@ inputResolutionStrategy repo conflicts =
     in
         do
             sayLn "The following files have merge conflicts:"
-            traverse_ (\c -> sayLn ("  " <> (text . T.pack . toFilePath) c))
-                      conflicts
-            sayLn $ text $ "Repository path: " <> T.pack (toFilePath repo)
-            result <- askUntil "Run \"git mergetool\" (y/n)? "
+            traverse_ (\c -> sayLn ("  " <> pretty c)) conflicts
+            sayLn $ "Repository path: " <> pretty repo
+            result <- askUntil "Run \"git mergetool\" (y/n)?"
                                (Just "y")
                                mapAnswer
             return $ bool AlreadyResolved MergeTool (result == "y")
