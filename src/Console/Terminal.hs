@@ -36,7 +36,7 @@ askUntil
     -> m a
 askUntil prompt defans confirm = ask prompt defans <&> confirm >>= reprompt
   where
-    reprompt (Left  prompt') = askUntil prompt' defans confirm
+    reprompt (Left  prompt') = askUntil (prompt' <+> prompt) defans confirm
     reprompt (Right result ) = return result
 
 say :: MonadIO m => Doc AnsiStyle -> m ()
