@@ -25,22 +25,23 @@ runAppM withDebug app =
     initPrintToTerminal withDebug >>= runLoggingT (unAppM app)
 
 instance MonadGit AppM where
-    withClonedRepository = GC.withClonedRepository
-    withRepository       = GC.withRepository
-    withNewWorktree      = GC.withNewWorktree
-    initRepository       = GC.initRepository
-    listBranches         = GC.listBranches
-    checkoutBranch       = GC.checkoutBranch
-    mergeBranch          = GC.mergeBranch
-    runMergeTool         = GC.runMergeTool
-    getBranchFile        = GC.getBranchFile
-    getWorkingCopyFile   = GC.getWorkingCopyFile
-    writeAddFile         = GC.writeAddFile
-    addFiles             = GC.addFiles
-    commit               = GC.commit
-    findCommit           = GC.findCommit
-    getCommitMessage     = GC.getCommitMessage
-    listFiles            = GC.listFiles
+    withClonedRepository    = GC.withClonedRepository
+    withRepository          = GC.withRepository
+    withNewWorktree         = GC.withNewWorktree
+    initRepository          = GC.initRepository
+    listBranches            = GC.listBranches
+    checkoutBranch          = GC.checkoutBranch
+    mergeBranch             = GC.mergeBranch
+    runMergeTool            = GC.runMergeTool
+    getBranchFile           = GC.getBranchFile
+    getWorkingCopyFile      = GC.getWorkingCopyFile
+    writeAddFile            = GC.writeAddFile
+    addFiles                = GC.addFiles
+    commit                  = GC.commit
+    findCommit              = GC.findCommit
+    getCommitMessage        = GC.getCommitMessage
+    listFiles               = GC.listFiles
+    populateRerereFromMerge = GC.populateRerereFromMerge
 
 instance MonadConsole AppM where
     ask      = Terminal.ask

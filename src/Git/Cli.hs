@@ -66,11 +66,7 @@ gitCmd
     -> m (ExitCode, ByteString, ByteString)
 gitCmd cmd = do
     logInfo $ "Running interactively git" <+> fillSep (map pretty cmd)
-    let process =
-            setStdin closed
-                $ setStdout byteStringOutput
-                $ setStderr byteStringOutput
-                $ proc "git" (map T.unpack cmd)
+    let process = setStdin closed $ proc "git" (map T.unpack cmd)
     (exitCode, out, err) <- liftIO $ readProcess process
     logDebug $ prefixed "err> " (decodeUtf8 err)
     logDebug $ prefixed "out> " (decodeUtf8 out)
@@ -109,7 +105,6 @@ gitcmdStdout
     -> m ByteString
 gitcmdStdout repo cmd = gitRepoCmd repo cmd >>= stdoutOrThrow
 
-
 withClonedRepository
     :: (MonadIO m, MonadMask m, MonadLog m)
     => RepositoryUrl
@@ -125,7 +120,9 @@ initRepository
     :: (MonadIO m, MonadMask m, MonadLog m) => Path Abs Dir -> m GitRepository
 initRepository dir = do
     gitCmd ["init", T.pack (toFilePath dir)] >>= unitOrThrow
-    return $ GitRepository dir
+    let repo = GitRepository dir
+    gitRepoCmd repo ["config", "rerere.enabled", "true"] >>= unitOrThrow
+    return repo
 
 withNewWorktree
     :: (MonadIO m, MonadMask m, MonadLog m)
@@ -162,6 +159,7 @@ cloneReporitory (RepositoryUrl url) dst =
     let repo = GitRepository dst
     in  do
             gitCmd ["init", T.pack (toFilePath dst)] >>= unitOrThrow
+            gitRepoCmd repo ["config", "rerere.enabled", "true"] >>= unitOrThrow
             gitRepoCmd repo ["remote", "add", "origin", url] >>= unitOrThrow
             gitRepoCmd repo ["fetch", "origin"] >>= unitOrThrow
             return repo
@@ -309,3 +307,27 @@ listFiles repo =
     gitcmdStdout repo ["ls-files"]
         >>= traverse (parseRelFile . T.unpack)
         .   (T.lines . decodeUtf8)
+
+populateRerereFromMerge
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> Committish
+    -> m ()
+populateRerereFromMerge repo (Committish commit) = do
+    parents <- T.words . decodeUtf8 <$> gitcmdStdout
+        repo
+        ["rev-list", "--max-count=1", "--parents", commit]
+    rerunMerge parents
+  where
+    rerunMerge :: (MonadIO m, MonadThrow m, MonadLog m) => [Text] -> m ()
+    rerunMerge [c, p1, p2] = do
+        gitRepoCmd repo ["checkout", p1] >>= unitOrThrow
+        (mergeResult, _, _) <- gitRepoCmd repo ["merge", "--no-commit", p2]
+        case mergeResult of
+            ExitSuccess   -> return ()
+            ExitFailure _ -> do
+                gitRepoCmd repo ["rerere"] >>= unitOrThrow
+                gitRepoCmd repo ["checkout", c, "--", "."] >>= unitOrThrow
+                gitRepoCmd repo ["rerere"] >>= unitOrThrow
+                gitRepoCmd repo ["reset", "--hard"] >>= unitOrThrow
+    rerunMerge _ = return ()
