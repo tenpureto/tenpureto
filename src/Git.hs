@@ -25,8 +25,12 @@ class Monad m => MonadGit m where
     commit :: GitRepository -> Text -> m (Maybe Committish)
     findCommit :: GitRepository -> Text -> m (Maybe Committish)
     getCommitMessage :: GitRepository -> Committish -> m Text
+    getCommitContent :: GitRepository -> Committish -> m Text
     listFiles :: GitRepository -> m [Path Rel File]
     populateRerereFromMerge :: GitRepository -> Committish -> m ()
+    getCurrentBranch :: GitRepository -> m Text
+    renameCurrentBranch :: GitRepository -> Text -> m ()
+    pushRefs :: GitRepository -> [(Maybe Committish, Text)] -> m ()
 
 instance Pretty Committish where
     pretty (Committish c) = pretty c

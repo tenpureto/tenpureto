@@ -296,8 +296,16 @@ getCommitMessage
     -> Committish
     -> m Text
 getCommitMessage repo (Committish c) =
-    gitcmdStdout repo ["rev-list", "--max-count=1", "--format=%B", "HEAD", c]
+    gitcmdStdout repo ["rev-list", "--max-count=1", "--format=%B", c]
         <&> decodeUtf8
+
+getCommitContent
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> Committish
+    -> m Text
+getCommitContent repo (Committish c) =
+    gitcmdStdout repo ["show", "--format=short", c] <&> decodeUtf8
 
 listFiles
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -331,3 +339,26 @@ populateRerereFromMerge repo (Committish commit) = do
                 gitRepoCmd repo ["rerere"] >>= unitOrThrow
                 gitRepoCmd repo ["reset", "--hard"] >>= unitOrThrow
     rerunMerge _ = return ()
+
+getCurrentBranch
+    :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> m Text
+getCurrentBranch repo = T.strip . decodeUtf8 <$> gitcmdStdout
+    repo
+    ["rev-parse", "--abbrev-ref", "HEAD"]
+
+renameCurrentBranch
+    :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> Text -> m ()
+renameCurrentBranch repo name =
+    gitRepoCmd repo ["branch", "--move", name] >>= unitOrThrow
+
+pushRefs
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> [(Maybe Committish, Text)]
+    -> m ()
+pushRefs repo refs =
+    gitRepoCmd repo (["push", "--atomic", "origin"] ++ fmap refspec refs)
+        >>= unitOrThrow
+  where
+    refspec (Nothing            , branch) = ":refs/heads/" <> branch
+    refspec (Just (Committish c), branch) = c <> ":refs/heads/" <> branch

@@ -253,17 +253,17 @@ inputResolutionStrategy
     => Path Abs Dir
     -> [Path Rel File]
     -> m ConflictResolutionStrategy
-inputResolutionStrategy repo conflicts =
-    let mapAnswer x = case x of
-            "y" -> Right x
-            "n" -> Right x
-            _   -> Left "Please answer \"y\" or \"n\"."
-    in
-        do
-            sayLn "The following files have merge conflicts:"
-            traverse_ (\c -> sayLn ("  " <> pretty c)) conflicts
-            sayLn $ "Repository path: " <> pretty repo
-            result <- askUntil "Run \"git mergetool\" (y/n)?"
-                               (Just "y")
-                               mapAnswer
-            return $ bool AlreadyResolved MergeTool (result == "y")
+inputResolutionStrategy repo conflicts = do
+    sayLn "The following files have merge conflicts:"
+    traverse_ (\c -> sayLn ("  " <> pretty c)) conflicts
+    sayLn $ "Repository path: " <> pretty repo
+    result <- confirm "Run \"git mergetool\""
+    return $ bool AlreadyResolved MergeTool result
+
+confirm :: MonadConsole m => Text -> m Bool
+confirm request = askUntil (pretty request <+> "(y/n)?") (Just "y") mapAnswer
+  where
+    mapAnswer x = case x of
+        "y" -> Right True
+        "n" -> Right False
+        _   -> Left "Please answer \"y\" or \"n\"."

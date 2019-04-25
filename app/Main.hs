@@ -42,8 +42,12 @@ instance MonadGit AppM where
     commit                  = GC.commit
     findCommit              = GC.findCommit
     getCommitMessage        = GC.getCommitMessage
+    getCommitContent        = GC.getCommitContent
     listFiles               = GC.listFiles
     populateRerereFromMerge = GC.populateRerereFromMerge
+    getCurrentBranch        = GC.getCurrentBranch
+    renameCurrentBranch     = GC.renameCurrentBranch
+    pushRefs                = GC.pushRefs
 
 instance MonadConsole AppM where
     ask      = Terminal.ask
@@ -52,7 +56,7 @@ instance MonadConsole AppM where
 
 data Command
     = Create
-            { templateName :: Maybe Text
+            { maybeTemplateName :: Maybe Text
             , maybeTargetDirectory :: Maybe FilePath
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
@@ -63,6 +67,12 @@ data Command
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
             }
+    | TemplateRenameBranch
+        { templateName :: Text
+        , oldBranchName :: Text
+        , newBranchName :: Text
+        , enableDebugLogging :: Bool
+        }
 
 templateNameOption :: Parser Text
 templateNameOption = strOption
@@ -71,7 +81,7 @@ templateNameOption = strOption
     )
 
 targetArgument :: Parser FilePath
-targetArgument = strArgument (metavar "<directory>" <> help "Target directory")
+targetArgument = strArgument (metavar "<dir>" <> help "Target directory")
 
 unattendedSwitch :: Parser Bool
 unattendedSwitch = switch (long "unattended" <> help "Do not ask anything")
@@ -83,6 +93,14 @@ versionOption :: Parser (a -> a)
 versionOption = infoOption
     ("tenpureto " ++ showVersion version)
     (short 'v' <> long "version" <> help "Show the program version" <> hidden)
+
+oldBranchNameArgument :: Parser Text
+oldBranchNameArgument =
+    strArgument (metavar "<old name>" <> help "Old branch name")
+
+newBranchNameArgument :: Parser Text
+newBranchNameArgument =
+    strArgument (metavar "<new name>" <> help "New branch name")
 
 createCommand :: Parser Command
 createCommand =
@@ -100,8 +118,23 @@ updateCommand =
         <*> unattendedSwitch
         <*> debugSwitch
 
+renameBranchCommand :: Parser Command
+renameBranchCommand =
+    TemplateRenameBranch
+        <$> templateNameOption
+        <*> oldBranchNameArgument
+        <*> newBranchNameArgument
+        <*> debugSwitch
+
+templateCommands :: Parser Command
+templateCommands = hsubparser
+    (command
+        "rename-branch"
+        (info renameBranchCommand (progDesc "Rename a template branch"))
+    )
+
 run :: Command -> IO ()
-run Create { templateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
+run Create { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
     = runAppM d $ do
         resolvedTd <- traverse resolveTargetDir td
         createProject
@@ -125,21 +158,25 @@ run Update { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u
                 , preVariableValues         = Nothing
                 }
         updateProject (inputConfig <> currentConfig) u
+run TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableDebugLogging = d }
+    = runAppM d $ renameTemplateBranch t on nn
 
 main :: IO ()
 main = run =<< customExecParser p opts
   where
-    commands = subparser
+    commands = hsubparser
         (  command
-                "create"
-                (info (createCommand <**> helper)
-                      (progDesc "Create a new project for a template")
-                )
+              "create"
+              (info createCommand
+                    (progDesc "Create a new project for a template")
+              )
         <> command
                "update"
-               (info (updateCommand <**> helper)
+               (info updateCommand
                      (progDesc "Update a project for a template")
                )
+        <> command "template"
+                   (info templateCommands (progDesc "Manage a template"))
         )
     opts = info (commands <**> versionOption <**> helper) fullDesc
     p    = prefs showHelpOnEmpty

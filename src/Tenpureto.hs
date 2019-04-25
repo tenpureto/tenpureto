@@ -35,14 +35,19 @@ import           Templater
 import           Path
 import           Path.IO
 
-data TenpuretoException = InvalidTemplateException Text Text deriving (Exception)
+data TenpuretoException = InvalidTemplateException Text Text
+                        | InvalidTemplateBranchException Text Text
+                        | CancelledException
+                        | TenpuretoException Text
+                        deriving (Exception)
 
 instance Show TenpuretoException where
     show (InvalidTemplateException template reason) =
-        "Template \""
-            <> T.unpack template
-            <> "\" is not valid: "
-            <> T.unpack reason
+        T.unpack $ "Template \"" <> template <> "\" is not valid: " <> reason
+    show (InvalidTemplateBranchException branch reason) =
+        T.unpack $ "Branch \"" <> branch <> "\" is not valid: " <> reason
+    show CancelledException           = "Cancelled"
+    show (TenpuretoException message) = T.unpack message
 
 templateYamlFile :: Path Rel File
 templateYamlFile = [relfile|.template.yaml|]
@@ -311,6 +316,62 @@ prepareTemplate repository template configuration =
         do
             checkoutBranch repository (baseBranch configuration) branch
             foldlM mergeTemplateBranch mempty (featureBranches configuration)
+
+renameTemplateBranch
+    :: (MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    => Text
+    -> Text
+    -> Text
+    -> m ()
+renameTemplateBranch template oldBranch newBranch =
+    withClonedRepository (buildRepositoryUrl template) $ \repo -> do
+        templateInformation <- loadTemplateInformation template repo
+        let maybeBranchInformation = find
+                ((==) oldBranch . branchName)
+                (branchesInformation templateInformation)
+        branchInformation <- maybe
+            ( throwM
+            $ InvalidTemplateBranchException oldBranch "branch not found"
+            )
+            return
+            maybeBranchInformation
+        let descriptor    = templateYaml branchInformation
+            newDescriptor = TemplateYaml
+                { variables = variables descriptor
+                , features  =
+                    (Set.insert newBranch . Set.delete oldBranch . features)
+                        descriptor
+                }
+        checkoutBranch repo oldBranch newBranch
+        writeAddFile repo
+                     templateYamlFile
+                     ((BS.fromStrict . Y.encode) newDescriptor)
+        maybeRenameCommit <- commit
+            repo
+            ("Rename " <> oldBranch <> " to " <> newBranch)
+        renameCommit <- maybe
+            (throwM $ TenpuretoException
+                "Failed to create a rename commit: empty changeset"
+            )
+            return
+            maybeRenameCommit
+        renameCommitContent <- getCommitContent repo renameCommit
+        sayLn
+            $  "Commit content:"
+            <> line
+            <> (indent 4 . pretty) renameCommitContent
+        shouldPush <- confirm
+            (  "Do you want to delete \""
+            <> oldBranch
+            <> "\" and push this commit to \""
+            <> newBranch
+            <> "\""
+            )
+        if shouldPush
+            then pushRefs
+                repo
+                [(Nothing, oldBranch), (Just renameCommit, newBranch)]
+            else throwM CancelledException
 
 commitCreateMessage :: FinalTemplateConfiguration -> Text
 commitCreateMessage cfg =

@@ -11,5 +11,5 @@ import           Data.Text.Prettyprint.Doc.Render.Terminal
 
 class Monad m => MonadConsole m where
   ask :: Doc AnsiStyle -> Maybe Text -> m Text
-  askUntil :: Doc AnsiStyle -> Maybe Text -> (Text -> Either (Doc AnsiStyle) Text) -> m Text
+  askUntil :: Doc AnsiStyle -> Maybe Text -> (Text -> Either (Doc AnsiStyle) a) -> m a
   sayLn :: Doc AnsiStyle -> m ()
