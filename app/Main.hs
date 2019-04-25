@@ -62,28 +62,36 @@ data Command
             , enableDebugLogging :: Bool
             }
 
-template :: Parser Text
-template = strOption
+templateNameOption :: Parser Text
+templateNameOption = strOption
     (long "template" <> metavar "<repository>" <> help
         "Template repository name or URL"
     )
 
-target :: Parser FilePath
-target = strArgument (metavar "<directory>" <> help "Target directory")
+targetArgument :: Parser FilePath
+targetArgument = strArgument (metavar "<directory>" <> help "Target directory")
 
-unattended :: Parser Bool
-unattended = switch (long "unattended" <> help "Do not ask anything")
+unattendedSwitch :: Parser Bool
+unattendedSwitch = switch (long "unattended" <> help "Do not ask anything")
 
-debug :: Parser Bool
-debug = switch (long "debug" <> help "Print debug information")
+debugSwitch :: Parser Bool
+debugSwitch = switch (long "debug" <> help "Print debug information")
 
-create :: Parser Command
-create =
-    Create <$> optional template <*> optional target <*> unattended <*> debug
+createCommand :: Parser Command
+createCommand =
+    Create
+        <$> optional templateNameOption
+        <*> optional targetArgument
+        <*> unattendedSwitch
+        <*> debugSwitch
 
-update :: Parser Command
-update =
-    Update <$> optional template <*> optional target <*> unattended <*> debug
+updateCommand :: Parser Command
+updateCommand =
+    Update
+        <$> optional templateNameOption
+        <*> optional targetArgument
+        <*> unattendedSwitch
+        <*> debugSwitch
 
 run :: Command -> IO ()
 run Create { templateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
@@ -117,12 +125,12 @@ main = run =<< customExecParser p opts
     commands = subparser
         (  command
                 "create"
-                (info (create <**> helper)
+                (info (createCommand <**> helper)
                       (progDesc "Create a new project for a template")
                 )
         <> command
                "update"
-               (info (update <**> helper)
+               (info (updateCommand <**> helper)
                      (progDesc "Update a project for a template")
                )
         )
