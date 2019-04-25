@@ -8,6 +8,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import           Data.Maybe
 import           Data.Text                      ( Text )
+import           Data.Version
 import           Console
 import qualified Console.Terminal              as Terminal
 import           Git
@@ -16,6 +17,7 @@ import           Data
 import           Logging
 import           Tenpureto
 import           UI                             ( resolveTargetDir )
+import           Paths_tenpureto                ( version )
 
 newtype AppM a = AppM { unAppM :: LoggingT IO a }
     deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadLog)
@@ -77,6 +79,11 @@ unattendedSwitch = switch (long "unattended" <> help "Do not ask anything")
 debugSwitch :: Parser Bool
 debugSwitch = switch (long "debug" <> help "Print debug information")
 
+versionOption :: Parser (a -> a)
+versionOption = infoOption
+    ("tenpureto " ++ showVersion version)
+    (short 'v' <> long "version" <> help "Show the program version" <> hidden)
+
 createCommand :: Parser Command
 createCommand =
     Create
@@ -134,5 +141,5 @@ main = run =<< customExecParser p opts
                      (progDesc "Update a project for a template")
                )
         )
-    opts = info (commands <**> helper) fullDesc
+    opts = info (commands <**> versionOption <**> helper) fullDesc
     p    = prefs showHelpOnEmpty
