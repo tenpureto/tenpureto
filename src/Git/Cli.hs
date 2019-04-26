@@ -7,6 +7,8 @@ module Git.Cli where
 import           Git                            ( RepositoryUrl(..)
                                                 , GitRepository(..)
                                                 , Committish(..)
+                                                , Ref(..)
+                                                , Refspec(..)
                                                 )
 import           Logging
 import           Data.Maybe
@@ -357,11 +359,11 @@ renameCurrentBranch repo name =
 pushRefs
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
-    -> [(Maybe Committish, Text)]
+    -> [Refspec]
     -> m ()
 pushRefs repo refs =
     gitRepoCmd repo (["push", "--atomic", "origin"] ++ fmap refspec refs)
         >>= unitOrThrow
   where
-    refspec (Nothing            , branch) = ":refs/heads/" <> branch
-    refspec (Just (Committish c), branch) = c <> ":refs/heads/" <> branch
+    refspec (Refspec Nothing               (Ref dst)) = ":" <> dst
+    refspec (Refspec (Just (Committish c)) (Ref dst)) = c <> ":" <> dst

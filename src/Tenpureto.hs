@@ -375,7 +375,10 @@ renameTemplateBranch template oldBranch newBranch =
         if shouldPush
             then pushRefs
                 repo
-                ((Nothing, oldBranch) : fmap (\(c, b) -> (Just c, b)) allCommits
+                ( Refspec Nothing (branchRef oldBranch)
+                : fmap
+                      (\(c, b) -> Refspec (Just c) (branchRef b))
+                      allCommits
                 )
             else throwM CancelledException
 
