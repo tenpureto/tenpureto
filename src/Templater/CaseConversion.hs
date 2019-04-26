@@ -8,6 +8,7 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Maybe
 import           Data.Functor
+import           Data.Bifunctor
 import           Data.Text.ICU                  ( Regex )
 import qualified Data.Text.ICU                 as ICU
 import           GHC.Generics
@@ -33,15 +34,16 @@ allWordSeparators :: [WordSeparator]
 allWordSeparators = NoSeparator : [ SingleSeparator c | c <- validSeparators ]
 
 wordCasePattern :: WordCase -> Text
-wordCasePattern LowerCase = "[:lower:]+"
-wordCasePattern UpperCase = "[:upper:]+"
-wordCasePattern TitleCase = "[:upper:][:lower:]*"
-wordCasePattern MixedCase = "(?:[:upper:]|[:lower:])+"
+wordCasePattern LowerCase = "(?:[:lower:]|[:digit:])+"
+wordCasePattern UpperCase = "(?:[:upper:]|[:digit:])+"
+wordCasePattern TitleCase = "[:upper:](?:[:lower:]|[:digit:])+"
+wordCasePattern MixedCase = "[:alnum:]+"
 
 wordCaseApply :: WordCase -> Text -> Text
 wordCaseApply LowerCase = T.toLower
 wordCaseApply UpperCase = T.toUpper
-wordCaseApply TitleCase = T.toTitle
+wordCaseApply TitleCase =
+    uncurry (<>) . bimap T.toUpper T.toLower . T.splitAt 1
 wordCaseApply MixedCase = id
 
 wordCasesApply :: WordCase -> WordCase -> [Text] -> [Text]
@@ -53,7 +55,7 @@ separator NoSeparator         = ""
 separator (SingleSeparator c) = T.singleton c
 
 capitalLetterPattern :: Regex
-capitalLetterPattern = ICU.regex [] ".(?=[:upper:])|$"
+capitalLetterPattern = ICU.regex [] "(?:[:lower:]|[:digit:])(?=[:upper:])|$"
 
 splitOnR :: ICU.Regex -> Text -> [Text]
 splitOnR regex text = ICU.findAll regex text
