@@ -68,11 +68,17 @@ data Command
             , enableDebugLogging :: Bool
             }
     | TemplateRenameBranch
-        { templateName :: Text
-        , oldBranchName :: Text
-        , newBranchName :: Text
-        , enableDebugLogging :: Bool
-        }
+            { templateName :: Text
+            , oldBranchName :: Text
+            , newBranchName :: Text
+            , enableDebugLogging :: Bool
+            }
+    | TemplateChangeVariable
+            { templateName :: Text
+            , oldVariableValue :: Text
+            , newVariableValue :: Text
+            , enableDebugLogging :: Bool
+            }
 
 templateNameOption :: Parser Text
 templateNameOption = strOption
@@ -94,13 +100,21 @@ versionOption = infoOption
     ("tenpureto " ++ showVersion version)
     (short 'v' <> long "version" <> help "Show the program version" <> hidden)
 
-oldBranchNameArgument :: Parser Text
-oldBranchNameArgument =
-    strArgument (metavar "<old name>" <> help "Old branch name")
+oldBranchNameOption :: Parser Text
+oldBranchNameOption =
+    strOption (long "old-name" <> metavar "<branch>" <> help "Old branch name")
 
-newBranchNameArgument :: Parser Text
-newBranchNameArgument =
-    strArgument (metavar "<new name>" <> help "New branch name")
+newBranchNameOption :: Parser Text
+newBranchNameOption =
+    strOption (long "new-name" <> metavar "<branch>" <> help "New branch name")
+
+oldVariableValueOption :: Parser Text
+oldVariableValueOption = strOption
+    (long "old-value" <> metavar "<value>" <> help "Old variable value")
+
+newVariableValueOption :: Parser Text
+newVariableValueOption = strOption
+    (long "new-value" <> metavar "<value>" <> help "New variable value")
 
 createCommand :: Parser Command
 createCommand =
@@ -122,15 +136,28 @@ renameBranchCommand :: Parser Command
 renameBranchCommand =
     TemplateRenameBranch
         <$> templateNameOption
-        <*> oldBranchNameArgument
-        <*> newBranchNameArgument
+        <*> oldBranchNameOption
+        <*> newBranchNameOption
+        <*> debugSwitch
+
+changeVariableCommand :: Parser Command
+changeVariableCommand =
+    TemplateChangeVariable
+        <$> templateNameOption
+        <*> oldVariableValueOption
+        <*> newVariableValueOption
         <*> debugSwitch
 
 templateCommands :: Parser Command
 templateCommands = hsubparser
-    (command
-        "rename-branch"
-        (info renameBranchCommand (progDesc "Rename a template branch"))
+    (  command
+            "rename-branch"
+            (info renameBranchCommand (progDesc "Rename a template branch"))
+    <> command
+           "change-variable"
+           (info changeVariableCommand
+                 (progDesc "Change a template variable value")
+           )
     )
 
 run :: Command -> IO ()
@@ -160,6 +187,8 @@ run Update { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u
         updateProject (inputConfig <> currentConfig) u
 run TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableDebugLogging = d }
     = runAppM d $ renameTemplateBranch t on nn
+run TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableDebugLogging = d }
+    = runAppM d $ changeTemplateVariableValue t ov nv
 
 main :: IO ()
 main = run =<< customExecParser p opts

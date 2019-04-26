@@ -379,6 +379,14 @@ renameTemplateBranch template oldBranch newBranch =
                 )
             else throwM CancelledException
 
+changeTemplateVariableValue
+    :: (MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    => Text
+    -> Text
+    -> Text
+    -> m ()
+changeTemplateVariableValue template oldValue newValue = return ()
+
 commitMessagePattern :: Text
 commitMessagePattern = "^Template: .*$"
 
