@@ -102,10 +102,11 @@ createProject projectConfiguration unattended =
               in
                   do
                       createDir dst
-                      project <- initRepository dst
-                      files   <- copy templaterSettings
-                                      template
-                                      (repositoryPath project)
+                      project          <- initRepository dst
+                      compiledSettings <- compileSettings templaterSettings
+                      files            <- copy compiledSettings
+                                               template
+                                               (repositoryPath project)
                       addFiles project files
                       commit
                           project
@@ -134,7 +135,9 @@ updateProject projectConfiguration unattended = do
                                 (previousTemplateCommit finalUpdateConfiguration
                                 )
                             $ \staging -> do
-                                  files <- copy templaterSettings
+                                  compiledSettings <- compileSettings
+                                      templaterSettings
+                                  files <- copy compiledSettings
                                                 template
                                                 (repositoryPath staging)
                                   addFiles staging files
@@ -327,6 +330,24 @@ replaceBranchInYaml old new descriptor = TemplateYaml
     , features  = replaceInSet old new (features descriptor)
     }
 
+replaceInFunctor :: (Functor f, Eq a) => a -> a -> f a -> f a
+replaceInFunctor from to = fmap (\v -> if from == v then to else v)
+
+replaceVariableInYaml :: Text -> Text -> TemplateYaml -> TemplateYaml
+replaceVariableInYaml old new descriptor = TemplateYaml
+    { variables = replaceInFunctor old new (variables descriptor)
+    , features  = features descriptor
+    }
+
+commit_ :: (MonadThrow m, MonadGit m) => GitRepository -> Text -> m Committish
+commit_ repo message =
+    commit repo message
+        >>= maybe
+                (throwM $ TenpuretoException
+                    "Failed to create a rename commit: empty changeset"
+                )
+                return
+
 renameTemplateBranch
     :: (MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
     => Text
@@ -335,14 +356,11 @@ renameTemplateBranch
     -> m ()
 renameTemplateBranch template oldBranch newBranch =
     runTemplateChange template $ \repo -> do
-        templateInformation <- loadTemplateInformation template repo
-        let bis = branchesInformation templateInformation
-            throwEmptyChangeset =
-                throwM $ TenpuretoException
-                    "Failed to create a rename commit: empty changeset"
-            throwOldBranchNotFound = throwM $ InvalidTemplateBranchException
+        bis <- branchesInformation <$> loadTemplateInformation template repo
+        let throwOldBranchNotFound = throwM $ InvalidTemplateBranchException
                 oldBranch
                 "branch not found"
+            refspec b c = Refspec (Just c) (branchRef b)
             renameOnBranch bi = do
                 checkoutBranch repo (branchName bi) Nothing
                 let descriptor = templateYaml bi
@@ -351,31 +369,48 @@ renameTemplateBranch template oldBranch newBranch =
                 writeAddFile repo
                              templateYamlFile
                              ((BS.fromStrict . Y.encode) newDescriptor)
-                maybeRenameCommit <- commit
-                    repo
-                    (commitRenameBranchMessage oldBranch newBranch)
-                let refspec c = return $ Refspec (Just c) (branchRef newBranch)
-                maybe throwEmptyChangeset refspec maybeRenameCommit
-            maybeMainBranch = find ((==) oldBranch . branchName) bis
-            relatedBranches =
-                ( filter (Set.member oldBranch . requiredBranches)
-                    . filter ((/=) oldBranch . branchName)
-                    )
-                    bis
+                commit_ repo (commitRenameBranchMessage oldBranch newBranch)
+            maybeMainBranch = find (isBranch oldBranch) bis
+            childBranches   = filter (isChildBranch oldBranch) bis
         mainBranch <- maybe throwOldBranchNotFound return maybeMainBranch
         let deleteOld = Refspec Nothing (branchRef oldBranch)
-        pushNew        <- renameOnBranch mainBranch
-        relatedRenames <- traverse renameOnBranch relatedBranches
-        return $ deleteOld : pushNew : relatedRenames
+        pushNew      <- refspec newBranch <$> renameOnBranch mainBranch
+        pushChildren <- traverse
+            (\bi -> refspec (branchName bi) <$> renameOnBranch bi)
+            childBranches
+        return $ deleteOld : pushNew : pushChildren
 
 
 changeTemplateVariableValue
-    :: (MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
     => Text
     -> Text
     -> Text
     -> m ()
-changeTemplateVariableValue template oldValue newValue = return ()
+changeTemplateVariableValue template oldValue newValue =
+    runTemplateChange template $ \repo -> do
+        bis <- branchesInformation <$> loadTemplateInformation template repo
+        templaterSettings <- compileSettings $ TemplaterSettings
+            { templaterFromVariables = InsOrdHashMap.singleton "Variable"
+                                                               oldValue
+            , templaterToVariables = InsOrdHashMap.singleton "Variable" newValue
+            , templaterExcludes = Set.empty
+            }
+        let branches = filter (hasVariableValue oldValue) bis
+            changeOnBranch bi = do
+                checkoutBranch repo (branchName bi) Nothing
+                files <- move templaterSettings repo
+                addFiles repo files
+                let descriptor = templateYaml bi
+                    newDescriptor =
+                        replaceVariableInYaml oldValue newValue descriptor
+                writeAddFile repo
+                             templateYamlFile
+                             ((BS.fromStrict . Y.encode) newDescriptor)
+                c <- commit_ repo
+                             (commitChangeVariableMessage oldValue newValue)
+                return $ Refspec (Just c) (branchRef (branchName bi))
+        traverse changeOnBranch branches
 
 runTemplateChange
     :: (MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
@@ -414,3 +449,14 @@ buildRepositoryUrl url
     = RepositoryUrl $ "git@github.com:" <> url <> ".git"
     | otherwise
     = RepositoryUrl url
+
+isBranch :: Text -> TemplateBranchInformation -> Bool
+isBranch branch bi = branch == branchName bi
+
+isChildBranch :: Text -> TemplateBranchInformation -> Bool
+isChildBranch branch bi =
+    branch /= branchName bi && Set.member branch (requiredBranches bi)
+
+hasVariableValue :: Text -> TemplateBranchInformation -> Bool
+hasVariableValue value bi =
+    value `elem` InsOrdHashMap.elems (branchVariables bi)

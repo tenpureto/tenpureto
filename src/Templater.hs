@@ -21,6 +21,7 @@ import           Control.Monad.Catch
 import           Logging
 import           Path
 import           Path.IO
+import           System.IO                      ( hClose )
 import qualified Data.Text.ICU                 as ICU
 import           Data.Text.Encoding
 import           Data.Text.ICU.Replace
@@ -127,15 +128,16 @@ copyAbsFile
     => CompiledTemplaterSettings
     -> Path Abs File
     -> Path Abs File
+    -> (ByteString -> m ())
     -> m ()
-copyAbsFile settings src dst = do
+copyAbsFile settings src dst write = do
     logDebug $ "Copying" <+> pretty src <+> "to" <+> pretty dst
     byteContent <- liftIO $ BS.readFile (toFilePath src)
     let content           = detectEncoding byteContent
         translatedContent = mapContent (translate settings) content
         translated        = contentToByteString translatedContent
     ensureDir (parent dst)
-    liftIO $ BS.writeFile (toFilePath dst) translated
+    write translated
 
 copyRelFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -146,18 +148,71 @@ copyRelFile
     -> m (Path Rel File)
 copyRelFile settings src dst srcFile = do
     dstFile <- translateFile settings srcFile
-    copyAbsFile settings (src </> srcFile) (dst </> dstFile)
-    copyPermissions (src </> srcFile) (dst </> dstFile)
+    let srcAbsFile = src </> srcFile
+        dstAbsFile = dst </> dstFile
+    copyAbsFile settings
+                srcAbsFile
+                dstAbsFile
+                (liftIO . BS.writeFile (toFilePath dstAbsFile))
+    copyPermissions srcAbsFile dstAbsFile
     return dstFile
+
+moveRelFile
+    :: (MonadIO m, MonadMask m, MonadLog m)
+    => CompiledTemplaterSettings
+    -> Path Abs Dir
+    -> Path Abs Dir
+    -> Path Rel File
+    -> m (Path Rel File, (Path Abs File, Path Rel File))
+moveRelFile settings src dst srcFile = do
+    dstFile <- translateFile settings srcFile
+    let srcAbsFile = src </> srcFile
+        dstAbsFile = dst </> dstFile
+        dstFileDir = parent dstAbsFile
+    ensureDir dstFileDir
+    bracket
+            (liftIO $ openBinaryTempFile dstFileDir
+                                         (toFilePath (filename dstFile))
+            )
+            (liftIO . hClose . snd)
+        $ \(tmpFile, tmpHandle) -> do
+              copyAbsFile settings
+                          srcAbsFile
+                          tmpFile
+                          (liftIO . BS.hPut tmpHandle)
+              copyPermissions srcAbsFile tmpFile
+              logDebug $ "Removing" <+> pretty srcAbsFile
+              removeFile srcAbsFile
+              return (srcFile, (tmpFile, dstFile))
 
 copy
     :: (MonadIO m, MonadThrow m, MonadLog m, MonadGit m)
-    => TemplaterSettings
+    => CompiledTemplaterSettings
     -> GitRepository
     -> Path Abs Dir
     -> m [Path Rel File]
-copy settings repo dst = do
-    compiledSettings <- compileSettings settings
-    files            <- listFiles repo
+copy settings repo dst =
     let src = repositoryPath repo
-    traverse (copyRelFile compiledSettings src dst) files
+    in  do
+            files <- listFiles repo
+            traverse (copyRelFile settings src dst) files
+
+move
+    :: (MonadIO m, MonadMask m, MonadLog m, MonadGit m)
+    => CompiledTemplaterSettings
+    -> GitRepository
+    -> m [Path Rel File]
+move settings repo =
+    let dir = repositoryPath repo
+        renameFile' (a, b) = do
+            logDebug $ "Moving" <+> pretty a <+> "to" <+> pretty (dir </> b)
+            renameFile a (dir </> b)
+    in  do
+            files       <- listFiles repo
+            moveResults <- traverse (moveRelFile settings dir dir) files
+            let oldFiles = fmap fst moveResults
+                actions  = fmap snd moveResults
+            traverse_ renameFile' actions
+            let newFiles = fmap snd actions
+                changes  = Set.fromList oldFiles <> Set.fromList newFiles
+            return $ Set.toList changes

@@ -22,7 +22,12 @@ commitUpdateMergeMessage :: FinalTemplateConfiguration -> Text
 commitUpdateMergeMessage cfg = "Merge " <> selectedTemplate cfg
 
 commitRenameBranchMessage :: Text -> Text -> Text
-commitRenameBranchMessage from to = "Rename " <> from <> " to " <> to
+commitRenameBranchMessage from to =
+    "Rename \"" <> from <> "\" branch to \"" <> to <> "\""
+
+commitChangeVariableMessage :: Text -> Text -> Text
+commitChangeVariableMessage from to =
+    "Change \"" <> from <> "\" variable to \"" <> to <> "\""
 
 -- UI messages
 
