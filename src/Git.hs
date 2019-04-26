@@ -10,7 +10,8 @@ import           Logging
 newtype RepositoryUrl = RepositoryUrl Text deriving (Eq, Show)
 newtype GitRepository = GitRepository { repositoryPath :: Path Abs Dir }
 newtype Committish = Committish Text deriving (Show)
-newtype Ref = Ref Text deriving (Show)
+data RefType = BranchRef deriving (Show)
+data Ref = Ref RefType Text deriving (Show)
 data Refspec = Refspec { sourceRef :: Maybe Committish, destinationRef :: Ref } deriving (Show)
 
 class Monad m => MonadGit m where
@@ -40,4 +41,4 @@ instance Pretty Committish where
     pretty (Committish c) = pretty c
 
 branchRef :: Text -> Ref
-branchRef = Ref . ("refs/heads/" <>)
+branchRef = Ref BranchRef

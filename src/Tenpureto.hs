@@ -334,7 +334,7 @@ renameTemplateBranch
     -> Text
     -> m ()
 renameTemplateBranch template oldBranch newBranch =
-    withClonedRepository (buildRepositoryUrl template) $ \repo -> do
+    runTemplateChange template $ \repo -> do
         templateInformation <- loadTemplateInformation template repo
         let bis = branchesInformation templateInformation
             throwEmptyChangeset =
@@ -354,33 +354,20 @@ renameTemplateBranch template oldBranch newBranch =
                 maybeRenameCommit <- commit
                     repo
                     (commitRenameBranchMessage oldBranch newBranch)
-                maybe throwEmptyChangeset return maybeRenameCommit
+                let refspec c = return $ Refspec (Just c) (branchRef newBranch)
+                maybe throwEmptyChangeset refspec maybeRenameCommit
             maybeMainBranch = find ((==) oldBranch . branchName) bis
             relatedBranches =
                 ( filter (Set.member oldBranch . requiredBranches)
                     . filter ((/=) oldBranch . branchName)
                     )
                     bis
-            getCommitMessage (commit, branch) =
-                commitOnBranchMessage branch <$> getCommitContent repo commit
         mainBranch <- maybe throwOldBranchNotFound return maybeMainBranch
-        mainRenameCommit <- (, newBranch) <$> renameOnBranch mainBranch
-        relatedRenameCommits <- traverse
-            (\bi -> (, branchName bi) <$> renameOnBranch bi)
-            relatedBranches
-        let allCommits = mainRenameCommit : relatedRenameCommits
-        commitMessages <- traverse getCommitMessage allCommits
-        sayLn $ vsep commitMessages
-        shouldPush <- confirm (confirmPush [oldBranch] (fmap snd allCommits))
-        if shouldPush
-            then pushRefs
-                repo
-                ( Refspec Nothing (branchRef oldBranch)
-                : fmap
-                      (\(c, b) -> Refspec (Just c) (branchRef b))
-                      allCommits
-                )
-            else throwM CancelledException
+        let deleteOld = Refspec Nothing (branchRef oldBranch)
+        pushNew        <- renameOnBranch mainBranch
+        relatedRenames <- traverse renameOnBranch relatedBranches
+        return $ deleteOld : pushNew : relatedRenames
+
 
 changeTemplateVariableValue
     :: (MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
@@ -389,6 +376,25 @@ changeTemplateVariableValue
     -> Text
     -> m ()
 changeTemplateVariableValue template oldValue newValue = return ()
+
+runTemplateChange
+    :: (MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    => Text
+    -> (GitRepository -> m [Refspec])
+    -> m ()
+runTemplateChange template f =
+    withClonedRepository (buildRepositoryUrl template) $ \repo -> do
+        let getCommitMessage (Refspec Nothing _) = return Nothing
+            getCommitMessage (Refspec (Just c) (Ref _ ref)) =
+                Just . commitOnBranchMessage ref <$> getCommitContent repo c
+            dst (Refspec _ (Ref _ x)) = x
+        changes        <- f repo
+        commitMessages <- traverse getCommitMessage changes
+        sayLn $ vsep (catMaybes commitMessages)
+        let (deletes, updates) = partition (isNothing . sourceRef) changes
+        shouldPush <- confirm
+            (confirmPush (fmap dst deletes) (fmap dst updates))
+        if shouldPush then pushRefs repo changes else throwM CancelledException
 
 commitMessagePattern :: Text
 commitMessagePattern = "^Template: .*$"

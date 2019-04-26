@@ -7,6 +7,7 @@ module Git.Cli where
 import           Git                            ( RepositoryUrl(..)
                                                 , GitRepository(..)
                                                 , Committish(..)
+                                                , RefType(..)
                                                 , Ref(..)
                                                 , Refspec(..)
                                                 )
@@ -365,5 +366,6 @@ pushRefs repo refs =
     gitRepoCmd repo (["push", "--atomic", "origin"] ++ fmap refspec refs)
         >>= unitOrThrow
   where
-    refspec (Refspec Nothing               (Ref dst)) = ":" <> dst
-    refspec (Refspec (Just (Committish c)) (Ref dst)) = c <> ":" <> dst
+    ref (Ref BranchRef dst) = "refs/heads/" <> dst
+    refspec (Refspec Nothing               dst) = ":" <> ref dst
+    refspec (Refspec (Just (Committish c)) dst) = c <> ":" <> ref dst
