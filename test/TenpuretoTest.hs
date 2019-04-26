@@ -11,6 +11,7 @@ import           Path
 import           Data
 import           Git
 import           Tenpureto
+import           Tenpureto.Messages
 
 test_extractTemplateName :: [TestTree]
 test_extractTemplateName =

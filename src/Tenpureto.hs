@@ -37,6 +37,8 @@ import           Templater
 import           Path
 import           Path.IO
 
+import           Tenpureto.Messages
+
 data TenpuretoException = InvalidTemplateException Text Text
                         | InvalidTemplateBranchException Text Text
                         | CancelledException
@@ -108,7 +110,7 @@ createProject projectConfiguration unattended =
                       commit
                           project
                           (commitCreateMessage finalTemplateConfiguration)
-                      sayLn $ "Created " <> pretty dst
+                      sayLn $ projectCreated dst
 
 updateProject
     :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
@@ -154,13 +156,10 @@ updateProject projectConfiguration unattended = do
                                               (commitUpdateMergeMessage
                                                   finalTemplateConfiguration
                                               )
-                                          sayLn
-                                              $  "Updated "
-                                              <> (pretty . repositoryPath)
-                                                     project
+                                          sayLn $ projectUpdated
+                                              (repositoryPath project)
                                       Nothing ->
-                                          sayLn
-                                              "There are no relevant changes in the template."
+                                          sayLn noRelevantTemplateChanges
 
 withPreparedTemplate
     :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
@@ -305,8 +304,8 @@ prepareTemplate repository template configuration =
                 inputResolutionStrategy (repositoryPath repository) conflicts
                     >>= \case
                             AlreadyResolved -> return ()
-                            MergeTool       -> runMergeTool repository
-                                >> sayLn "Successfully merged."
+                            MergeTool ->
+                                runMergeTool repository >> sayLn mergeSuccess
         mergeTemplateBranch a b =
             let bi = find ((==) b . branchName) (branchesInformation template)
                 d  = maybe a ((<>) a . templateYaml) bi
@@ -362,14 +361,8 @@ renameTemplateBranch template oldBranch newBranch =
                     . filter ((/=) oldBranch . branchName)
                     )
                     bis
-            getCommitMessage (commit, branch) = do
-                content <- getCommitContent repo commit
-                return
-                    $  "Commit on "
-                    <> pretty branch
-                    <> ":"
-                    <> line
-                    <> (indent 4 . pretty) content
+            getCommitMessage (commit, branch) =
+                commitOnBranchMessage branch <$> getCommitContent repo commit
         mainBranch <- maybe throwOldBranchNotFound return maybeMainBranch
         mainRenameCommit <- (, newBranch) <$> renameOnBranch mainBranch
         relatedRenameCommits <- traverse
@@ -378,38 +371,13 @@ renameTemplateBranch template oldBranch newBranch =
         let allCommits = mainRenameCommit : relatedRenameCommits
         commitMessages <- traverse getCommitMessage allCommits
         sayLn $ vsep commitMessages
-        shouldPush <- confirm
-            (  "Do you want to delete \""
-            <> pretty oldBranch
-            <> "\" and push "
-            <> (if null relatedRenameCommits
-                   then "this commit"
-                   else "these commits"
-               )
-            <> " to "
-            <> (fillSep . punctuate comma . fmap (dquotes . pretty . snd))
-                   allCommits
-            )
+        shouldPush <- confirm (confirmPush [oldBranch] (fmap snd allCommits))
         if shouldPush
             then pushRefs
                 repo
                 ((Nothing, oldBranch) : fmap (\(c, b) -> (Just c, b)) allCommits
                 )
             else throwM CancelledException
-
-commitCreateMessage :: FinalTemplateConfiguration -> Text
-commitCreateMessage cfg =
-    "Create from a template\n\nTemplate: " <> selectedTemplate cfg
-
-commitUpdateMessage :: FinalTemplateConfiguration -> Text
-commitUpdateMessage cfg =
-    "Update from a template\n\nTemplate: " <> selectedTemplate cfg
-
-commitUpdateMergeMessage :: FinalTemplateConfiguration -> Text
-commitUpdateMergeMessage cfg = "Merge " <> selectedTemplate cfg
-
-commitRenameBranchMessage :: Text -> Text -> Text
-commitRenameBranchMessage from to = "Rename " <> from <> " to " <> to
 
 commitMessagePattern :: Text
 commitMessagePattern = "^Template: .*$"
