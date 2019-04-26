@@ -260,8 +260,8 @@ inputResolutionStrategy repo conflicts = do
     result <- confirm "Run \"git mergetool\""
     return $ bool AlreadyResolved MergeTool result
 
-confirm :: MonadConsole m => Text -> m Bool
-confirm request = askUntil (pretty request <+> "(y/n)?") (Just "y") mapAnswer
+confirm :: MonadConsole m => Doc AnsiStyle -> m Bool
+confirm request = askUntil (request <+> "(y/n)?") (Just "y") mapAnswer
   where
     mapAnswer x = case x of
         "y" -> Right True

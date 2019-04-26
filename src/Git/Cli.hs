@@ -192,11 +192,14 @@ checkoutBranch
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
     -> Text
-    -> Text
+    -> Maybe Text
     -> m ()
 checkoutBranch repo branch name = do
     gitRepoCmd repo ["checkout", branch] >>= unitOrThrow
-    gitRepoCmd repo ["checkout", "-b", name] >>= unitOrThrow
+    gitRepoCmd
+            repo
+            (maybe ["checkout", "--detach"] (\n -> ["checkout", "-b", n]) name)
+        >>= unitOrThrow
 
 listConflicts
     :: (MonadIO m, MonadThrow m, MonadLog m)

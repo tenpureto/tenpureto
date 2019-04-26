@@ -3,6 +3,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE TupleSections #-}
 
 module Tenpureto where
 
@@ -13,6 +14,7 @@ import           Data.ByteString.Lazy           ( ByteString )
 import qualified Data.ByteString.Lazy          as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
+import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
@@ -314,8 +316,17 @@ prepareTemplate repository template configuration =
                     return d
     in
         do
-            checkoutBranch repository (baseBranch configuration) branch
+            checkoutBranch repository (baseBranch configuration) (Just branch)
             foldlM mergeTemplateBranch mempty (featureBranches configuration)
+
+replaceInSet :: Ord a => a -> a -> Set a -> Set a
+replaceInSet from to = Set.insert to . Set.delete from
+
+replaceBranchInYaml :: Text -> Text -> TemplateYaml -> TemplateYaml
+replaceBranchInYaml old new descriptor = TemplateYaml
+    { variables = variables descriptor
+    , features  = replaceInSet old new (features descriptor)
+    }
 
 renameTemplateBranch
     :: (MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
@@ -326,51 +337,64 @@ renameTemplateBranch
 renameTemplateBranch template oldBranch newBranch =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
         templateInformation <- loadTemplateInformation template repo
-        let maybeBranchInformation = find
-                ((==) oldBranch . branchName)
-                (branchesInformation templateInformation)
-        branchInformation <- maybe
-            ( throwM
-            $ InvalidTemplateBranchException oldBranch "branch not found"
-            )
-            return
-            maybeBranchInformation
-        let descriptor    = templateYaml branchInformation
-            newDescriptor = TemplateYaml
-                { variables = variables descriptor
-                , features  =
-                    (Set.insert newBranch . Set.delete oldBranch . features)
-                        descriptor
-                }
-        checkoutBranch repo oldBranch newBranch
-        writeAddFile repo
-                     templateYamlFile
-                     ((BS.fromStrict . Y.encode) newDescriptor)
-        maybeRenameCommit <- commit
-            repo
-            ("Rename " <> oldBranch <> " to " <> newBranch)
-        renameCommit <- maybe
-            (throwM $ TenpuretoException
-                "Failed to create a rename commit: empty changeset"
-            )
-            return
-            maybeRenameCommit
-        renameCommitContent <- getCommitContent repo renameCommit
-        sayLn
-            $  "Commit content:"
-            <> line
-            <> (indent 4 . pretty) renameCommitContent
+        let bis = branchesInformation templateInformation
+            throwEmptyChangeset =
+                throwM $ TenpuretoException
+                    "Failed to create a rename commit: empty changeset"
+            throwOldBranchNotFound = throwM $ InvalidTemplateBranchException
+                oldBranch
+                "branch not found"
+            renameOnBranch bi = do
+                checkoutBranch repo (branchName bi) Nothing
+                let descriptor = templateYaml bi
+                    newDescriptor =
+                        replaceBranchInYaml oldBranch newBranch descriptor
+                writeAddFile repo
+                             templateYamlFile
+                             ((BS.fromStrict . Y.encode) newDescriptor)
+                maybeRenameCommit <- commit
+                    repo
+                    (commitRenameBranchMessage oldBranch newBranch)
+                maybe throwEmptyChangeset return maybeRenameCommit
+            maybeMainBranch = find ((==) oldBranch . branchName) bis
+            relatedBranches =
+                ( filter (Set.member oldBranch . requiredBranches)
+                    . filter ((/=) oldBranch . branchName)
+                    )
+                    bis
+            getCommitMessage (commit, branch) = do
+                content <- getCommitContent repo commit
+                return
+                    $  "Commit on "
+                    <> pretty branch
+                    <> ":"
+                    <> line
+                    <> (indent 4 . pretty) content
+        mainBranch <- maybe throwOldBranchNotFound return maybeMainBranch
+        mainRenameCommit <- (, newBranch) <$> renameOnBranch mainBranch
+        relatedRenameCommits <- traverse
+            (\bi -> (, branchName bi) <$> renameOnBranch bi)
+            relatedBranches
+        let allCommits = mainRenameCommit : relatedRenameCommits
+        commitMessages <- traverse getCommitMessage allCommits
+        sayLn $ vsep commitMessages
         shouldPush <- confirm
             (  "Do you want to delete \""
-            <> oldBranch
-            <> "\" and push this commit to \""
-            <> newBranch
-            <> "\""
+            <> pretty oldBranch
+            <> "\" and push "
+            <> (if null relatedRenameCommits
+                   then "this commit"
+                   else "these commits"
+               )
+            <> " to "
+            <> (fillSep . punctuate comma . fmap (dquotes . pretty . snd))
+                   allCommits
             )
         if shouldPush
             then pushRefs
                 repo
-                [(Nothing, oldBranch), (Just renameCommit, newBranch)]
+                ((Nothing, oldBranch) : fmap (\(c, b) -> (Just c, b)) allCommits
+                )
             else throwM CancelledException
 
 commitCreateMessage :: FinalTemplateConfiguration -> Text
@@ -383,6 +407,9 @@ commitUpdateMessage cfg =
 
 commitUpdateMergeMessage :: FinalTemplateConfiguration -> Text
 commitUpdateMergeMessage cfg = "Merge " <> selectedTemplate cfg
+
+commitRenameBranchMessage :: Text -> Text -> Text
+commitRenameBranchMessage from to = "Rename " <> from <> " to " <> to
 
 commitMessagePattern :: Text
 commitMessagePattern = "^Template: .*$"
