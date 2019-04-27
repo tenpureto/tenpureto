@@ -311,7 +311,7 @@ getCommitContent
     -> Committish
     -> m Text
 getCommitContent repo (Committish c) =
-    gitcmdStdout repo ["show", "--format=short", c] <&> decodeUtf8
+    gitcmdStdout repo ["show", "--format=short", "--color", c] <&> decodeUtf8
 
 listFiles
     :: (MonadIO m, MonadThrow m, MonadLog m)
