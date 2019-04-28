@@ -46,6 +46,7 @@ instance MonadGit AppM where
     listFiles               = GC.listFiles
     populateRerereFromMerge = GC.populateRerereFromMerge
     getCurrentBranch        = GC.getCurrentBranch
+    getCurrentHead          = GC.getCurrentHead
     renameCurrentBranch     = GC.renameCurrentBranch
     pushRefs                = GC.pushRefs
 
@@ -71,12 +72,14 @@ data Command
             { templateName :: Text
             , oldBranchName :: Text
             , newBranchName :: Text
+            , enableInteractivity :: Bool
             , enableDebugLogging :: Bool
             }
     | TemplateChangeVariable
             { templateName :: Text
             , oldVariableValue :: Text
             , newVariableValue :: Text
+            , enableInteractivity :: Bool
             , enableDebugLogging :: Bool
             }
 
@@ -91,6 +94,12 @@ targetArgument = strArgument (metavar "<dir>" <> help "Target directory")
 
 unattendedSwitch :: Parser Bool
 unattendedSwitch = switch (long "unattended" <> help "Do not ask anything")
+
+interactiveSwitch :: Parser Bool
+interactiveSwitch = switch
+    (  long "interactive"
+    <> help "Stop before committing to allow manual intervention"
+    )
 
 debugSwitch :: Parser Bool
 debugSwitch = switch (long "debug" <> help "Print debug information")
@@ -138,6 +147,7 @@ renameBranchCommand =
         <$> templateNameOption
         <*> oldBranchNameOption
         <*> newBranchNameOption
+        <*> interactiveSwitch
         <*> debugSwitch
 
 changeVariableCommand :: Parser Command
@@ -146,6 +156,7 @@ changeVariableCommand =
         <$> templateNameOption
         <*> oldVariableValueOption
         <*> newVariableValueOption
+        <*> interactiveSwitch
         <*> debugSwitch
 
 templateCommands :: Parser Command
@@ -185,10 +196,10 @@ run Update { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u
                 , preVariableValues         = Nothing
                 }
         updateProject (inputConfig <> currentConfig) u
-run TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableDebugLogging = d }
-    = runAppM d $ renameTemplateBranch t on nn
-run TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableDebugLogging = d }
-    = runAppM d $ changeTemplateVariableValue t ov nv
+run TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableInteractivity = i, enableDebugLogging = d }
+    = runAppM d $ renameTemplateBranch t on nn i
+run TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
+    = runAppM d $ changeTemplateVariableValue t ov nv i
 
 main :: IO ()
 main = run =<< customExecParser p opts

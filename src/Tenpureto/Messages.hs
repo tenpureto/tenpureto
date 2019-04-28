@@ -7,6 +7,7 @@ import           Data.Text.Prettyprint.Doc
 import           Path
 
 import           Data
+import           Git
 
 -- Commit messages
 
@@ -47,10 +48,14 @@ noRelevantTemplateChanges = "There are no relevant changes in the template."
 mergeSuccess :: Doc a
 mergeSuccess = "Successfully merged."
 
-confirmPush :: [Text] -> [Text] -> Doc a
-confirmPush deletes updates = "Do you want to"
+confirmPushMessage :: [Refspec] -> [Refspec] -> Doc a
+confirmPushMessage deletes updates = "Do you want to"
     <+> (fillSep . punctuate " and") (toDelete ++ toUpdate)
   where
-    branchList = fillSep . punctuate comma . fmap (dquotes . pretty)
-    toDelete   = if null deletes then [] else ["delete" <+> branchList deletes]
-    toUpdate   = if null updates then [] else ["push to" <+> branchList updates]
+    branchList = fillSep . punctuate comma . fmap
+        (dquotes . pretty . reference . destinationRef)
+    toDelete = if null deletes then [] else ["delete" <+> branchList deletes]
+    toUpdate = if null updates then [] else ["push to" <+> branchList updates]
+
+confirmShellToAmendMessage :: Doc a
+confirmShellToAmendMessage = "Do you want to enter a shell to amend the commit"

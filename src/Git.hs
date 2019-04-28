@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Git where
 
 import           Data.ByteString.Lazy           ( ByteString )
@@ -11,7 +9,7 @@ newtype RepositoryUrl = RepositoryUrl Text deriving (Eq, Show)
 newtype GitRepository = GitRepository { repositoryPath :: Path Abs Dir }
 newtype Committish = Committish Text deriving (Show)
 data RefType = BranchRef deriving (Show)
-data Ref = Ref RefType Text deriving (Show)
+data Ref = Ref { refType :: RefType, reference :: Text } deriving (Show)
 data Refspec = Refspec { sourceRef :: Maybe Committish, destinationRef :: Ref } deriving (Show)
 
 class Monad m => MonadGit m where
@@ -34,6 +32,7 @@ class Monad m => MonadGit m where
     listFiles :: GitRepository -> m [Path Rel File]
     populateRerereFromMerge :: GitRepository -> Committish -> m ()
     getCurrentBranch :: GitRepository -> m Text
+    getCurrentHead :: GitRepository -> m Committish
     renameCurrentBranch :: GitRepository -> Text -> m ()
     pushRefs :: GitRepository -> [Refspec] -> m ()
 

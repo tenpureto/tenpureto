@@ -3,7 +3,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE TupleSections #-}
 
 module Tenpureto where
 
@@ -36,7 +35,7 @@ import           Logging
 import           Templater
 import           Path
 import           Path.IO
-
+import           System.Process.Typed
 import           Tenpureto.Messages
 
 data TenpuretoException = InvalidTemplateException Text Text
@@ -349,13 +348,14 @@ commit_ repo message =
                 return
 
 renameTemplateBranch
-    :: (MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
     => Text
     -> Text
     -> Text
+    -> Bool
     -> m ()
-renameTemplateBranch template oldBranch newBranch =
-    runTemplateChange template $ \repo -> do
+renameTemplateBranch template oldBranch newBranch interactive =
+    runTemplateChange template interactive $ \repo -> do
         bis <- branchesInformation <$> loadTemplateInformation template repo
         let throwOldBranchNotFound = throwM $ InvalidTemplateBranchException
                 oldBranch
@@ -386,9 +386,10 @@ changeTemplateVariableValue
     => Text
     -> Text
     -> Text
+    -> Bool
     -> m ()
-changeTemplateVariableValue template oldValue newValue =
-    runTemplateChange template $ \repo -> do
+changeTemplateVariableValue template oldValue newValue interactive =
+    runTemplateChange template interactive $ \repo -> do
         bis <- branchesInformation <$> loadTemplateInformation template repo
         templaterSettings <- compileSettings $ TemplaterSettings
             { templaterFromVariables = InsOrdHashMap.singleton "Variable"
@@ -413,23 +414,40 @@ changeTemplateVariableValue template oldValue newValue =
         traverse changeOnBranch branches
 
 runTemplateChange
-    :: (MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
     => Text
+    -> Bool
     -> (GitRepository -> m [Refspec])
     -> m ()
-runTemplateChange template f =
+runTemplateChange template interactive f =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
-        let getCommitMessage (Refspec Nothing _) = return Nothing
-            getCommitMessage (Refspec (Just c) (Ref _ ref)) =
-                Just . commitOnBranchMessage ref <$> getCommitContent repo c
-            dst (Refspec _ (Ref _ x)) = x
-        changes        <- f repo
-        commitMessages <- traverse getCommitMessage changes
-        sayLn $ vsep (catMaybes commitMessages)
+        let confirmCommit (Refspec Nothing _) = return Nothing
+            confirmCommit refspec@(Refspec (Just c) (Ref _ ref)) = do
+                msg <- commitOnBranchMessage ref <$> getCommitContent repo c
+                sayLn msg
+                if not interactive
+                    then return $ Just refspec
+                    else do
+                        shouldRunShell <- confirm confirmShellToAmendMessage
+                        if shouldRunShell
+                            then do
+                                runShell (repositoryPath repo)
+                                newCommit <- getCurrentHead repo
+                                return $ Just
+                                    (Refspec
+                                        { sourceRef      = Just newCommit
+                                        , destinationRef = destinationRef
+                                                               refspec
+                                        }
+                                    )
+                            else return $ Just refspec
+        changes <- catMaybes <$> (f repo >>= traverse confirmCommit)
         let (deletes, updates) = partition (isNothing . sourceRef) changes
-        shouldPush <- confirm
-            (confirmPush (fmap dst deletes) (fmap dst updates))
+        shouldPush <- confirm $ confirmPushMessage deletes updates
         if shouldPush then pushRefs repo changes else throwM CancelledException
+
+runShell :: MonadIO m => Path Abs Dir -> m ()
+runShell dir = runProcess_ $ setWorkingDir (toFilePath dir) $ shell "$SHELL"
 
 commitMessagePattern :: Text
 commitMessagePattern = "^Template: .*$"

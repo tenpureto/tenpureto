@@ -352,6 +352,12 @@ getCurrentBranch repo = T.strip . decodeUtf8 <$> gitcmdStdout
     repo
     ["rev-parse", "--abbrev-ref", "HEAD"]
 
+getCurrentHead
+    :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> m Committish
+getCurrentHead repo = Committish . T.strip . decodeUtf8 <$> gitcmdStdout
+    repo
+    ["rev-parse", "HEAD"]
+
 renameCurrentBranch
     :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> Text -> m ()
 renameCurrentBranch repo name =
