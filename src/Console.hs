@@ -1,8 +1,8 @@
 module Console
-  ( module Console
-  , module Data.Text.Prettyprint.Doc
-  , module Data.Text.Prettyprint.Doc.Render.Terminal
-  )
+    ( module Console
+    , module Data.Text.Prettyprint.Doc
+    , module Data.Text.Prettyprint.Doc.Render.Terminal
+    )
 where
 
 import           Data.Text                      ( Text )

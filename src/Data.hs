@@ -65,83 +65,73 @@ data TemplateYaml = TemplateYaml
         deriving (Show)
 
 instance Semigroup PreliminaryProjectConfiguration where
-        (<>) a b = PreliminaryProjectConfiguration
-                { preSelectedTemplate       = preSelectedTemplate a
-                                                      <|> preSelectedTemplate b
-                , preTargetDirectory        = preTargetDirectory a
-                                                      <|> preTargetDirectory b
-                , prePreviousTemplateCommit =
-                        prePreviousTemplateCommit a
-                                <|> prePreviousTemplateCommit b
-                , preSelectedBranches       = preSelectedBranches a
-                                                      <|> preSelectedBranches b
-                , preVariableValues         = preVariableValues a
-                                                      <|> preVariableValues b
-                }
+    (<>) a b = PreliminaryProjectConfiguration
+        { preSelectedTemplate = preSelectedTemplate a <|> preSelectedTemplate b
+        , preTargetDirectory = preTargetDirectory a <|> preTargetDirectory b
+        , prePreviousTemplateCommit = prePreviousTemplateCommit a
+                                          <|> prePreviousTemplateCommit b
+        , preSelectedBranches = preSelectedBranches a <|> preSelectedBranches b
+        , preVariableValues = preVariableValues a <|> preVariableValues b
+        }
 
 instance Pretty PreliminaryProjectConfiguration where
-        pretty cfg = (align . vsep)
-                [ "Template:                 "
-                        <+> (align . pretty) (preSelectedTemplate cfg)
-                , "Target directory:         "
-                        <+> (align . pretty) (preTargetDirectory cfg)
-                , "Previous template commit: " <+> (align . pretty . show)
-                        (prePreviousTemplateCommit cfg)
-                , "Selected branches:        "
-                        <+> (align . pretty) (preSelectedBranches cfg)
-                , "Variable values:          "
-                        <+> (align . pretty) (preVariableValues cfg)
-                ]
+    pretty cfg = (align . vsep)
+        [ "Template:                 "
+            <+> (align . pretty) (preSelectedTemplate cfg)
+        , "Target directory:         "
+            <+> (align . pretty) (preTargetDirectory cfg)
+        , "Previous template commit: "
+            <+> (align . pretty . show) (prePreviousTemplateCommit cfg)
+        , "Selected branches:        "
+            <+> (align . pretty) (preSelectedBranches cfg)
+        , "Variable values:          "
+            <+> (align . pretty) (preVariableValues cfg)
+        ]
 
 instance Pretty FinalProjectConfiguration where
-        pretty cfg = (align . vsep)
-                [ "Base branch:     " <+> (align . pretty) (baseBranch cfg)
-                , "Feature branches:" <+> (align . pretty) (featureBranches cfg)
-                , "Variable values: " <+> (align . pretty) (variableValues cfg)
-                ]
+    pretty cfg = (align . vsep)
+        [ "Base branch:     " <+> (align . pretty) (baseBranch cfg)
+        , "Feature branches:" <+> (align . pretty) (featureBranches cfg)
+        , "Variable values: " <+> (align . pretty) (variableValues cfg)
+        ]
 
 instance Pretty FinalUpdateConfiguration where
-        pretty cfg = (align . vsep)
-                [ "Previous template commit:"
-                          <+> (align . pretty) (previousTemplateCommit cfg)
-                ]
+    pretty cfg = (align . vsep)
+        [ "Previous template commit:"
+              <+> (align . pretty) (previousTemplateCommit cfg)
+        ]
 
 instance Pretty TemplateBranchInformation where
-        pretty cfg = (align . vsep)
-                [ "Branch name:      " <+> (align . pretty) (branchName cfg)
-                , "Base branch:      " <+> (align . pretty) (isBaseBranch cfg)
-                , "Required branches:"
-                        <+> (align . pretty) (requiredBranches cfg)
-                , "Branche variables:"
-                        <+> (align . pretty) (branchVariables cfg)
-                ]
+    pretty cfg = (align . vsep)
+        [ "Branch name:      " <+> (align . pretty) (branchName cfg)
+        , "Base branch:      " <+> (align . pretty) (isBaseBranch cfg)
+        , "Required branches:" <+> (align . pretty) (requiredBranches cfg)
+        , "Branche variables:" <+> (align . pretty) (branchVariables cfg)
+        ]
 
 instance Pretty TemplateInformation where
-        pretty cfg =
-                (align . vsep)
-                        [ "Branches:"
-                                  <+> (align . pretty) (branchesInformation cfg)
-                        ]
+    pretty cfg = (align . vsep)
+        ["Branches:" <+> (align . pretty) (branchesInformation cfg)]
 
 instance Pretty TemplateYaml where
-        pretty cfg = (align . vsep)
-                [ "Variables:" <+> (align . pretty) (variables cfg)
-                , "Features: " <+> (align . pretty) (features cfg)
-                ]
+    pretty cfg = (align . vsep)
+        [ "Variables:" <+> (align . pretty) (variables cfg)
+        , "Features: " <+> (align . pretty) (features cfg)
+        ]
 
 instance FromJSON TemplateYaml where
-        parseJSON (Y.Object v) =
-                TemplateYaml <$> v .: "variables" <*> v .: "features"
-        parseJSON _ = fail "Invalid template YAML definition"
+    parseJSON (Y.Object v) =
+        TemplateYaml <$> v .: "variables" <*> v .: "features"
+    parseJSON _ = fail "Invalid template YAML definition"
 
 instance ToJSON TemplateYaml where
-        toJSON TemplateYaml { variables = v, features = f } =
-                Y.object ["variables" .= v, "features" .= f]
+    toJSON TemplateYaml { variables = v, features = f } =
+        Y.object ["variables" .= v, "features" .= f]
 
 instance Semigroup TemplateYaml where
-        (<>) a b = TemplateYaml { variables = variables a <> variables b
-                                , features  = features a <> features b
-                                }
+    (<>) a b = TemplateYaml { variables = variables a <> variables b
+                            , features  = features a <> features b
+                            }
 
 instance Monoid TemplateYaml where
-        mempty = TemplateYaml { variables = mempty, features = mempty }
+    mempty = TemplateYaml { variables = mempty, features = mempty }

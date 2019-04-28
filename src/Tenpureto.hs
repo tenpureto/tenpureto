@@ -280,7 +280,7 @@ loadTemplateInformation repositoryName repository = do
     branchConfigurations <- traverse (loadBranchConfiguration repository)
         $ sort branches
     let bi = catMaybes branchConfigurations
-    _ <- if hasBaseBranches bi
+    if hasBaseBranches bi
         then return ()
         else throwM $ InvalidTemplateException repositoryName
                                                "no base branches found"
