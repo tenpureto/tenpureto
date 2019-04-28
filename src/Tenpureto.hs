@@ -421,12 +421,12 @@ runTemplateChange
     -> m ()
 runTemplateChange template interactive f =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
-        let confirmCommit (Refspec Nothing _) = return Nothing
+        let confirmCommit refspec@(Refspec Nothing _) = return refspec
             confirmCommit refspec@(Refspec (Just c) (Ref _ ref)) = do
                 msg <- commitOnBranchMessage ref <$> getCommitContent repo c
                 sayLn msg
                 if not interactive
-                    then return $ Just refspec
+                    then return refspec
                     else do
                         shouldRunShell <- confirm confirmShellToAmendMessage
                                                   (Just False)
@@ -434,15 +434,12 @@ runTemplateChange template interactive f =
                             then do
                                 runShell (repositoryPath repo)
                                 newCommit <- getCurrentHead repo
-                                return $ Just
-                                    (Refspec
-                                        { sourceRef      = Just newCommit
-                                        , destinationRef = destinationRef
-                                                               refspec
-                                        }
-                                    )
-                            else return $ Just refspec
-        changes <- catMaybes <$> (f repo >>= traverse confirmCommit)
+                                return $ Refspec
+                                    { sourceRef      = Just newCommit
+                                    , destinationRef = destinationRef refspec
+                                    }
+                            else return refspec
+        changes <- f repo >>= traverse confirmCommit
         let (deletes, updates) = partition (isNothing . sourceRef) changes
         shouldPush <- confirm (confirmPushMessage deletes updates) (Just False)
         if shouldPush then pushRefs repo changes else throwM CancelledException
