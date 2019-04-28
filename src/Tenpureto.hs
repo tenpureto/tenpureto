@@ -440,9 +440,16 @@ runTemplateChange template interactive f =
                                     }
                             else return refspec
         changes <- f repo >>= traverse confirmCommit
-        let (deletes, updates) = partition (isNothing . sourceRef) changes
-        shouldPush <- confirm (confirmPushMessage deletes updates) (Just False)
-        if shouldPush then pushRefs repo changes else throwM CancelledException
+        if null changes
+            then sayLn noRelevantTemplateChanges
+            else do
+                let (deletes, updates) =
+                        partition (isNothing . sourceRef) changes
+                shouldPush <- confirm (confirmPushMessage deletes updates)
+                                      (Just False)
+                if shouldPush
+                    then pushRefs repo changes
+                    else throwM CancelledException
 
 runShell :: MonadIO m => Path Abs Dir -> m ()
 runShell dir = runProcess_ $ setWorkingDir (toFilePath dir) $ shell "$SHELL"
