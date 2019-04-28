@@ -429,6 +429,7 @@ runTemplateChange template interactive f =
                     then return $ Just refspec
                     else do
                         shouldRunShell <- confirm confirmShellToAmendMessage
+                                                  (Just False)
                         if shouldRunShell
                             then do
                                 runShell (repositoryPath repo)
@@ -443,7 +444,7 @@ runTemplateChange template interactive f =
                             else return $ Just refspec
         changes <- catMaybes <$> (f repo >>= traverse confirmCommit)
         let (deletes, updates) = partition (isNothing . sourceRef) changes
-        shouldPush <- confirm $ confirmPushMessage deletes updates
+        shouldPush <- confirm (confirmPushMessage deletes updates) (Just False)
         if shouldPush then pushRefs repo changes else throwM CancelledException
 
 runShell :: MonadIO m => Path Abs Dir -> m ()

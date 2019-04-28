@@ -257,13 +257,17 @@ inputResolutionStrategy repo conflicts = do
     sayLn "The following files have merge conflicts:"
     traverse_ (\c -> sayLn ("  " <> pretty c)) conflicts
     sayLn $ "Repository path: " <> pretty repo
-    result <- confirm "Run \"git mergetool\""
+    result <- confirm "Run \"git mergetool\"" (Just True)
     return $ bool AlreadyResolved MergeTool result
 
-confirm :: MonadConsole m => Doc AnsiStyle -> m Bool
-confirm request = askUntil (request <+> "(y/n)?") (Just "y") mapAnswer
+confirm :: MonadConsole m => Doc AnsiStyle -> Maybe Bool -> m Bool
+confirm request def = askUntil (request <+> "(y/n)?")
+                               (fmap defAns def)
+                               mapAnswer
   where
     mapAnswer x = case x of
         "y" -> Right True
         "n" -> Right False
         _   -> Left "Please answer \"y\" or \"n\"."
+    defAns True  = "y"
+    defAns False = "n"
