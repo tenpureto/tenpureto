@@ -33,6 +33,8 @@ import           Console
 import           Path
 import           Path.IO
 
+import           Tenpureto.TemplateLoader
+
 data UIException = UnattendedNotPossibleException | InvalidInputException | InterruptedInputException deriving (Exception)
 
 instance Show UIException where

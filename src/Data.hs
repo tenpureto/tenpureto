@@ -6,15 +6,12 @@ import           Data.Text                      ( Text )
 import           Data.Set                       ( Set )
 import           Data.Map                       ( Map )
 import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
-import           Data.Yaml                      ( FromJSON(..)
-                                                , ToJSON(..)
-                                                , (.:)
-                                                , (.=)
-                                                )
-import qualified Data.Yaml                     as Y
-import           Git                            ( Committish )
+
 import           Control.Applicative
+
 import           Path
+
+import           Git                            ( Committish )
 import           Logging
 
 data PreliminaryProjectConfiguration = PreliminaryProjectConfiguration
@@ -41,26 +38,6 @@ data FinalProjectConfiguration = FinalProjectConfiguration
         { baseBranch :: Text
         , featureBranches :: Set Text
         , variableValues :: Map Text Text
-        }
-        deriving (Show)
-
-data TemplateBranchInformation = TemplateBranchInformation
-        { branchName :: Text
-        , isBaseBranch :: Bool
-        , requiredBranches :: Set Text
-        , branchVariables :: InsOrdHashMap Text Text
-        , templateYaml :: TemplateYaml
-        }
-        deriving (Show)
-
-newtype TemplateInformation = TemplateInformation
-        { branchesInformation :: [TemplateBranchInformation]
-        }
-        deriving (Show)
-
-data TemplateYaml = TemplateYaml
-        { variables :: InsOrdHashMap Text Text
-        , features :: Set Text
         }
         deriving (Show)
 
@@ -100,38 +77,3 @@ instance Pretty FinalUpdateConfiguration where
         [ "Previous template commit:"
               <+> (align . pretty) (previousTemplateCommit cfg)
         ]
-
-instance Pretty TemplateBranchInformation where
-    pretty cfg = (align . vsep)
-        [ "Branch name:      " <+> (align . pretty) (branchName cfg)
-        , "Base branch:      " <+> (align . pretty) (isBaseBranch cfg)
-        , "Required branches:" <+> (align . pretty) (requiredBranches cfg)
-        , "Branche variables:" <+> (align . pretty) (branchVariables cfg)
-        ]
-
-instance Pretty TemplateInformation where
-    pretty cfg = (align . vsep)
-        ["Branches:" <+> (align . pretty) (branchesInformation cfg)]
-
-instance Pretty TemplateYaml where
-    pretty cfg = (align . vsep)
-        [ "Variables:" <+> (align . pretty) (variables cfg)
-        , "Features: " <+> (align . pretty) (features cfg)
-        ]
-
-instance FromJSON TemplateYaml where
-    parseJSON (Y.Object v) =
-        TemplateYaml <$> v .: "variables" <*> v .: "features"
-    parseJSON _ = fail "Invalid template YAML definition"
-
-instance ToJSON TemplateYaml where
-    toJSON TemplateYaml { variables = v, features = f } =
-        Y.object ["variables" .= v, "features" .= f]
-
-instance Semigroup TemplateYaml where
-    (<>) a b = TemplateYaml { variables = variables a <> variables b
-                            , features  = features a <> features b
-                            }
-
-instance Monoid TemplateYaml where
-    mempty = TemplateYaml { variables = mempty, features = mempty }

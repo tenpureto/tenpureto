@@ -9,8 +9,6 @@ module Tenpureto where
 import           Data.List
 import           Data.Maybe
 import           Data.Either.Combinators
-import           Data.ByteString.Lazy           ( ByteString )
-import qualified Data.ByteString.Lazy          as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Set                       ( Set )
@@ -23,37 +21,31 @@ import           Data.Foldable
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import           Control.Monad.Trans
-import           Control.Monad.Trans.Maybe
-import qualified Data.Yaml                     as Y
-import           Data
 import qualified Data.Text.ICU                 as ICU
 import           Data.Functor
+import           Path
+import           Path.IO
+import           System.Process.Typed
+
+import           Data
 import           Git
 import           Console
 import           UI
 import           Logging
 import           Templater
-import           Path
-import           Path.IO
-import           System.Process.Typed
 import           Tenpureto.Messages
+import           Tenpureto.TemplateLoader
 
-data TenpuretoException = InvalidTemplateException Text Text
-                        | InvalidTemplateBranchException Text Text
+data TenpuretoException = InvalidTemplateBranchException Text Text
                         | CancelledException
                         | TenpuretoException Text
                         deriving (Exception)
 
 instance Show TenpuretoException where
-    show (InvalidTemplateException template reason) =
-        T.unpack $ "Template \"" <> template <> "\" is not valid: " <> reason
     show (InvalidTemplateBranchException branch reason) =
         T.unpack $ "Branch \"" <> branch <> "\" is not valid: " <> reason
     show CancelledException           = "Cancelled"
     show (TenpuretoException message) = T.unpack message
-
-templateYamlFile :: Path Rel File
-templateYamlFile = [relfile|.template.yaml|]
 
 makeFinalTemplateConfiguration
     :: (MonadMask m, MonadIO m, MonadConsole m)
@@ -212,12 +204,6 @@ withPreparedTemplate projectConfiguration unattended block = do
                       finalProjectConfiguration
               block repository finalTemplateConfiguration templaterSettings
 
-parseTemplateYaml :: ByteString -> Maybe TemplateYaml
-parseTemplateYaml yaml =
-    let info :: Either Y.ParseException TemplateYaml
-        info = Y.decodeEither' (BS.toStrict yaml)
-    in  rightToMaybe info
-
 loadExistingProjectConfiguration
     :: (MonadGit m, MonadLog m)
     => Path Abs Dir
@@ -231,7 +217,7 @@ loadExistingProjectConfiguration projectPath =
         previousTemplateCommit <- findCommit project commitMessagePattern
         previousCommitMessage  <- traverse (getCommitMessage project)
                                            previousTemplateCommit
-        let yaml = templateYamlContent >>= parseTemplateYaml
+        let yaml = templateYamlContent >>= (rightToMaybe . parseTemplateYaml)
         return PreliminaryProjectConfiguration
             { preSelectedTemplate       = extractTemplateName
                                               =<< previousCommitMessage
@@ -245,46 +231,6 @@ loadExistingProjectConfiguration projectPath =
                                               )
                                               yaml
             }
-
-loadBranchConfiguration
-    :: (MonadThrow m, MonadGit m)
-    => GitRepository
-    -> Text
-    -> m (Maybe TemplateBranchInformation)
-loadBranchConfiguration repo branch = runMaybeT $ do
-    descriptor <- MaybeT $ getBranchFile
-        repo
-        (T.pack "remotes/origin/" <> branch)
-        templateYamlFile
-    info <- MaybeT $ return $ parseTemplateYaml descriptor
-    let checkFeatures f = if Set.member branch f then Just f else Nothing
-    fb <- MaybeT $ return $ checkFeatures (features info)
-    return $ TemplateBranchInformation
-        { branchName       = branch
-        , isBaseBranch     = fb == Set.singleton branch
-        , requiredBranches = fb
-        , branchVariables  = variables info
-        , templateYaml     = info
-        }
-
-hasBaseBranches :: [TemplateBranchInformation] -> Bool
-hasBaseBranches = any isBaseBranch
-
-loadTemplateInformation
-    :: (MonadThrow m, MonadGit m)
-    => Text
-    -> GitRepository
-    -> m TemplateInformation
-loadTemplateInformation repositoryName repository = do
-    branches             <- listBranches repository
-    branchConfigurations <- traverse (loadBranchConfiguration repository)
-        $ sort branches
-    let bi = catMaybes branchConfigurations
-    if hasBaseBranches bi
-        then return ()
-        else throwM $ InvalidTemplateException repositoryName
-                                               "no base branches found"
-    return $ TemplateInformation { branchesInformation = bi }
 
 prepareTemplate
     :: (MonadIO m, MonadGit m, MonadConsole m)
@@ -300,7 +246,7 @@ prepareTemplate repository template configuration =
             then
                 writeAddFile repository
                              templateYamlFile
-                             ((BS.fromStrict . Y.encode) descriptor)
+                             (formatTemplateYaml descriptor)
                     >> resolve descriptor (delete templateYamlFile conflicts)
             else
                 inputResolutionStrategy (repositoryPath repository) conflicts
@@ -368,7 +314,7 @@ renameTemplateBranch template oldBranch newBranch interactive =
                         replaceBranchInYaml oldBranch newBranch descriptor
                 writeAddFile repo
                              templateYamlFile
-                             ((BS.fromStrict . Y.encode) newDescriptor)
+                             (formatTemplateYaml newDescriptor)
                 commit_ repo (commitRenameBranchMessage oldBranch newBranch)
             maybeMainBranch = find (isBranch oldBranch) bis
             childBranches   = filter (isChildBranch oldBranch) bis
@@ -407,7 +353,7 @@ changeTemplateVariableValue template oldValue newValue interactive =
                         replaceVariableInYaml oldValue newValue descriptor
                 writeAddFile repo
                              templateYamlFile
-                             ((BS.fromStrict . Y.encode) newDescriptor)
+                             (formatTemplateYaml newDescriptor)
                 c <- commit_ repo
                              (commitChangeVariableMessage oldValue newValue)
                 return $ Refspec (Just c) (branchRef (branchName bi))
