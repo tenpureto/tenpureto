@@ -64,7 +64,7 @@ where
 * `<directory>` — where to create a project.
 
 If you have a local clone of a Git repository with `--mirror`, you can pass its
-path instead of a Git URL as the `<repository>` argument instead.
+path instead of a Git URL as the `<repository>` argument.
 
 You will be asked to choose a subset of template features you want to include,
 and to provide some variable values, and then the project will be created.
