@@ -235,9 +235,9 @@ inputProjectConfiguration templateInformation providedConfiguration = do
     let fbi = filter (child base) bi
         preSelectedFeatures =
             preSelectedFeatureBranches templateInformation providedConfiguration
-    branches <- inputFeatureBranches
-        fbi
-        (fromMaybe Set.empty preSelectedFeatures)
+    branches <- if null fbi
+        then return Set.empty
+        else inputFeatureBranches fbi (fromMaybe Set.empty preSelectedFeatures)
     let sbi    = filter (flip Set.member branches . branchName) bi
         sbvars = mconcat (map branchVariables sbi)
         cvars  = fromMaybe Map.empty (preVariableValues providedConfiguration)
