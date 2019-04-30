@@ -19,7 +19,8 @@ reasonable amount of flexibility:
 You can install `tenpureto` with [Homebrew](https://brew.sh):
 
 ```sh 
-$ brew tap rtimush/tap # you need it only once $ brew install tenpureto
+$ brew tap rtimush/tap # you need it only once 
+$ brew install tenpureto
 ```
 
 ### Build from sources
@@ -62,8 +63,8 @@ where
     use `organization/repo`).
 * `<directory>` — where to create a project.
 
-You can also pass a local path (either to a clone of an online repo, or just a
-regular folder) instead of a Git URL.
+If you have a local clone of a Git repository with `--mirror`, you can pass its
+path instead of a Git URL as the `<repository>` argument instead.
 
 You will be asked to choose a subset of template features you want to include,
 and to provide some variable values, and then the project will be created.
