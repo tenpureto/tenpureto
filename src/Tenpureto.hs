@@ -254,17 +254,21 @@ prepareTemplate repository template configuration =
                             AlreadyResolved -> return ()
                             MergeTool ->
                                 runMergeTool repository >> sayLn mergeSuccess
-        mergeTemplateBranch a b =
-            let bi = find ((==) b . branchName) (branchesInformation template)
-                d  = maybe a ((<>) a . templateYaml) bi
-            in  do
-                    mergeBranch repository ("origin/" <> b) (resolve d)
-                    commit repository ("Merge " <> b)
-                    return d
+        findBranch b =
+            find ((==) b . branchName) (branchesInformation template)
+        baseTemplateYaml =
+            fmap templateYaml $ findBranch (baseBranch configuration)
+        mergeTemplateBranch a b = do
+            let d = maybe a ((<>) a . templateYaml) (findBranch b)
+            mergeBranch repository ("origin/" <> b) (resolve d)
+            commit repository ("Merge " <> b)
+            return d
     in
         do
             checkoutBranch repository (baseBranch configuration) (Just branch)
-            foldlM mergeTemplateBranch mempty (featureBranches configuration)
+            foldlM mergeTemplateBranch
+                   (fromMaybe mempty baseTemplateYaml)
+                   (featureBranches configuration)
 
 replaceInSet :: Ord a => a -> a -> Set a -> Set a
 replaceInSet from to = Set.insert to . Set.delete from
