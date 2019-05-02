@@ -94,10 +94,15 @@ unattendedProjectConfiguration
     -> m FinalProjectConfiguration
 unattendedProjectConfiguration templateInformation providedConfiguration =
     let bb = preSelectedBaseBranch templateInformation providedConfiguration
-        fb = preSelectedFeatureBranches templateInformation
-                                        providedConfiguration
+        fb =
+                Set.toList
+                    <$> preSelectedFeatureBranches templateInformation
+                                                   providedConfiguration
+        bbi = bb >>= findTemplateBranch templateInformation
+        fbi = fb >>= traverse (findTemplateBranch templateInformation)
+        bis = (:) <$> bbi <*> fbi
         v   = preVariableValues providedConfiguration
-        cfg = FinalProjectConfiguration <$> bb <*> fb <*> v
+        cfg = FinalProjectConfiguration <$> bis <*> v
     in  maybe (throwM UnattendedNotPossibleException) return cfg
 
 required :: (Monad m) => m (Maybe a) -> m a
@@ -239,13 +244,12 @@ inputProjectConfiguration templateInformation providedConfiguration = do
         then return Set.empty
         else inputFeatureBranches fbi (fromMaybe Set.empty preSelectedFeatures)
     let allBranches = Set.insert base branches
-        sbi    = filter (flip Set.member allBranches . branchName) bi
-        sbvars = mconcat (map branchVariables sbi)
-        cvars  = fromMaybe Map.empty (preVariableValues providedConfiguration)
-        vars   = withDefaults sbvars cvars
+        sbi         = filter (flip Set.member allBranches . branchName) bi
+        sbvars      = mconcat (map branchVariables sbi)
+        cvars = fromMaybe Map.empty (preVariableValues providedConfiguration)
+        vars        = withDefaults sbvars cvars
     varVals <- inputVariables vars
-    return FinalProjectConfiguration { baseBranch      = base
-                                     , featureBranches = branches
+    return FinalProjectConfiguration { projectBranches = sbi
                                      , variableValues  = varVals
                                      }
 

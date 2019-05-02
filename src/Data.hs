@@ -13,6 +13,7 @@ import           Path
 
 import           Git                            ( Committish )
 import           Logging
+import           Tenpureto.TemplateLoader
 
 data PreliminaryProjectConfiguration = PreliminaryProjectConfiguration
         { preSelectedTemplate :: Maybe Text
@@ -35,8 +36,7 @@ newtype FinalUpdateConfiguration = FinalUpdateConfiguration
         deriving (Show)
 
 data FinalProjectConfiguration = FinalProjectConfiguration
-        { baseBranch :: Text
-        , featureBranches :: Set Text
+        { projectBranches :: [TemplateBranchInformation]
         , variableValues :: Map Text Text
         }
         deriving (Show)
@@ -53,23 +53,22 @@ instance Semigroup PreliminaryProjectConfiguration where
 
 instance Pretty PreliminaryProjectConfiguration where
     pretty cfg = (align . vsep)
-        [ "Template:                 "
+        [ "Template:                "
             <+> (align . pretty) (preSelectedTemplate cfg)
-        , "Target directory:         "
+        , "Target directory:        "
             <+> (align . pretty) (preTargetDirectory cfg)
-        , "Previous template commit: "
+        , "Previous template commit:"
             <+> (align . pretty . show) (prePreviousTemplateCommit cfg)
-        , "Selected branches:        "
+        , "Selected branches:       "
             <+> (align . pretty) (preSelectedBranches cfg)
-        , "Variable values:          "
+        , "Variable values:         "
             <+> (align . pretty) (preVariableValues cfg)
         ]
 
 instance Pretty FinalProjectConfiguration where
     pretty cfg = (align . vsep)
-        [ "Base branch:     " <+> (align . pretty) (baseBranch cfg)
-        , "Feature branches:" <+> (align . pretty) (featureBranches cfg)
-        , "Variable values: " <+> (align . pretty) (variableValues cfg)
+        [ "Branches:       " <+> (align . pretty) (projectBranches cfg)
+        , "Variable values:" <+> (align . pretty) (variableValues cfg)
         ]
 
 instance Pretty FinalUpdateConfiguration where

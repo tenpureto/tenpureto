@@ -43,7 +43,7 @@ data TemplateYaml = TemplateYaml
         { variables :: InsOrdHashMap Text Text
         , features :: Set Text
         }
-        deriving (Show)
+        deriving (Show, Eq)
 
 data TemplateBranchInformation = TemplateBranchInformation
     { branchName :: Text
@@ -52,12 +52,12 @@ data TemplateBranchInformation = TemplateBranchInformation
     , branchVariables :: InsOrdHashMap Text Text
     , templateYaml :: TemplateYaml
     }
-    deriving (Show)
+    deriving (Show, Eq)
 
 newtype TemplateInformation = TemplateInformation
     { branchesInformation :: [TemplateBranchInformation]
     }
-    deriving (Show)
+    deriving (Show, Eq)
 
 loadTemplateInformation
     :: (MonadThrow m, MonadGit m)
@@ -111,12 +111,17 @@ formatTemplateYaml = BS.fromStrict . Y.encode
 templateYamlFile :: Path Rel File
 templateYamlFile = [relfile|.template.yaml|]
 
+findTemplateBranch
+    :: TemplateInformation -> Text -> Maybe TemplateBranchInformation
+findTemplateBranch template branch =
+    find ((==) branch . branchName) (branchesInformation template)
+
 instance Pretty TemplateBranchInformation where
     pretty cfg = (align . vsep)
         [ "Branch name:      " <+> (align . pretty) (branchName cfg)
         , "Base branch:      " <+> (align . pretty) (isBaseBranch cfg)
         , "Required branches:" <+> (align . pretty) (requiredBranches cfg)
-        , "Branche variables:" <+> (align . pretty) (branchVariables cfg)
+        , "Branch variables: " <+> (align . pretty) (branchVariables cfg)
         ]
 
 instance Pretty TemplateInformation where

@@ -233,14 +233,13 @@ loadExistingProjectConfiguration projectPath =
             }
 
 prepareTemplate
-    :: (MonadIO m, MonadGit m, MonadConsole m)
+    :: (MonadIO m, MonadThrow m, MonadGit m, MonadConsole m)
     => GitRepository
     -> TemplateInformation
     -> FinalProjectConfiguration
     -> m TemplateYaml
 prepareTemplate repository template configuration =
     let
-        branch = "template"
         resolve descriptor []        = return ()
         resolve descriptor conflicts = if templateYamlFile `elem` conflicts
             then
@@ -254,21 +253,21 @@ prepareTemplate repository template configuration =
                             AlreadyResolved -> return ()
                             MergeTool ->
                                 runMergeTool repository >> sayLn mergeSuccess
-        findBranch b =
-            find ((==) b . branchName) (branchesInformation template)
-        baseTemplateYaml =
-            fmap templateYaml $ findBranch (baseBranch configuration)
+        checkoutTemplateBranch a = do
+            checkoutBranch repository (branchName a) Nothing
+            return $ templateYaml a
         mergeTemplateBranch a b = do
-            let d = maybe a ((<>) a . templateYaml) (findBranch b)
-            mergeBranch repository ("origin/" <> b) (resolve d)
-            commit repository ("Merge " <> b)
+            let d = ((<>) a . templateYaml) b
+            mergeBranch repository ("origin/" <> branchName b) (resolve d)
+            commit repository ("Merge " <> branchName b)
             return d
     in
-        do
-            checkoutBranch repository (baseBranch configuration) (Just branch)
-            foldlM mergeTemplateBranch
-                   (fromMaybe mempty baseTemplateYaml)
-                   (featureBranches configuration)
+        case projectBranches configuration of
+            [] ->
+                throwM $ TenpuretoException
+                    "Cannot create a project from an empty selection"
+            h : t ->
+                checkoutTemplateBranch h >>= flip (foldlM mergeTemplateBranch) t
 
 replaceInSet :: Ord a => a -> a -> Set a -> Set a
 replaceInSet from to = Set.insert to . Set.delete from
