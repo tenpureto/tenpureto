@@ -35,6 +35,7 @@ import           Logging
 import           Templater
 import           Tenpureto.Messages
 import           Tenpureto.TemplateLoader
+import           Tenpureto.MergeOptimizer
 
 data TenpuretoException = InvalidTemplateBranchException Text Text
                         | CancelledException
@@ -233,7 +234,7 @@ loadExistingProjectConfiguration projectPath =
             }
 
 prepareTemplate
-    :: (MonadIO m, MonadThrow m, MonadGit m, MonadConsole m)
+    :: (MonadIO m, MonadThrow m, MonadGit m, MonadConsole m, MonadLog m)
     => GitRepository
     -> TemplateInformation
     -> FinalProjectConfiguration
@@ -261,12 +262,15 @@ prepareTemplate repository template configuration =
             mergeBranch repository ("origin/" <> branchName b) (resolve d)
             commit repository ("Merge " <> branchName b)
             return d
+        branchesToMerge = reorderBranches (projectBranches configuration)
     in
-        case projectBranches configuration of
+        case branchesToMerge of
             [] ->
                 throwM $ TenpuretoException
                     "Cannot create a project from an empty selection"
-            h : t ->
+            h : t -> do
+                logInfo $ "Merging branches:" <> line <> (indent 4 . pretty)
+                    (fmap branchName branchesToMerge)
                 checkoutTemplateBranch h >>= flip (foldlM mergeTemplateBranch) t
 
 replaceInSet :: Ord a => a -> a -> Set a -> Set a
