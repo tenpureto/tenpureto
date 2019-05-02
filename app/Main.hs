@@ -64,6 +64,7 @@ data Command
             }
     | Update
             { maybeTemplateName :: Maybe Text
+            , maybePreviousCommit :: Maybe Text
             , maybeTargetDirectory :: Maybe FilePath
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
@@ -87,6 +88,12 @@ templateNameOption :: Parser Text
 templateNameOption = strOption
     (long "template" <> metavar "<repository>" <> help
         "Template repository name or URL"
+    )
+
+previousCommitOption :: Parser Text
+previousCommitOption = strOption
+    (long "previous-commit" <> metavar "<sha1>" <> help
+        "Override the commit in which the template was previously generated"
     )
 
 targetArgument :: Parser FilePath
@@ -137,6 +144,7 @@ updateCommand :: Parser Command
 updateCommand =
     Update
         <$> optional templateNameOption
+        <*> optional previousCommitOption
         <*> optional targetArgument
         <*> unattendedSwitch
         <*> debugSwitch
@@ -184,14 +192,14 @@ run Create { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u
                 , preVariableValues         = Nothing
                 }
             u
-run Update { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
+run Update { maybeTemplateName = t, maybeTargetDirectory = td, maybePreviousCommit = pc, runUnattended = u, enableDebugLogging = d }
     = runAppM d $ do
         resolvedTd    <- resolveTargetDir (fromMaybe "." td)
         currentConfig <- loadExistingProjectConfiguration resolvedTd
         let inputConfig = PreliminaryProjectConfiguration
                 { preSelectedTemplate       = t
                 , preTargetDirectory        = Just resolvedTd
-                , prePreviousTemplateCommit = Nothing
+                , prePreviousTemplateCommit = fmap Committish pc
                 , preSelectedBranches       = Nothing
                 , preVariableValues         = Nothing
                 }
