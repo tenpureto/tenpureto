@@ -261,7 +261,9 @@ prepareTemplate repository template configuration =
             mergeBranch repository ("origin/" <> branchName b) (resolve d)
             commit repository ("Merge " <> branchName b)
             return d
-        branchesToMerge = reorderBranches (projectBranches configuration)
+        branchesToMerge =
+            reorderBranches $ includeMergeBranches template $ projectBranches
+                configuration
     in
         case branchesToMerge of
             [] ->
