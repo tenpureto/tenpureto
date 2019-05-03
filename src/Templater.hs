@@ -21,6 +21,7 @@ import           Control.Monad.Catch
 import           Logging
 import           Path
 import           Path.IO
+import qualified System.Directory              as Directory
 import           System.IO                      ( hClose )
 import qualified Data.Text.ICU                 as ICU
 import           Data.Text.Encoding
@@ -132,12 +133,19 @@ copyAbsFile
     -> m ()
 copyAbsFile settings src dst write = do
     logDebug $ "Copying" <+> pretty src <+> "to" <+> pretty dst
-    byteContent <- liftIO $ BS.readFile (toFilePath src)
-    let content           = detectEncoding byteContent
-        translatedContent = mapContent (translate settings) content
-        translated        = contentToByteString translatedContent
     ensureDir (parent dst)
-    write translated
+    symlink <- isSymlink src
+    if symlink
+        then liftIO $ Directory.getSymbolicLinkTarget (toFilePath src) >>= flip
+            Directory.createDirectoryLink
+            (toFilePath dst)
+        else do
+            byteContent <- liftIO $ BS.readFile (toFilePath src)
+            let content           = detectEncoding byteContent
+                translatedContent = mapContent (translate settings) content
+                translated        = contentToByteString translatedContent
+            write translated
+            copyPermissions src dst
 
 copyRelFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -154,7 +162,6 @@ copyRelFile settings src dst srcFile = do
                 srcAbsFile
                 dstAbsFile
                 (liftIO . BS.writeFile (toFilePath dstAbsFile))
-    copyPermissions srcAbsFile dstAbsFile
     return dstFile
 
 moveRelFile

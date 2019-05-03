@@ -16,6 +16,7 @@ dependencies:
 - text-regex-replace
 - path
 - path-io
+- directory
 - containers
 - insert-ordered-containers
 - exceptions
