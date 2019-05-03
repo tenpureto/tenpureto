@@ -18,6 +18,7 @@ branch :: Text -> [Text] -> TemplateBranchInformation
 branch name deps = TemplateBranchInformation
     { branchName       = name
     , isBaseBranch     = False
+    , isFeatureBranch  = False
     , requiredBranches = Set.insert name $ Set.fromList deps
     , branchVariables  = mempty
     , templateYaml     = mempty

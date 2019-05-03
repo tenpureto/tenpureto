@@ -48,6 +48,7 @@ data TemplateYaml = TemplateYaml
 data TemplateBranchInformation = TemplateBranchInformation
     { branchName :: Text
     , isBaseBranch :: Bool
+    , isFeatureBranch :: Bool
     , requiredBranches :: Set Text
     , branchVariables :: InsOrdHashMap Text Text
     , templateYaml :: TemplateYaml
@@ -94,6 +95,7 @@ loadBranchConfiguration repo branch = runMaybeT $ do
     return $ TemplateBranchInformation
         { branchName       = branch
         , isBaseBranch     = fb == Set.singleton branch
+        , isFeatureBranch  = Set.member branch fb
         , requiredBranches = fb
         , branchVariables  = variables info
         , templateYaml     = info

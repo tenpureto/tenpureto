@@ -230,19 +230,21 @@ inputProjectConfiguration
     -> PreliminaryProjectConfiguration
     -> m FinalProjectConfiguration
 inputProjectConfiguration templateInformation providedConfiguration = do
-    let bi    = branchesInformation templateInformation
-        bases = filter isBaseBranch bi
+    let bi       = branchesInformation templateInformation
+        bases    = filter isBaseBranch bi
+        features = filter isFeatureBranch bi
         child base branch = Set.member base (requiredBranches branch)
             && not (isBaseBranch branch)
     base <- inputBaseBranch
         bases
         (preSelectedBaseBranch templateInformation providedConfiguration)
-    let fbi = filter (child base) bi
+    let featuresForBase = filter (child base) features
         preSelectedFeatures =
             preSelectedFeatureBranches templateInformation providedConfiguration
-    branches <- if null fbi
+    branches <- if null featuresForBase
         then return Set.empty
-        else inputFeatureBranches fbi (fromMaybe Set.empty preSelectedFeatures)
+        else inputFeatureBranches featuresForBase
+                                  (fromMaybe Set.empty preSelectedFeatures)
     let allBranches = Set.insert base branches
         sbi         = filter (flip Set.member allBranches . branchName) bi
         sbvars      = mconcat (map branchVariables sbi)
