@@ -1,0 +1,19 @@
+version: "2.4"
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.${OS_DISTRIBUTION}
+    image: tenpureto-package-agent:${OS_DISTRIBUTION}
+    environment:
+      - OS_DISTRIBUTION
+      - STACK_ROOT=/build/.stack
+      - LANG=en_US.UTF-8
+    volumes:
+      - ..:/build:delegated
+      - ../.build/${OS_DISTRIBUTION}/staging:/build/.build/staging:delegated
+      - ../.build/${OS_DISTRIBUTION}/.stack-work:/build/.stack-work:delegated
+      - ../.build/${OS_DISTRIBUTION}/.stack:/build/.stack:delegated
+      - ../dist:/build/dist
+    working_dir: /build
+    user: ${DOCKER_USER}:${DOCKER_GROUP}

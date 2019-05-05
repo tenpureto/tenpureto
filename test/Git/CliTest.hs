@@ -30,7 +30,7 @@ withTempRepository
 withTempRepository f = withSystemTempDir "tenpureto"
     $ \dir -> withCurrentDir dir $ (initRepository >=> f) dir
 
-data CmdException = CmdException deriving Show
+data CmdException = CmdException { code :: Int, stdOut :: Text, stdErr :: Text } deriving Show
 instance Exception CmdException
 
 cmd c = do
@@ -39,8 +39,9 @@ cmd c = do
     logDebug $ prefixed "err> " (decodeUtf8 err)
     logDebug $ prefixed "out> " (decodeUtf8 out)
     case exitCode of
-        ExitSuccess      -> return ()
-        ExitFailure code -> throwM CmdException
+        ExitSuccess -> return ()
+        ExitFailure code ->
+            throwM $ CmdException code (decodeUtf8 out) (decodeUtf8 err)
 
 cmds :: (MonadIO m, MonadThrow m, MonadLog m) => [Text] -> m ()
 cmds = traverse_ cmd

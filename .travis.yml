@@ -1,22 +1,63 @@
 dist: xenial
 language: generic
 
-cache:
-  directories:
-    - $HOME/.stack
-
 addons:
   apt:
     packages:
       - libgmp-dev
 
+services:
+  - docker
+
+stages:
+  - test
+  - package
+  - name: publish
+    if: branch = master
+
+env:
+  global:
+    # BINTRAY_API_USER
+    - secure: "LT5Ys4YxitulxL2BwNErmb/4d6vlhdX4GPiJvEqMaZqlzPavvgXAJNL5oC8yRVe9lHd3kjiSQG9rjzwU5kFMdw/Xmg6Xzz6r4PGz1F/0KzasfrB1guHnyhBU3xuFqkawJEJe1L2hcxFGn1vv8j2qIore0FA0YiChVOcxEWOKA7qlC0BV7qLnP4D+YRrWKW1LrLi2FPKlw2lROzrJWT639Z0GIl6uCxaUqvxr4pTZVJoDxA+SFge1iGYSzfzxOoYEDfMChHSulLCJ3eOpur40emGP4DmOk+z2XJC4pZ7sNUSzNH0zKSoaRr3Htc3clNlrYcv+WI+BgHZih8HhZ1X0OcjwY0//UbSj15uTtoHgtKbeuaf8HQUEc0yMuIvBcpKp/7yrNvUxEm0QwHpKa1za1lq4wv9786spwMJnVlB2HefOdsMDKPmwloD8LiTWw3ifu1oJHs2pd5kBC211swuWTl9QiQp/x0neVucH/1L9ed3kRBp0jAntr68Lonfy+Z3CKyXwu1Mqq6YiFVWh11qGiKiyGV32lGI1TsEW1+cMab95xoBYbPr0pL/AjJlbmhZGJHWy2aDroq9oZ+BrH+M/7CcbrGYHLFr5w/SL4YV7GUE9npdWrkSIrr0rXcJ+ZxgtcgwcvFq2luiYFSgcMm0mR7GMvQ1bRtEWdV/qT3t2z9M="
+    # BINTRAY_API_KEY
+    - secure: "hojtYaKu4W81hO6TSIQrNPhAIWId6kJLPuwgVvlEGL8VbyCIaccdfsLVdFgS3ULIqE6jnohCPq/8cY0IjYJrQRDqZ33JY1GnO4k36zzOe06W+AvTXwgpsvnN8b5/4h5GDlUQJJmvI20Wbe8HQ14fRmUuut9rFukQ2zVZ76n2hkcd+w0hrAOU66K8HV26oXCKXeXkFNMNJ7zZMHu/yNE4yXO6AIIyTObfKqvE3U4GqkqOJoshB5vMYmvrDPHKH/uBPXwwfZFH90M1LmHYQlz34ox+q49B2RckTIWNuJgm7I9At6wUjEvpzXFSH/evnRcA7Io9llIURlY+WFZcIW0hWFwca3LkI5sWIJoQ903LFzcnNvHqgyIx7Krk9TXoF+7WylvLeNZGBA/h19USMM0TTzC5Nyzc8ZkXMgOKmkEumazMJvL+nAppFV3PICqb2GFFzGpaKNZ6n4OOEdbFSsFxxUIV4Q0utezmhtFtxGGqijaz0cEWlszQLU0jXYSmK02nSDn6EF3EGEZS0mP22Q39IP65OaMoJ05a7ChdGs0s8HtC1EuHXZY5hMTng7S84u+umgahdpFl0lwIXcjCawDk251G0Rp/+r8KRtm8LZfQgTkjKTYN6RPWFT4obs7VefKEAay8tXZVcYGnG0MsvypNzn75qqVTjsDNJxm1c1LZUSo="
+
 before_install:
+  - export PACKAGE_ACTION=$(if [ "$TRAVIS_BRANCH" == "master" ]; then echo bintray-upload; else echo package; fi)
   - mkdir -p ~/.local/bin
   - export PATH=$HOME/.local/bin:$PATH
-  - travis_retry curl -L https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+  - pushd ~/.local/bin && (curl -fL https://getcli.jfrog.io | sh) && popd
 
-install:
-  - stack --no-terminal --install-ghc test --only-dependencies
+jobs:
+  include:
 
-script:
-  - stack --no-terminal test
+    - stage: test
+      before_install:
+        - mkdir -p ~/.local/bin
+        - export PATH=$HOME/.local/bin:$PATH
+        - travis_retry curl -L https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+      install:
+        - stack --no-terminal --install-ghc test --only-dependencies
+      script:
+        - stack --no-terminal test
+      cache:
+        directories:
+          - $HOME/.stack
+
+    - stage: package
+      name: Amazon Linux 2
+      env: OS=amzn2
+      script: make $PACKAGE_ACTION-rpm-$OS
+      cache:
+        directories:
+          - .build/$OS/.stack
+    - name: Ubuntu 18.04
+      env: OS=bionic
+      script: make $PACKAGE_ACTION-deb-$OS
+      cache:
+        directories:
+          - .build/$OS/.stack
+
+    - stage: publish
+      env: CACHE_NAME=publish
+      script: make bintray-publish-rpm bintray-publish-deb

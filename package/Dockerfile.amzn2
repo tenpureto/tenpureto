@@ -1,0 +1,15 @@
+FROM amazonlinux:2
+
+# stack
+RUN yum groupinstall -y "Development Tools"
+RUN curl -sSL https://get.haskellstack.org/ | sh
+
+# fpm
+RUN yum install -y ruby-devel rubygems hostname
+RUN gem install --no-ri --no-rdoc fpm
+
+# ghc dependencies
+RUN yum install -y gmp-devel
+
+# tenpureto dependencies
+RUN yum install -y libicu-devel

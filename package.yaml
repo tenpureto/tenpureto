@@ -3,6 +3,7 @@ version:             0.1.3
 author:              "Roman Timushev"
 maintainer:          "rtimush@gmail.com"
 github:              "rtimush/tenpureto"
+homepage:            "https://github.com/rtimush/tenpureto#readme"
 copyright:           "2019 Roman Timushev"
 synopsis:            "Simple and flexible project templates"
 description:         "Please see the README on GitHub at <https://github.com/rtimush/tenpureto#readme>"

@@ -12,15 +12,19 @@ RUN apt-get update \
 
 WORKDIR /source
 
+# build ghc
+COPY stack.yaml Makefile ./
+RUN make ghc
+
 # build dependencies
-COPY package.yaml stack.yaml ./
-RUN stack --no-terminal --install-ghc build --only-dependencies
+COPY package.yaml ./
+RUN make build-deps
 
 # build code
-ADD *.hs ./
-ADD app ./app
-ADD src ./src
-RUN stack --no-terminal install
+COPY *.hs ./
+COPY app ./app
+COPY src ./src
+RUN make install
 
 # --------
 

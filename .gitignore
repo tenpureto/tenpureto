@@ -1,3 +1,6 @@
 .stack-work/
-tenpureto.cabal
+.build/
+.staging/
+/tenpureto.cabal
+/dist
 *~
