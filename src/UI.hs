@@ -33,6 +33,7 @@ import           Console
 import           Path
 import           Path.IO
 
+import           Git                            ( Committish(..) )
 import           Tenpureto.TemplateLoader
 
 data UIException = UnattendedNotPossibleException | InvalidInputException | InterruptedInputException deriving (Exception)
@@ -114,6 +115,9 @@ inputTemplate = ask "Template URL" Nothing
 inputTarget :: (MonadIO m, MonadMask m, MonadConsole m) => m (Path Abs Dir)
 inputTarget = T.unpack <$> ask "Target directory" Nothing >>= resolveTargetDir
 
+inputPreviousCommit :: MonadConsole m => m Committish
+inputPreviousCommit = Committish <$> ask "Previous template commit" Nothing
+
 resolveTargetDir :: (MonadIO m, MonadCatch m) => FilePath -> m (Path Abs Dir)
 resolveTargetDir path = catch
     (resolveDir' path)
@@ -134,10 +138,11 @@ inputTemplateConfiguration PreliminaryProjectConfiguration { preSelectedTemplate
         <*> maybe inputTarget   return mbtd
 
 inputUpdateConfiguration
-    :: (MonadThrow m)
+    :: (MonadThrow m, MonadConsole m)
     => PreliminaryProjectConfiguration
     -> m FinalUpdateConfiguration
-inputUpdateConfiguration = unattendedUpdateConfiguration
+inputUpdateConfiguration PreliminaryProjectConfiguration { prePreviousTemplateCommit = mbc }
+    = FinalUpdateConfiguration <$> maybe inputPreviousCommit return mbc
 
 inputBranch
     :: (MonadIO m, MonadConsole m)
