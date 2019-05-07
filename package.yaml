@@ -29,6 +29,7 @@ dependencies:
 - typed-process
 - optparse-applicative
 - yaml
+- dotgen
 
 library:
   source-dirs: src

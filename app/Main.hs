@@ -69,6 +69,10 @@ data Command
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
             }
+    | TemplateGraph
+            { templateName :: Text
+            , enableDebugLogging :: Bool
+            }
     | TemplateRenameBranch
             { templateName :: Text
             , oldBranchName :: Text
@@ -149,6 +153,10 @@ updateCommand =
         <*> unattendedSwitch
         <*> debugSwitch
 
+templateGraphCommand :: Parser Command
+templateGraphCommand =
+    TemplateGraph <$> templateNameOption <*> debugSwitch
+
 renameBranchCommand :: Parser Command
 renameBranchCommand =
     TemplateRenameBranch
@@ -170,13 +178,18 @@ changeVariableCommand =
 templateCommands :: Parser Command
 templateCommands = hsubparser
     (  command
-            "rename-branch"
-            (info renameBranchCommand (progDesc "Rename a template branch"))
+          "graph"
+          (info templateGraphCommand
+                (progDesc "Change a template variable value")
+          )
     <> command
            "change-variable"
            (info changeVariableCommand
                  (progDesc "Change a template variable value")
            )
+    <> command
+           "rename-branch"
+           (info renameBranchCommand (progDesc "Rename a template branch"))
     )
 
 run :: Command -> IO ()
@@ -204,6 +217,8 @@ run Update { maybeTemplateName = t, maybeTargetDirectory = td, maybePreviousComm
                 , preVariableValues         = Nothing
                 }
         updateProject (inputConfig <> currentConfig) u
+run TemplateGraph { templateName = t, enableDebugLogging = d } =
+    runAppM d $ generateTemplateGraph t
 run TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d $ renameTemplateBranch t on nn i
 run TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }

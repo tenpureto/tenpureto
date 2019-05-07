@@ -117,6 +117,16 @@ findTemplateBranch
 findTemplateBranch template branch =
     find ((==) branch . branchName) (branchesInformation template)
 
+getDirectAncestors :: TemplateInformation -> TemplateBranchInformation -> [Text]
+getDirectAncestors template branch =
+    let strictRequiredBranches branch =
+                Set.delete (branchName branch) (requiredBranches branch)
+        ancestorNames         = strictRequiredBranches branch
+        bis                   = branchesInformation template
+        ancestors = filter (flip Set.member ancestorNames . branchName) bis
+        indirectAncestorNames = mconcat $ fmap strictRequiredBranches ancestors
+    in  Set.toList $ ancestorNames `Set.difference` indirectAncestorNames
+
 instance Pretty TemplateBranchInformation where
     pretty cfg = (align . vsep)
         [ "Branch name:      " <+> (align . pretty) (branchName cfg)

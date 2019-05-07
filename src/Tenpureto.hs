@@ -25,6 +25,7 @@ import           Data.Functor
 import           Path
 import           Path.IO
 import           System.Process.Typed
+import           Text.Dot
 
 import           Data
 import           Git
@@ -300,6 +301,33 @@ commit_ repo message =
                     "Failed to create a rename commit: empty changeset"
                 )
                 return
+
+generateTemplateGraph
+    :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    => Text
+    -> m ()
+generateTemplateGraph template =
+    withClonedRepository (buildRepositoryUrl template) $ \repo -> do
+        templateInformation <- loadTemplateInformation template repo
+        let nodeAttributes branch =
+                [("label", T.unpack (branchName branch)), ("shape", "box")]
+        let nodeParents branch =
+                Set.toList
+                    . Set.delete (branchName branch)
+                    . requiredBranches
+                    $ branch
+        let relevantBranches = filter
+                (\b -> isBaseBranch b || isFeatureBranch b)
+                (branchesInformation templateInformation)
+        let nodes = map branchName relevantBranches `zip` relevantBranches
+        let
+            graph =
+                netlistGraph nodeAttributes
+                             (getDirectAncestors templateInformation)
+                             nodes
+                    *> attribute ("layout", "dot")
+                    *> attribute ("rankdir", "LR")
+        liftIO $ putStrLn (showDot graph)
 
 renameTemplateBranch
     :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
