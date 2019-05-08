@@ -41,7 +41,7 @@ printToTerminal width message =
         reannotated = reAnnotate (const mempty) text
         annotated   = annotate style reannotated
         sdoc        = layoutSmart layoutOptions annotated
-    in  renderIO stdout sdoc
+    in  renderIO stderr sdoc
 
 instance Pretty (Path a t) where
     pretty = pretty . toFilePath
