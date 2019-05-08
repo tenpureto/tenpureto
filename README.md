@@ -33,8 +33,8 @@ If you are building on macOS, you will also need `icu4c`:
 $ brew install icu4c 
 ``` 
 
-You will also need to let `Stack` know the location of the `icu4c`
-library. Add the following snippet to your `~/.stack/config.yaml`: 
+Let `Stack` know the location of the `icu4c` library by adding
+the following snippet to your `~/.stack/config.yaml`: 
 
 ```yaml
 extra-lib-dirs:
@@ -44,10 +44,19 @@ extra-include-dirs:
   - /usr/local/opt/icu4c/include 
 ```
 
-Once you have it installed, get `tenpureto` sources and run 
+On Linux you will need to install `libicu-devel` (on RPM-based distributions)
+or `libicu-dev` (on DEB-based distibutions).
+
+Once you have everything set up, get `tenpureto` sources and run 
 
 ```sh 
-$ stack build 
+# will install tenpureto binary to ~/.local/bin
+$ stack install
+```
+or
+```sh
+# will run tenpureto without installing
+$ stack run -- <tenpureto options here>
 ```
 
 ## Usage
