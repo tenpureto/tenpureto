@@ -29,6 +29,7 @@ FROM ubuntu:18.04
 # stack
 RUN apt-get update && apt-get install -y \
     git \
+    graphviz \
     libicu60 \
     && rm -rf /var/lib/apt/lists/*
 
