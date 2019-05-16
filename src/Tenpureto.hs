@@ -323,11 +323,22 @@ generateTemplateGraph template =
         let
             graph =
                 netlistGraph nodeAttributes
-                             (getDirectAncestors templateInformation)
+                             (Set.toList . getBranchParents templateInformation)
                              nodes
                     *> attribute ("layout", "dot")
                     *> attribute ("rankdir", "LR")
         liftIO $ putStrLn (showDot graph)
+
+listTemplateBranches
+    :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    => Text
+    -> [BranchFilter]
+    -> m ()
+listTemplateBranches template branchFilters =
+    withClonedRepository (buildRepositoryUrl template) $ \repo -> do
+        templateInformation <- loadTemplateInformation template repo
+        let branches = getTemplateBranches branchFilters templateInformation
+        liftIO $ traverse_ (putStrLn . T.unpack . branchName) branches
 
 renameTemplateBranch
     :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)

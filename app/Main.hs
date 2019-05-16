@@ -16,6 +16,7 @@ import qualified Git.Cli                       as GC
 import           Data
 import           Logging
 import           Tenpureto
+import           Tenpureto.TemplateLoader       ( BranchFilter(..) )
 import           UI                             ( resolveTargetDir )
 import           Paths_tenpureto                ( version )
 
@@ -73,6 +74,11 @@ data Command
             { templateName :: Text
             , enableDebugLogging :: Bool
             }
+    | TemplateListBranches
+            { templateName :: Text
+            , branchFilters :: [BranchFilter]
+            , enableDebugLogging :: Bool
+            }
     | TemplateRenameBranch
             { templateName :: Text
             , oldBranchName :: Text
@@ -128,6 +134,27 @@ newBranchNameOption :: Parser Text
 newBranchNameOption =
     strOption (long "new-name" <> metavar "<branch>" <> help "New branch name")
 
+branchNameOption :: Parser Text
+branchNameOption = strOption
+    (long "branch" <> metavar "<branch>" <> help "Branch name to filter against"
+    )
+
+branchFilterChildOfOption :: Parser BranchFilter
+branchFilterChildOfOption = fmap BranchFilterChildOf $ strOption
+    (long "children-of" <> metavar "<branch>" <> help
+        "Child branches of a given branch"
+    )
+
+branchFilterParentOfOption :: Parser BranchFilter
+branchFilterParentOfOption = fmap BranchFilterParentOf $ strOption
+    (long "parents-of" <> metavar "<branch>" <> help
+        "Parent branches of a given branch"
+    )
+
+branchFilterOptions :: Parser [BranchFilter]
+branchFilterOptions = (fmap catMaybes . sequenceA . fmap optional)
+    [branchFilterChildOfOption, branchFilterParentOfOption]
+
 oldVariableValueOption :: Parser Text
 oldVariableValueOption = strOption
     (long "old-value" <> metavar "<value>" <> help "Old variable value")
@@ -154,8 +181,14 @@ updateCommand =
         <*> debugSwitch
 
 templateGraphCommand :: Parser Command
-templateGraphCommand =
-    TemplateGraph <$> templateNameOption <*> debugSwitch
+templateGraphCommand = TemplateGraph <$> templateNameOption <*> debugSwitch
+
+templateListBranchesCommand :: Parser Command
+templateListBranchesCommand =
+    TemplateListBranches
+        <$> templateNameOption
+        <*> branchFilterOptions
+        <*> debugSwitch
 
 renameBranchCommand :: Parser Command
 renameBranchCommand =
@@ -182,6 +215,11 @@ templateCommands = hsubparser
           (info templateGraphCommand
                 (progDesc "Change a template variable value")
           )
+    <> command
+           "list-branches"
+           (info templateListBranchesCommand
+                 (progDesc "List template branches")
+           )
     <> command
            "change-variable"
            (info changeVariableCommand
@@ -219,6 +257,8 @@ run Update { maybeTemplateName = t, maybeTargetDirectory = td, maybePreviousComm
         updateProject (inputConfig <> currentConfig) u
 run TemplateGraph { templateName = t, enableDebugLogging = d } =
     runAppM d $ generateTemplateGraph t
+run TemplateListBranches { templateName = t, branchFilters = bfs, enableDebugLogging = d }
+    = runAppM d $ listTemplateBranches t bfs
 run TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d $ renameTemplateBranch t on nn i
 run TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }

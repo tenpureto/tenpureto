@@ -7,33 +7,11 @@ import           Test.Tasty.HUnit
 import           Test.SmallCheck
 import           Test.SmallCheck.Series
 
-import           Data.Text                      ( Text )
-import qualified Data.Set                      as Set
-
+import           Tenpureto.TemplateTestHelper
 import           Tenpureto.TemplateLoader       ( TemplateInformation(..)
                                                 , TemplateBranchInformation(..)
                                                 )
 import           Tenpureto.MergeOptimizer
-
-branch :: Text -> [Text] -> TemplateBranchInformation
-branch name deps = TemplateBranchInformation
-    { branchName       = name
-    , isBaseBranch     = False
-    , isFeatureBranch  = False
-    , requiredBranches = Set.insert name $ Set.fromList deps
-    , branchVariables  = mempty
-    , templateYaml     = mempty
-    }
-
-mergeBranch :: Text -> [Text] -> TemplateBranchInformation
-mergeBranch name deps = TemplateBranchInformation
-    { branchName       = name
-    , isBaseBranch     = False
-    , isFeatureBranch  = False
-    , requiredBranches = Set.fromList deps
-    , branchVariables  = mempty
-    , templateYaml     = mempty
-    }
 
 test_reorderBranches :: [TestTree]
 test_reorderBranches =

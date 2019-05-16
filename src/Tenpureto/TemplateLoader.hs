@@ -39,6 +39,8 @@ instance Show TenpuretoTemplateException where
     show (InvalidTemplateException template reason) =
         T.unpack $ "Template \"" <> template <> "\" is not valid: " <> reason
 
+data BranchFilter = BranchFilterChildOf Text | BranchFilterParentOf Text
+
 data TemplateYaml = TemplateYaml
         { variables :: InsOrdHashMap Text Text
         , features :: Set Text
@@ -117,15 +119,43 @@ findTemplateBranch
 findTemplateBranch template branch =
     find ((==) branch . branchName) (branchesInformation template)
 
-getDirectAncestors :: TemplateInformation -> TemplateBranchInformation -> [Text]
-getDirectAncestors template branch =
+getBranchParents :: TemplateInformation -> TemplateBranchInformation -> Set Text
+getBranchParents template branch =
     let strictRequiredBranches branch =
                 Set.delete (branchName branch) (requiredBranches branch)
         ancestorNames         = strictRequiredBranches branch
         bis                   = branchesInformation template
         ancestors = filter (flip Set.member ancestorNames . branchName) bis
         indirectAncestorNames = mconcat $ fmap strictRequiredBranches ancestors
-    in  Set.toList $ ancestorNames `Set.difference` indirectAncestorNames
+    in  ancestorNames `Set.difference` indirectAncestorNames
+
+getBranchChildren
+    :: TemplateInformation -> TemplateBranchInformation -> Set Text
+getBranchChildren template branch = Set.fromList $ fmap branchName $ filter
+    (Set.member (branchName branch) . getBranchParents template)
+    (branchesInformation template)
+
+getTemplateBranches
+    :: [BranchFilter] -> TemplateInformation -> [TemplateBranchInformation]
+getTemplateBranches [] ti = branchesInformation ti
+getTemplateBranches (head : tail) ti =
+    filter (applyBranchFilter head ti) $ getTemplateBranches tail ti
+  where
+    applyBranchFilter
+        :: BranchFilter
+        -> TemplateInformation
+        -> TemplateBranchInformation
+        -> Bool
+    applyBranchFilter (BranchFilterChildOf parentBranch) ti =
+        let parentNames = maybe Set.empty
+                                (getBranchChildren ti)
+                                (findTemplateBranch ti parentBranch)
+        in  \b -> Set.member (branchName b) parentNames
+    applyBranchFilter (BranchFilterParentOf childBranch) ti =
+        let parentNames = maybe Set.empty
+                                (getBranchParents ti)
+                                (findTemplateBranch ti childBranch)
+        in  \b -> Set.member (branchName b) parentNames
 
 instance Pretty TemplateBranchInformation where
     pretty cfg = (align . vsep)
