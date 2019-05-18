@@ -41,7 +41,8 @@ instance MonadGit AppM where
     writeAddFile            = GC.writeAddFile
     addFiles                = GC.addFiles
     commit                  = GC.commit
-    findCommit              = GC.findCommit
+    findCommitByRef         = GC.findCommitByRef
+    findCommitByMessage     = GC.findCommitByMessage
     getCommitMessage        = GC.getCommitMessage
     getCommitContent        = GC.getCommitContent
     listFiles               = GC.listFiles
@@ -86,6 +87,12 @@ data Command
             , enableInteractivity :: Bool
             , enableDebugLogging :: Bool
             }
+    | TemplatePropagateBranchChanges
+        { templateName :: Text
+        , branchName :: Text
+        , pullRequest :: Bool
+        , enableDebugLogging :: Bool
+        }
     | TemplateChangeVariable
             { templateName :: Text
             , oldVariableValue :: Text
@@ -163,6 +170,12 @@ newVariableValueOption :: Parser Text
 newVariableValueOption = strOption
     (long "new-value" <> metavar "<value>" <> help "New variable value")
 
+pullRequestSwitch :: Parser Bool
+pullRequestSwitch = switch
+    (  long "pull-request"
+    <> help "Create a pull request instead of merging directly"
+    )
+
 createCommand :: Parser Command
 createCommand =
     Create
@@ -199,6 +212,14 @@ renameBranchCommand =
         <*> interactiveSwitch
         <*> debugSwitch
 
+propagateBranchChanges :: Parser Command
+propagateBranchChanges =
+    TemplatePropagateBranchChanges
+        <$> templateNameOption
+        <*> branchNameOption
+        <*> pullRequestSwitch
+        <*> debugSwitch
+
 changeVariableCommand :: Parser Command
 changeVariableCommand =
     TemplateChangeVariable
@@ -228,6 +249,11 @@ templateCommands = hsubparser
     <> command
            "rename-branch"
            (info renameBranchCommand (progDesc "Rename a template branch"))
+    <> command
+           "propagate-branch-changes"
+           (info propagateBranchChanges
+                 (progDesc "Merge a template branch into child branches")
+           )
     )
 
 run :: Command -> IO ()
@@ -261,6 +287,8 @@ run TemplateListBranches { templateName = t, branchFilters = bfs, enableDebugLog
     = runAppM d $ listTemplateBranches t bfs
 run TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d $ renameTemplateBranch t on nn i
+run TemplatePropagateBranchChanges { templateName = t, branchName = b, pullRequest = pr, enableDebugLogging = d }
+    = runAppM d $ propagateTemplateBranchChanges t b pr
 run TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d $ changeTemplateVariableValue t ov nv i
 

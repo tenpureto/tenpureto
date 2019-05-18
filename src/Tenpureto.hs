@@ -215,7 +215,7 @@ loadExistingProjectConfiguration projectPath =
             $   "Loading template configuration from"
             <+> pretty templateYamlFile
         templateYamlContent    <- getWorkingCopyFile project templateYamlFile
-        previousTemplateCommit <- findCommit project commitMessagePattern
+        previousTemplateCommit <- findCommitByMessage project commitMessagePattern
         previousCommitMessage  <- traverse (getCommitMessage project)
                                            previousTemplateCommit
         let yaml = templateYamlContent >>= (rightToMaybe . parseTemplateYaml)
@@ -322,9 +322,10 @@ generateTemplateGraph template =
         let nodes = map branchName relevantBranches `zip` relevantBranches
         let
             graph =
-                netlistGraph nodeAttributes
-                             (Set.toList . getBranchParents templateInformation)
-                             nodes
+                netlistGraph
+                        nodeAttributes
+                        (Set.toList . getBranchParents templateInformation)
+                        nodes
                     *> attribute ("layout", "dot")
                     *> attribute ("rankdir", "LR")
         liftIO $ putStrLn (showDot graph)
@@ -349,11 +350,11 @@ renameTemplateBranch
     -> m ()
 renameTemplateBranch template oldBranch newBranch interactive =
     runTemplateChange template interactive $ \repo -> do
-        bis <- branchesInformation <$> loadTemplateInformation template repo
-        let throwOldBranchNotFound = throwM $ InvalidTemplateBranchException
-                oldBranch
-                "branch not found"
-            refspec b c = Refspec (Just c) (branchRef b)
+        templateInformation <- loadTemplateInformation template repo
+        mainBranch          <- getTemplateBranch templateInformation oldBranch
+        let bis = branchesInformation templateInformation
+        let refspec b c = Refspec (Just c) (branchRef b)
+        let
             renameOnBranch bi = do
                 checkoutBranch repo (branchName bi) Nothing
                 let descriptor = templateYaml bi
@@ -363,16 +364,30 @@ renameTemplateBranch template oldBranch newBranch interactive =
                              templateYamlFile
                              (formatTemplateYaml newDescriptor)
                 commit_ repo (commitRenameBranchMessage oldBranch newBranch)
-            maybeMainBranch = find (isBranch oldBranch) bis
-            childBranches   = filter (isChildBranch oldBranch) bis
-        mainBranch <- maybe throwOldBranchNotFound return maybeMainBranch
-        let deleteOld = Refspec Nothing (branchRef oldBranch)
+        let childBranches = filter (isChildBranch oldBranch) bis
+        let deleteOld     = Refspec Nothing (branchRef oldBranch)
         pushNew      <- refspec newBranch <$> renameOnBranch mainBranch
         pushChildren <- traverse
             (\bi -> refspec (branchName bi) <$> renameOnBranch bi)
             childBranches
         return $ deleteOld : pushNew : pushChildren
 
+propagateTemplateBranchChanges
+    :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    => Text
+    -> Text
+    -> Bool
+    -> m ()
+propagateTemplateBranchChanges template sourceBranch _ =
+    runTemplateChange template False $ \repo -> do
+        templateInformation <- loadTemplateInformation template repo
+        branch <- getTemplateBranch templateInformation sourceBranch
+        let childBranches = getTemplateBranches
+                [BranchFilterChildOf sourceBranch]
+                templateInformation
+        let refspec bi =
+                Refspec (Just $ branchCommit branch) (branchRef $ branchName bi)
+        return $ map refspec childBranches
 
 changeTemplateVariableValue
     :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
@@ -466,9 +481,6 @@ buildRepositoryUrl url
     | otherwise
     = RepositoryUrl url
 
-isBranch :: Text -> TemplateBranchInformation -> Bool
-isBranch branch bi = branch == branchName bi
-
 isChildBranch :: Text -> TemplateBranchInformation -> Bool
 isChildBranch branch bi =
     branch /= branchName bi && Set.member branch (requiredBranches bi)
@@ -476,3 +488,13 @@ isChildBranch branch bi =
 hasVariableValue :: Text -> TemplateBranchInformation -> Bool
 hasVariableValue value bi =
     value `elem` InsOrdHashMap.elems (branchVariables bi)
+
+getTemplateBranch
+    :: MonadThrow m
+    => TemplateInformation
+    -> Text
+    -> m TemplateBranchInformation
+getTemplateBranch templateInformation branch = maybe
+    (throwM $ InvalidTemplateBranchException branch "branch not found")
+    return
+    (findTemplateBranch templateInformation branch)

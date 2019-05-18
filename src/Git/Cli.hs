@@ -285,12 +285,20 @@ commit repo message = do
             gitcmdStdout repo ["rev-parse", "--verify", "HEAD"]
                 <&> outputToCommittish
 
-findCommit
+findCommitByRef
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> Ref
+    -> m (Maybe Committish)
+findCommitByRef repo (Ref BranchRef branch) =
+    gitcmdStdout repo ["rev-parse", "--verify", branch] <&> outputToCommittish
+
+findCommitByMessage
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
     -> Text
     -> m (Maybe Committish)
-findCommit repo pat =
+findCommitByMessage repo pat =
     gitcmdStdout
             repo
             ["rev-list", "--max-count=1", "--date-order", "--grep", pat, "HEAD"]

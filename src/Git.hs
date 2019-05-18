@@ -26,7 +26,8 @@ class Monad m => MonadGit m where
     writeAddFile :: GitRepository -> Path Rel File -> ByteString -> m ()
     addFiles :: GitRepository -> [Path Rel File] -> m ()
     commit :: GitRepository -> Text -> m (Maybe Committish)
-    findCommit :: GitRepository -> Text -> m (Maybe Committish)
+    findCommitByRef :: GitRepository -> Ref -> m (Maybe Committish)
+    findCommitByMessage :: GitRepository -> Text -> m (Maybe Committish)
     getCommitMessage :: GitRepository -> Committish -> m Text
     getCommitContent :: GitRepository -> Committish -> m Text
     listFiles :: GitRepository -> m [Path Rel File]
