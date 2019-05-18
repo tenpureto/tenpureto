@@ -18,7 +18,8 @@ import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import qualified Data.Yaml                     as Y
 import           Data.Yaml                      ( FromJSON(..)
                                                 , ToJSON(..)
-                                                , (.:)
+                                                , (.:?)
+                                                , (.!=)
                                                 , (.=)
                                                 )
 import           Data.Foldable
@@ -178,7 +179,7 @@ instance Pretty TemplateYaml where
 
 instance FromJSON TemplateYaml where
     parseJSON (Y.Object v) =
-        TemplateYaml <$> v .: "variables" <*> v .: "features"
+        TemplateYaml <$> v .:? "variables" .!= InsOrdHashMap.empty <*> v .:? "features" .!= Set.empty
     parseJSON _ = fail "Invalid template YAML definition"
 
 instance ToJSON TemplateYaml where
