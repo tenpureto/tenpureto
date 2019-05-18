@@ -36,7 +36,7 @@ instance MonadGit AppM where
     checkoutBranch          = GC.checkoutBranch
     mergeBranch             = GC.mergeBranch
     runMergeTool            = GC.runMergeTool
-    getBranchFile           = GC.getBranchFile
+    getRepositoryFile       = GC.getRepositoryFile
     getWorkingCopyFile      = GC.getWorkingCopyFile
     writeAddFile            = GC.writeAddFile
     addFiles                = GC.addFiles

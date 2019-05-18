@@ -173,14 +173,14 @@ listBranches repo = T.lines . decodeUtf8 <$> gitcmdStdout
     repo
     ["for-each-ref", "--format=%(refname:strip=3)", "refs/remotes/origin/"]
 
-getBranchFile
+getRepositoryFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
-    -> Text
+    -> Committish
     -> Path Rel File
     -> m (Maybe ByteString)
-getBranchFile repo branch file = stdoutOrNothing
-    <$> gitRepoCmd repo ["show", branch <> ":" <> T.pack (toFilePath file)]
+getRepositoryFile repo (Committish c) file = stdoutOrNothing
+    <$> gitRepoCmd repo ["show", c <> ":" <> T.pack (toFilePath file)]
 
 getWorkingCopyFile
     :: (MonadIO m, MonadThrow m, MonadLog m)

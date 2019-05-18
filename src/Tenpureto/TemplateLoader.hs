@@ -50,6 +50,7 @@ data TemplateYaml = TemplateYaml
 
 data TemplateBranchInformation = TemplateBranchInformation
     { branchName :: Text
+    , branchCommit :: Committish
     , isBaseBranch :: Bool
     , isFeatureBranch :: Bool
     , requiredBranches :: Set Text
@@ -88,14 +89,13 @@ loadBranchConfiguration
     -> Text
     -> m (Maybe TemplateBranchInformation)
 loadBranchConfiguration repo branch = runMaybeT $ do
-    descriptor <- MaybeT $ getBranchFile
-        repo
-        (T.pack "remotes/origin/" <> branch)
-        templateYamlFile
-    info <- MaybeT . return . rightToMaybe $ parseTemplateYaml descriptor
+    branchHead <- MaybeT $ findCommit repo (T.pack "remotes/origin/" <> branch)
+    descriptor <- MaybeT $ getRepositoryFile repo branchHead templateYamlFile
+    info       <- MaybeT . return . rightToMaybe $ parseTemplateYaml descriptor
     let fb = features info
     return $ TemplateBranchInformation
         { branchName       = branch
+        , branchCommit     = branchHead
         , isBaseBranch     = fb == Set.singleton branch
         , isFeatureBranch  = Set.member branch fb
         , requiredBranches = fb
@@ -179,7 +179,13 @@ instance Pretty TemplateYaml where
 
 instance FromJSON TemplateYaml where
     parseJSON (Y.Object v) =
-        TemplateYaml <$> v .:? "variables" .!= InsOrdHashMap.empty <*> v .:? "features" .!= Set.empty
+        TemplateYaml
+            <$> v
+            .:? "variables"
+            .!= InsOrdHashMap.empty
+            <*> v
+            .:? "features"
+            .!= Set.empty
     parseJSON _ = fail "Invalid template YAML definition"
 
 instance ToJSON TemplateYaml where

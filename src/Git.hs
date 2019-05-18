@@ -7,7 +7,7 @@ import           Logging
 
 newtype RepositoryUrl = RepositoryUrl Text deriving (Eq, Show)
 newtype GitRepository = GitRepository { repositoryPath :: Path Abs Dir }
-newtype Committish = Committish Text deriving (Show)
+newtype Committish = Committish Text deriving (Eq, Show)
 data RefType = BranchRef deriving (Show)
 data Ref = Ref { refType :: RefType, reference :: Text } deriving (Show)
 data Refspec = Refspec { sourceRef :: Maybe Committish, destinationRef :: Ref } deriving (Show)
@@ -21,7 +21,7 @@ class Monad m => MonadGit m where
     checkoutBranch :: GitRepository -> Text -> Maybe Text -> m ()
     mergeBranch :: GitRepository -> Text -> ([Path Rel File] -> m ()) -> m ()
     runMergeTool :: GitRepository -> m ()
-    getBranchFile :: GitRepository -> Text -> Path Rel File -> m (Maybe ByteString)
+    getRepositoryFile :: GitRepository -> Committish -> Path Rel File -> m (Maybe ByteString)
     getWorkingCopyFile :: GitRepository -> Path Rel File -> m (Maybe ByteString)
     writeAddFile :: GitRepository -> Path Rel File -> ByteString -> m ()
     addFiles :: GitRepository -> [Path Rel File] -> m ()
