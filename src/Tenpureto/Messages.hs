@@ -32,9 +32,13 @@ commitChangeVariableMessage from to =
 
 -- UI messages
 
-commitOnBranchMessage :: Text -> Text -> Doc a
-commitOnBranchMessage branch content =
-    "Commit on" <+> pretty branch <> ":" <> line <> (indent 4 . pretty) content
+changesForBranchMessage :: Text -> Text -> Doc a
+changesForBranchMessage branch content =
+    "Changes for"
+        <+> pretty branch
+        <>  ":"
+        <>  line
+        <>  (indent 4 . pretty) content
 
 projectCreated :: Path t Dir -> Doc a
 projectCreated dir = "Created" <+> pretty dir <> "."

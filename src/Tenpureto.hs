@@ -215,9 +215,10 @@ loadExistingProjectConfiguration projectPath =
             $   "Loading template configuration from"
             <+> pretty templateYamlFile
         templateYamlContent    <- getWorkingCopyFile project templateYamlFile
-        previousTemplateCommit <- findCommitByMessage project commitMessagePattern
-        previousCommitMessage  <- traverse (getCommitMessage project)
-                                           previousTemplateCommit
+        previousTemplateCommit <- findCommitByMessage project
+                                                      commitMessagePattern
+        previousCommitMessage <- traverse (getCommitMessage project)
+                                          previousTemplateCommit
         let yaml = templateYamlContent >>= (rightToMaybe . parseTemplateYaml)
         return PreliminaryProjectConfiguration
             { preSelectedTemplate       = extractTemplateName
@@ -431,7 +432,10 @@ runTemplateChange template interactive f =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
         let confirmCommit refspec@(Refspec Nothing _) = return refspec
             confirmCommit refspec@(Refspec (Just c) (Ref _ ref)) = do
-                msg <- commitOnBranchMessage ref <$> getCommitContent repo c
+                msg <- changesForBranchMessage ref <$> gitLogDiff
+                    repo
+                    c
+                    (Committish $ "remotes/origin/" <> ref)
                 sayLn msg
                 if not interactive
                     then return refspec

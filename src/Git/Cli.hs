@@ -313,13 +313,15 @@ getCommitMessage repo (Committish c) =
     gitcmdStdout repo ["rev-list", "--max-count=1", "--format=%B", c]
         <&> decodeUtf8
 
-getCommitContent
+gitLogDiff
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
     -> Committish
+    -> Committish
     -> m Text
-getCommitContent repo (Committish c) =
-    gitcmdStdout repo ["show", "--format=short", "--color", c] <&> decodeUtf8
+gitLogDiff repo (Committish c) (Committish base) =
+    gitcmdStdout repo ["log", "--patch", "--color", c, "^" <> base]
+        <&> decodeUtf8
 
 listFiles
     :: (MonadIO m, MonadThrow m, MonadLog m)

@@ -29,7 +29,7 @@ class Monad m => MonadGit m where
     findCommitByRef :: GitRepository -> Ref -> m (Maybe Committish)
     findCommitByMessage :: GitRepository -> Text -> m (Maybe Committish)
     getCommitMessage :: GitRepository -> Committish -> m Text
-    getCommitContent :: GitRepository -> Committish -> m Text
+    gitLogDiff :: GitRepository -> Committish -> Committish -> m Text
     listFiles :: GitRepository -> m [Path Rel File]
     populateRerereFromMerge :: GitRepository -> Committish -> m ()
     getCurrentBranch :: GitRepository -> m Text
