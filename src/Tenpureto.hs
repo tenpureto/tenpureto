@@ -7,6 +7,7 @@ module Tenpureto where
 
 import           Data.List
 import           Data.Maybe
+import           Data.Either
 import           Data.Either.Combinators
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
@@ -40,6 +41,7 @@ import           Tenpureto.MergeOptimizer
 data TenpuretoException = InvalidTemplateBranchException Text Text
                         | CancelledException
                         | TenpuretoException Text
+                        | MultipleExceptions [SomeException]
                         deriving (Exception)
 
 instance Show TenpuretoException where
@@ -47,6 +49,10 @@ instance Show TenpuretoException where
         T.unpack $ "Branch \"" <> branch <> "\" is not valid: " <> reason
     show CancelledException           = "Cancelled"
     show (TenpuretoException message) = T.unpack message
+    show (MultipleExceptions errors ) = show (map show errors)
+
+data RemoteChangeMode = PushDirectly
+                      | UpstreamPullRequest { pullRequestSettings :: PullRequestSettings }
 
 makeFinalTemplateConfiguration
     :: (MonadMask m, MonadIO m, MonadConsole m)
@@ -343,18 +349,24 @@ listTemplateBranches template branchFilters =
         liftIO $ traverse_ (putStrLn . T.unpack . branchName) branches
 
 renameTemplateBranch
-    :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    :: ( MonadIO m
+       , MonadMask m
+       , MonadGit m
+       , MonadGitServer m
+       , MonadLog m
+       , MonadConsole m
+       )
     => Text
     -> Text
     -> Text
     -> Bool
     -> m ()
 renameTemplateBranch template oldBranch newBranch interactive =
-    runTemplateChange template interactive $ \repo -> do
+    runTemplateChange template interactive PushDirectly $ \repo -> do
         templateInformation <- loadTemplateInformation template repo
         mainBranch          <- getTemplateBranch templateInformation oldBranch
         let bis = branchesInformation templateInformation
-        let refspec b c = Refspec (Just c) (branchRef b)
+        let refspec b c = Refspec (Just c) (Just $ branchRef b) (branchRef b)
         let
             renameOnBranch bi = do
                 checkoutBranch repo (branchName bi) Nothing
@@ -366,7 +378,7 @@ renameTemplateBranch template oldBranch newBranch interactive =
                              (formatTemplateYaml newDescriptor)
                 commit_ repo (commitRenameBranchMessage oldBranch newBranch)
         let childBranches = filter (isChildBranch oldBranch) bis
-        let deleteOld     = Refspec Nothing (branchRef oldBranch)
+        let deleteOld     = Refspec Nothing Nothing (branchRef oldBranch)
         pushNew      <- refspec newBranch <$> renameOnBranch mainBranch
         pushChildren <- traverse
             (\bi -> refspec (branchName bi) <$> renameOnBranch bi)
@@ -374,31 +386,45 @@ renameTemplateBranch template oldBranch newBranch interactive =
         return $ deleteOld : pushNew : pushChildren
 
 propagateTemplateBranchChanges
-    :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    :: ( MonadIO m
+       , MonadMask m
+       , MonadGit m
+       , MonadGitServer m
+       , MonadLog m
+       , MonadConsole m
+       )
     => Text
     -> Text
-    -> Bool
+    -> RemoteChangeMode
     -> m ()
-propagateTemplateBranchChanges template sourceBranch _ =
-    runTemplateChange template False $ \repo -> do
+propagateTemplateBranchChanges template sourceBranch pushMode =
+    runTemplateChange template False pushMode $ \repo -> do
         templateInformation <- loadTemplateInformation template repo
         branch <- getTemplateBranch templateInformation sourceBranch
         let childBranches = getTemplateBranches
                 [BranchFilterChildOf sourceBranch]
                 templateInformation
-        let refspec bi =
-                Refspec (Just $ branchCommit branch) (branchRef $ branchName bi)
+        let prBranch bi = branchName branch <> "/" <> branchName bi
+        let refspec bi = Refspec (Just $ branchCommit branch)
+                                 (Just $ branchRef $ prBranch bi)
+                                 (branchRef $ branchName bi)
         return $ map refspec childBranches
 
 changeTemplateVariableValue
-    :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    :: ( MonadIO m
+       , MonadMask m
+       , MonadGit m
+       , MonadGitServer m
+       , MonadLog m
+       , MonadConsole m
+       )
     => Text
     -> Text
     -> Text
     -> Bool
     -> m ()
 changeTemplateVariableValue template oldValue newValue interactive =
-    runTemplateChange template interactive $ \repo -> do
+    runTemplateChange template interactive PushDirectly $ \repo -> do
         bis <- branchesInformation <$> loadTemplateInformation template repo
         templaterSettings <- compileSettings $ TemplaterSettings
             { templaterFromVariables = InsOrdHashMap.singleton "Variable"
@@ -419,19 +445,28 @@ changeTemplateVariableValue template oldValue newValue interactive =
                              (formatTemplateYaml newDescriptor)
                 c <- commit_ repo
                              (commitChangeVariableMessage oldValue newValue)
-                return $ Refspec (Just c) (branchRef (branchName bi))
+                return $ Refspec (Just c)
+                                 (Just $ branchRef $ branchName bi)
+                                 (branchRef $ branchName bi)
         traverse changeOnBranch branches
 
 runTemplateChange
-    :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    :: ( MonadIO m
+       , MonadMask m
+       , MonadGit m
+       , MonadGitServer m
+       , MonadLog m
+       , MonadConsole m
+       )
     => Text
     -> Bool
+    -> RemoteChangeMode
     -> (GitRepository -> m [Refspec])
     -> m ()
-runTemplateChange template interactive f =
+runTemplateChange template interactive changeMode f =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
-        let confirmCommit refspec@(Refspec Nothing _) = return refspec
-            confirmCommit refspec@(Refspec (Just c) (Ref _ ref)) = do
+        let confirmCommit refspec@(Refspec Nothing _ _) = return refspec
+            confirmCommit refspec@(Refspec (Just c) sourceRef (Ref _ ref)) = do
                 msg <- changesForBranchMessage ref <$> gitLogDiff
                     repo
                     c
@@ -447,10 +482,33 @@ runTemplateChange template interactive f =
                                 runShell (repositoryPath repo)
                                 newCommit <- getCurrentHead repo
                                 return $ Refspec
-                                    { sourceRef      = Just newCommit
+                                    { sourceCommit   = Just newCommit
+                                    , sourceRef      = sourceRef
                                     , destinationRef = destinationRef refspec
                                     }
                             else return refspec
+        let pullRequest _ (Refspec Nothing Nothing (Ref BranchRef dst)) = do
+                sayLn $ deleteBranchManually dst
+                return
+                    $  Left
+                    $  SomeException
+                    $  TenpuretoException
+                    $  "Branch "
+                    <> dst
+                    <> " not deleted."
+            pullRequest settings (Refspec (Just c) (Just (Ref BranchRef src)) (Ref BranchRef dst))
+                = try $ createOrUpdatePullRequest repo
+                                                  settings
+                                                  c
+                                                  ("tenpureto/" <> src)
+                                                  dst
+        let pushRefsToServer PushDirectly changes = pushRefs repo changes
+            pushRefsToServer UpstreamPullRequest { pullRequestSettings = settings } changes
+                = do
+                    errors <- lefts <$> traverse (pullRequest settings) changes
+                    case errors of
+                        [] -> return ()
+                        e  -> throwM $ MultipleExceptions e
         changes <- f repo >>= traverse confirmCommit
         if null changes
             then sayLn noRelevantTemplateChanges
@@ -460,7 +518,7 @@ runTemplateChange template interactive f =
                 shouldPush <- confirm (confirmPushMessage deletes updates)
                                       (Just False)
                 if shouldPush
-                    then pushRefs repo changes
+                    then pushRefsToServer changeMode changes
                     else throwM CancelledException
 
 runShell :: MonadIO m => Path Abs Dir -> m ()

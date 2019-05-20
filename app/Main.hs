@@ -4,6 +4,7 @@ module Main where
 
 import           Options.Applicative
 import           Data.Semigroup                 ( (<>) )
+import           Data.Foldable
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import           Data.Maybe
@@ -13,6 +14,7 @@ import           Console
 import qualified Console.Terminal              as Terminal
 import           Git
 import qualified Git.Cli                       as GC
+import qualified Git.GitHub                    as GH
 import           Data
 import           Logging
 import           Tenpureto
@@ -52,6 +54,9 @@ instance MonadGit AppM where
     renameCurrentBranch     = GC.renameCurrentBranch
     pushRefs                = GC.pushRefs
 
+instance MonadGitServer AppM where
+    createOrUpdatePullRequest = GH.createOrUpdatePullRequest
+
 instance MonadConsole AppM where
     ask      = Terminal.ask
     askUntil = Terminal.askUntil
@@ -90,7 +95,7 @@ data Command
     | TemplatePropagateBranchChanges
         { templateName :: Text
         , branchName :: Text
-        , pullRequest :: Bool
+        , remoteChangeMode :: RemoteChangeMode
         , enableDebugLogging :: Bool
         }
     | TemplateChangeVariable
@@ -170,11 +175,36 @@ newVariableValueOption :: Parser Text
 newVariableValueOption = strOption
     (long "new-value" <> metavar "<value>" <> help "New variable value")
 
-pullRequestSwitch :: Parser Bool
-pullRequestSwitch = switch
+pullRequestFlag :: Parser ()
+pullRequestFlag = flag'
+    ()
     (  long "pull-request"
     <> help "Create a pull request instead of merging directly"
     )
+
+pullRequestLabelOption :: Parser Text
+pullRequestLabelOption = strOption
+    (long "pull-request-label" <> metavar "<name>" <> help
+        "Assign a label to a pull request (requires --pull-request)"
+    )
+
+pullRequestAssignOption :: Parser Text
+pullRequestAssignOption = strOption
+    (long "pull-request-assignee" <> metavar "<user>" <> help
+        "Assign a pull request to a user (requires --pull-request)"
+    )
+
+pullRequestSettingsOptionSet :: Parser PullRequestSettings
+pullRequestSettingsOptionSet =
+    PullRequestSettings
+        <$> many pullRequestLabelOption
+        <*> many pullRequestAssignOption
+
+remoteChangeModeOptionSet :: Parser RemoteChangeMode
+remoteChangeModeOptionSet = asum
+    [ UpstreamPullRequest <$> (pullRequestFlag *> pullRequestSettingsOptionSet)
+    , pure PushDirectly
+    ]
 
 createCommand :: Parser Command
 createCommand =
@@ -217,7 +247,7 @@ propagateBranchChanges =
     TemplatePropagateBranchChanges
         <$> templateNameOption
         <*> branchNameOption
-        <*> pullRequestSwitch
+        <*> remoteChangeModeOptionSet
         <*> debugSwitch
 
 changeVariableCommand :: Parser Command
@@ -287,8 +317,8 @@ run TemplateListBranches { templateName = t, branchFilters = bfs, enableDebugLog
     = runAppM d $ listTemplateBranches t bfs
 run TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d $ renameTemplateBranch t on nn i
-run TemplatePropagateBranchChanges { templateName = t, branchName = b, pullRequest = pr, enableDebugLogging = d }
-    = runAppM d $ propagateTemplateBranchChanges t b pr
+run TemplatePropagateBranchChanges { templateName = t, branchName = b, remoteChangeMode = cm, enableDebugLogging = d }
+    = runAppM d $ propagateTemplateBranchChanges t b cm
 run TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d $ changeTemplateVariableValue t ov nv i
 

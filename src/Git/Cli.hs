@@ -4,15 +4,8 @@
 
 module Git.Cli where
 
-import           Git                            ( RepositoryUrl(..)
-                                                , GitRepository(..)
-                                                , Committish(..)
-                                                , RefType(..)
-                                                , Ref(..)
-                                                , Refspec(..)
-                                                )
-import           Logging
 import           Data.Maybe
+import           Data.List.NonEmpty             ( NonEmpty(..) )
 import           Data.ByteString.Lazy           ( ByteString )
 import qualified Data.ByteString.Lazy          as BS
 import           Data.Text                      ( Text )
@@ -29,51 +22,21 @@ import           Path.IO
 import           System.Exit
 import           System.Process.Typed
 
-data GitException = GitCallException
-    { exitCode :: Int
-    , stdErr :: Text }
-    deriving Show
-
-instance Exception GitException
-
-prefixed :: Doc () -> Text -> Doc ()
-prefixed prefix =
-    concatWith (\a b -> a <> hardline <> b)
-        . map ((<>) prefix . pretty)
-        . T.lines
-
-
-decodeUtf8 :: ByteString -> Text
-decodeUtf8 = E.decodeUtf8 . BS.toStrict
-
-stdoutOrThrow
-    :: MonadThrow m => (ExitCode, ByteString, ByteString) -> m ByteString
-stdoutOrThrow (ExitSuccess, out, err) = return out
-stdoutOrThrow (ExitFailure code, out, err) =
-    throwM $ GitCallException code (decodeUtf8 err)
-
-stdoutOrNothing :: (ExitCode, ByteString, ByteString) -> Maybe ByteString
-stdoutOrNothing (ExitSuccess     , out, err) = Just out
-stdoutOrNothing (ExitFailure code, out, err) = Nothing
-
-unitOrThrow :: MonadThrow m => (ExitCode, ByteString, ByteString) -> m ()
-unitOrThrow a = void (stdoutOrThrow a)
-
-throwIfFailed :: MonadThrow m => ExitCode -> m ()
-throwIfFailed ExitSuccess        = return ()
-throwIfFailed (ExitFailure code) = throwM $ GitCallException code ""
+import           Tenpureto.Exec
+import           Logging
+import           Git                            ( RepositoryUrl(..)
+                                                , GitRepository(..)
+                                                , Committish(..)
+                                                , RefType(..)
+                                                , Ref(..)
+                                                , Refspec(..)
+                                                )
 
 gitCmd
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => [Text]
     -> m (ExitCode, ByteString, ByteString)
-gitCmd cmd = do
-    logInfo $ "Running interactively git" <+> fillSep (map pretty cmd)
-    let process = setStdin closed $ proc "git" (map T.unpack cmd)
-    (exitCode, out, err) <- liftIO $ readProcess process
-    logDebug $ prefixed "err> " (decodeUtf8 err)
-    logDebug $ prefixed "out> " (decodeUtf8 out)
-    return (exitCode, out, err)
+gitCmd cmd = runCmd ("git" :| cmd)
 
 gitRepoCmd
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -85,13 +48,7 @@ gitRepoCmd (GitRepository path) cmd =
 
 gitInteractiveCmd
     :: (MonadIO m, MonadThrow m, MonadLog m) => [Text] -> m ExitCode
-gitInteractiveCmd cmd = do
-    logInfo $ "Running git" <+> fillSep (map pretty cmd)
-    let process =
-            setStdin inherit $ setStdout inherit $ setStderr inherit $ proc
-                "git"
-                (map T.unpack cmd)
-    liftIO $ runProcess process
+gitInteractiveCmd cmd = runInteractiveCmd ("git" :| cmd)
 
 gitInteractiveRepoCmd
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -101,12 +58,12 @@ gitInteractiveRepoCmd
 gitInteractiveRepoCmd (GitRepository path) cmd =
     gitInteractiveCmd (map T.pack ["-C", toFilePath path] ++ cmd)
 
-gitcmdStdout
+gitCmdStdout
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
     -> [Text]
     -> m ByteString
-gitcmdStdout repo cmd = gitRepoCmd repo cmd >>= stdoutOrThrow
+gitCmdStdout repo cmd = gitRepoCmd repo cmd >>= stdoutOrThrow
 
 withClonedRepository
     :: (MonadIO m, MonadMask m, MonadLog m)
@@ -169,7 +126,7 @@ cloneReporitory (RepositoryUrl url) dst =
 
 listBranches
     :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> m [Text]
-listBranches repo = T.lines . decodeUtf8 <$> gitcmdStdout
+listBranches repo = T.lines . decodeUtf8 <$> gitCmdStdout
     repo
     ["for-each-ref", "--format=%(refname:strip=3)", "refs/remotes/origin/"]
 
@@ -179,7 +136,7 @@ getRepositoryFile
     -> Committish
     -> Path Rel File
     -> m (Maybe ByteString)
-getRepositoryFile repo (Committish c) file = stdoutOrNothing
+getRepositoryFile repo (Committish c) file = maybeStdout
     <$> gitRepoCmd repo ["show", c <> ":" <> T.pack (toFilePath file)]
 
 getWorkingCopyFile
@@ -282,7 +239,7 @@ commit repo message = do
         then return Nothing
         else do
             gitRepoCmd repo ["commit", "--message", message] >>= unitOrThrow
-            gitcmdStdout repo ["rev-parse", "--verify", "HEAD"]
+            gitCmdStdout repo ["rev-parse", "--verify", "HEAD"]
                 <&> outputToCommittish
 
 findCommitByRef
@@ -291,7 +248,7 @@ findCommitByRef
     -> Ref
     -> m (Maybe Committish)
 findCommitByRef repo (Ref BranchRef branch) =
-    gitcmdStdout repo ["rev-parse", "--verify", branch] <&> outputToCommittish
+    gitCmdStdout repo ["rev-parse", "--verify", branch] <&> outputToCommittish
 
 findCommitByMessage
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -299,7 +256,7 @@ findCommitByMessage
     -> Text
     -> m (Maybe Committish)
 findCommitByMessage repo pat =
-    gitcmdStdout
+    gitCmdStdout
             repo
             ["rev-list", "--max-count=1", "--date-order", "--grep", pat, "HEAD"]
         <&> outputToCommittish
@@ -310,7 +267,7 @@ getCommitMessage
     -> Committish
     -> m Text
 getCommitMessage repo (Committish c) =
-    gitcmdStdout repo ["rev-list", "--max-count=1", "--format=%B", c]
+    gitCmdStdout repo ["rev-list", "--max-count=1", "--format=%B", c]
         <&> decodeUtf8
 
 gitLogDiff
@@ -320,7 +277,7 @@ gitLogDiff
     -> Committish
     -> m Text
 gitLogDiff repo (Committish c) (Committish base) =
-    gitcmdStdout repo ["log", "--patch", "--color", c, "^" <> base]
+    gitCmdStdout repo ["log", "--patch", "--color", c, "^" <> base]
         <&> decodeUtf8
 
 listFiles
@@ -328,7 +285,7 @@ listFiles
     => GitRepository
     -> m [Path Rel File]
 listFiles repo =
-    gitcmdStdout repo ["ls-files"]
+    gitCmdStdout repo ["ls-files"]
         >>= traverse (parseRelFile . T.unpack)
         .   (T.lines . decodeUtf8)
 
@@ -338,7 +295,7 @@ populateRerereFromMerge
     -> Committish
     -> m ()
 populateRerereFromMerge repo (Committish commit) = do
-    parents <- T.words . decodeUtf8 <$> gitcmdStdout
+    parents <- T.words . decodeUtf8 <$> gitCmdStdout
         repo
         ["rev-list", "--max-count=1", "--parents", commit]
     rerunMerge parents
@@ -358,13 +315,13 @@ populateRerereFromMerge repo (Committish commit) = do
 
 getCurrentBranch
     :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> m Text
-getCurrentBranch repo = T.strip . decodeUtf8 <$> gitcmdStdout
+getCurrentBranch repo = T.strip . decodeUtf8 <$> gitCmdStdout
     repo
     ["rev-parse", "--abbrev-ref", "HEAD"]
 
 getCurrentHead
     :: (MonadIO m, MonadThrow m, MonadLog m) => GitRepository -> m Committish
-getCurrentHead repo = Committish . T.strip . decodeUtf8 <$> gitcmdStdout
+getCurrentHead repo = Committish . T.strip . decodeUtf8 <$> gitCmdStdout
     repo
     ["rev-parse", "HEAD"]
 
@@ -383,5 +340,5 @@ pushRefs repo refs =
         >>= unitOrThrow
   where
     ref (Ref BranchRef dst) = "refs/heads/" <> dst
-    refspec (Refspec Nothing               dst) = ":" <> ref dst
-    refspec (Refspec (Just (Committish c)) dst) = c <> ":" <> ref dst
+    refspec (Refspec Nothing               _ dst) = ":" <> ref dst
+    refspec (Refspec (Just (Committish c)) _ dst) = c <> ":" <> ref dst

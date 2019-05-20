@@ -63,3 +63,9 @@ confirmPushMessage deletes updates = "Do you want to"
 
 confirmShellToAmendMessage :: Doc a
 confirmShellToAmendMessage = "Do you want to enter a shell to amend the commit"
+
+deleteBranchManually :: Text -> Doc a
+deleteBranchManually branch =
+    "Cannot delete a branch with a pull request, please delete a \""
+        <> pretty branch
+        <> "\" branch manually."

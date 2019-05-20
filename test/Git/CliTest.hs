@@ -18,6 +18,7 @@ import           Path
 import           Path.IO
 import           Data.Foldable
 
+import           Tenpureto.Exec
 import           Git                            ( GitRepository(..)
                                                 , Committish(..)
                                                 )
@@ -32,7 +33,6 @@ withTempRepository f = withSystemTempDir "tenpureto"
 data CmdException = CmdException deriving Show
 instance Exception CmdException
 
-cmd :: (MonadIO m, MonadThrow m, MonadLog m) => Text -> m ()
 cmd c = do
     logInfo $ "Running " <+> pretty c
     (exitCode, out, err) <- (readProcess . setStdin closed . shell) (T.unpack c)

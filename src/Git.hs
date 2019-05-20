@@ -10,7 +10,10 @@ newtype GitRepository = GitRepository { repositoryPath :: Path Abs Dir }
 newtype Committish = Committish Text deriving (Eq, Show)
 data RefType = BranchRef deriving (Show)
 data Ref = Ref { refType :: RefType, reference :: Text } deriving (Show)
-data Refspec = Refspec { sourceRef :: Maybe Committish, destinationRef :: Ref } deriving (Show)
+-- FIXME sourceCommit and sourceRef are not independent
+data Refspec = Refspec { sourceCommit :: Maybe Committish, sourceRef :: Maybe Ref, destinationRef :: Ref } deriving (Show)
+
+data PullRequestSettings = PullRequestSettings { pullRequestAddLabels :: [Text], pullRequestAssignTo :: [Text] }
 
 class Monad m => MonadGit m where
     withClonedRepository :: RepositoryUrl -> (GitRepository -> m a) -> m a
@@ -36,6 +39,9 @@ class Monad m => MonadGit m where
     getCurrentHead :: GitRepository -> m Committish
     renameCurrentBranch :: GitRepository -> Text -> m ()
     pushRefs :: GitRepository -> [Refspec] -> m ()
+
+class Monad m => MonadGitServer m where
+    createOrUpdatePullRequest :: GitRepository -> PullRequestSettings -> Committish -> Text -> Text -> m ()
 
 instance Pretty Committish where
     pretty (Committish c) = pretty c
