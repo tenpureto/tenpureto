@@ -121,17 +121,18 @@ findTemplateBranch template branch =
 
 getBranchParents :: TemplateInformation -> TemplateBranchInformation -> Set Text
 getBranchParents template branch =
-    let strictRequiredBranches branch =
-                Set.delete (branchName branch) (requiredBranches branch)
-        ancestorNames         = strictRequiredBranches branch
-        bis                   = branchesInformation template
-        ancestors = filter (flip Set.member ancestorNames . branchName) bis
-        indirectAncestorNames = mconcat $ fmap strictRequiredBranches ancestors
-    in  ancestorNames `Set.difference` indirectAncestorNames
+    let getAncestors :: TemplateBranchInformation -> [TemplateBranchInformation]
+        getAncestors b = filter
+            (flip Set.isProperSubsetOf (requiredBranches b) . requiredBranches)
+            (branchesInformation template)
+        ancestors         = getAncestors branch
+        indirectAncestors = mconcat $ getAncestors <$> ancestors
+    in  Set.fromList (fmap branchName ancestors)
+            `Set.difference` Set.fromList (fmap branchName indirectAncestors)
 
 getBranchChildren
     :: TemplateInformation -> TemplateBranchInformation -> Set Text
-getBranchChildren template branch = Set.fromList $ fmap branchName $ filter
+getBranchChildren template branch = Set.fromList $ branchName <$> filter
     (Set.member (branchName branch) . getBranchParents template)
     (branchesInformation template)
 

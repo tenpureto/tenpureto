@@ -20,11 +20,18 @@ test_getBranchParents =
     , testCase "not include grand parents"
         $   getBranchParents (TemplateInformation [a, b, c]) c
         @?= Set.fromList ["b"]
+    , testCase "not include an original branch for a renamed one"
+        $   getBranchParents (TemplateInformation [d, b, c]) d
+        @?= Set.fromList ["b"]
+    , testCase "not include a renamed branch for an original one"
+        $   getBranchParents (TemplateInformation [d, b, c]) c
+        @?= Set.fromList ["b"]
     ]
   where
     a = branch "a" []
     b = branch "b" ["a"]
     c = branch "c" ["a", "b"]
+    d = mergeBranch "d" ["a", "b", "c"]
 
 test_getBranchChildren :: [TestTree]
 test_getBranchChildren =
@@ -34,11 +41,18 @@ test_getBranchChildren =
     , testCase "not include grand children"
         $   getBranchChildren (TemplateInformation [a, b, c]) a
         @?= Set.fromList ["b"]
+    , testCase "not include an original branch for a renamed one"
+        $   getBranchChildren (TemplateInformation [a, b, d]) d
+        @?= Set.fromList ["b"]
+    , testCase "not include a renamed one for an original one"
+        $   getBranchChildren (TemplateInformation [a, b, d]) a
+        @?= Set.fromList ["b"]
     ]
   where
     a = branch "a" []
     b = branch "b" ["a"]
     c = branch "c" ["a", "b"]
+    d = mergeBranch "d" ["a"]
 
 test_getTemplateBranches :: [TestTree]
 test_getTemplateBranches =
