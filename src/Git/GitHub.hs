@@ -43,12 +43,11 @@ newtype GitHubException = GitHubApiResponseParseException { stdOut :: Text }
 
 instance Exception GitHubException
 
-data ApiMethod = ApiPost | ApiPatch | ApiGet
+data ApiMethod = ApiPost | ApiPatch
 
 apiMethod :: ApiMethod -> Text
 apiMethod ApiPost  = "POST"
 apiMethod ApiPatch = "PATCH"
-apiMethod ApiGet   = "GET"
 
 newtype PullRequestAssignee = PullRequestAssignee { assigneeLogin :: Text }
 newtype PullRequestLabel = PullRequestLabel { labelName :: Text }
@@ -113,6 +112,18 @@ hubApiCmd (GitRepository path) method endpoint input = runInputCmd
     )
     (Aeson.encode input)
 
+hubApiGetCmd
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> Text
+    -> [(Text, Text)]
+    -> m (ExitCode, ByteString, ByteString)
+hubApiGetCmd (GitRepository path) endpoint fields = runCmd
+    (  "hub"
+    :| ["-C", T.pack (toFilePath path), "api", "--method", "GET", endpoint]
+    ++ (fields >>= \(key, value) -> ["--raw-field", key <> "=" <> value])
+    )
+
 createOrUpdateReference
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
@@ -154,14 +165,9 @@ createOrUpdatePullRequest repo settings (Committish c) source target = do
             throwM $ GitHubApiResponseParseException (decodeUtf8 bs)
         parseApiResponse bs = maybe (throwApiError bs) return (Aeson.decode bs)
     exitingPullRequests <-
-        hubApiCmd
-            repo
-            ApiGet
-            "/repos/{owner}/{repo}/pulls"
-            PullRequestInputPayload { pullRequestHead  = source
-                                    , pullRequestBase  = target
-                                    , pullRequestTitle = Nothing
-                                    }
+        hubApiGetCmd repo
+                     "/repos/{owner}/{repo}/pulls"
+                     [("head", source), ("base", target)]
         >>= stdoutOrThrow
         >>= parseApiResponse
     pullRequest <- case exitingPullRequests of
