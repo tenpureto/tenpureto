@@ -1,4 +1,4 @@
-# tenpureto
+# tenpureto [![Build Status](https://travis-ci.com/rtimush/tenpureto.svg?branch=master)](https://travis-ci.com/rtimush/tenpureto)
 
 ## Introduction
 
