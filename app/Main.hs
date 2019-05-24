@@ -152,19 +152,19 @@ branchNameOption = strOption
     )
 
 branchFilterChildOfOption :: Parser BranchFilter
-branchFilterChildOfOption = fmap BranchFilterChildOf $ strOption
+branchFilterChildOfOption = BranchFilterChildOf <$> strOption
     (long "children-of" <> metavar "<branch>" <> help
         "Child branches of a given branch"
     )
 
 branchFilterParentOfOption :: Parser BranchFilter
-branchFilterParentOfOption = fmap BranchFilterParentOf $ strOption
+branchFilterParentOfOption = BranchFilterParentOf <$> strOption
     (long "parents-of" <> metavar "<branch>" <> help
         "Parent branches of a given branch"
     )
 
 branchFilterOptions :: Parser [BranchFilter]
-branchFilterOptions = (fmap catMaybes . sequenceA . fmap optional)
+branchFilterOptions = (fmap catMaybes . traverse optional)
     [branchFilterChildOfOption, branchFilterParentOfOption]
 
 oldVariableValueOption :: Parser Text
