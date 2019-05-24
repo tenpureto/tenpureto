@@ -270,6 +270,18 @@ getCommitMessage repo (Committish c) =
     gitCmdStdout repo ["rev-list", "--max-count=1", "--format=%B", c]
         <&> decodeUtf8
 
+gitDiffHasCommits
+    :: (MonadIO m, MonadThrow m, MonadLog m)
+    => GitRepository
+    -> Committish
+    -> Committish
+    -> m Bool
+gitDiffHasCommits repo (Committish c) (Committish base) =
+    gitCmdStdout repo ["rev-list", "--count", c, "^" <> base]
+        <&> decodeUtf8
+        <&> T.strip
+        <&> ("0" /=)
+
 gitLogDiff
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository

@@ -405,10 +405,14 @@ propagateTemplateBranchChanges template sourceBranch pushMode =
                 [BranchFilterChildOf sourceBranch]
                 templateInformation
         let prBranch bi = branchName branch <> "/" <> branchName bi
+        let keepNeedsMerge bi =
+                gitDiffHasCommits repo (branchCommit branch) (branchCommit bi)
+                    <&> \needs -> if needs then Just bi else Nothing
         let refspec bi = Refspec (Just $ branchCommit branch)
                                  (Just $ branchRef $ prBranch bi)
                                  (branchRef $ branchName bi)
-        return $ map refspec childBranches
+        needsMerge <- catMaybes <$> traverse keepNeedsMerge childBranches
+        return $ fmap refspec needsMerge
 
 changeTemplateVariableValue
     :: ( MonadIO m

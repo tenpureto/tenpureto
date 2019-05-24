@@ -46,6 +46,7 @@ instance MonadGit AppM where
     findCommitByRef         = GC.findCommitByRef
     findCommitByMessage     = GC.findCommitByMessage
     getCommitMessage        = GC.getCommitMessage
+    gitDiffHasCommits       = GC.gitDiffHasCommits
     gitLogDiff              = GC.gitLogDiff
     listFiles               = GC.listFiles
     populateRerereFromMerge = GC.populateRerereFromMerge
