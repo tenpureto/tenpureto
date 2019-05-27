@@ -90,7 +90,7 @@ loadBranchConfiguration
     -> m (Maybe TemplateBranchInformation)
 loadBranchConfiguration repo branch = runMaybeT $ do
     branchHead <- MaybeT
-        $ findCommitByRef repo (branchRef $ T.pack "remotes/origin/" <> branch)
+        $ findCommitByRef repo (BranchRef $ T.pack "remotes/origin/" <> branch)
     descriptor <- MaybeT $ getRepositoryFile repo branchHead templateYamlFile
     info       <- MaybeT . return . rightToMaybe $ parseTemplateYaml descriptor
     let fb = features info

@@ -30,9 +30,8 @@ import           Path
 import           Git                            ( RepositoryUrl(..)
                                                 , GitRepository(..)
                                                 , Committish(..)
-                                                , RefType(..)
-                                                , Ref(..)
-                                                , Refspec(..)
+                                                , PushSpec
+                                                , BranchRef(..)
                                                 , PullRequestSettings(..)
                                                 )
 import           Logging
@@ -158,8 +157,9 @@ createOrUpdatePullRequest
     -> Committish
     -> Text
     -> Text
+    -> Text
     -> m ()
-createOrUpdatePullRequest repo settings (Committish c) source target = do
+createOrUpdatePullRequest repo settings (Committish c) title source target = do
     createOrUpdateReference repo (Committish c) source
     let throwApiError bs =
             throwM $ GitHubApiResponseParseException (decodeUtf8 bs)
@@ -179,7 +179,7 @@ createOrUpdatePullRequest repo settings (Committish c) source target = do
                     "/repos/{owner}/{repo}/pulls"
                     PullRequestInputPayload { pullRequestHead  = source
                                             , pullRequestBase  = target
-                                            , pullRequestTitle = Just target
+                                            , pullRequestTitle = Just title
                                             }
                 >>= stdoutOrThrow
                 >>= parseApiResponse

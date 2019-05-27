@@ -8,10 +8,12 @@ import           Logging
 newtype RepositoryUrl = RepositoryUrl Text deriving (Eq, Show)
 newtype GitRepository = GitRepository { repositoryPath :: Path Abs Dir }
 newtype Committish = Committish Text deriving (Eq, Show)
-data RefType = BranchRef deriving (Show)
-data Ref = Ref { refType :: RefType, reference :: Text } deriving (Show)
--- FIXME sourceCommit and sourceRef are not independent
-data Refspec = Refspec { sourceCommit :: Maybe Committish, sourceRef :: Maybe Ref, destinationRef :: Ref } deriving (Show)
+
+newtype BranchRef = BranchRef { reference :: Text } deriving (Show)
+data PushSpec = CreateBranch { sourceCommit :: Committish, destinationRef :: BranchRef }
+              | UpdateBranch { sourceCommit :: Committish, destinationRef :: BranchRef, pullRequestRef :: BranchRef, pullRequestTitle :: Text }
+              | DeleteBranch { destinationRef :: BranchRef }
+              deriving (Show)
 
 data PullRequestSettings = PullRequestSettings { pullRequestAddLabels :: [Text], pullRequestAssignTo :: [Text] }
 
@@ -29,7 +31,7 @@ class Monad m => MonadGit m where
     writeAddFile :: GitRepository -> Path Rel File -> ByteString -> m ()
     addFiles :: GitRepository -> [Path Rel File] -> m ()
     commit :: GitRepository -> Text -> m (Maybe Committish)
-    findCommitByRef :: GitRepository -> Ref -> m (Maybe Committish)
+    findCommitByRef :: GitRepository -> BranchRef -> m (Maybe Committish)
     findCommitByMessage :: GitRepository -> Text -> m (Maybe Committish)
     getCommitMessage :: GitRepository -> Committish -> m Text
     gitDiffHasCommits :: GitRepository -> Committish -> Committish -> m Bool
@@ -39,13 +41,10 @@ class Monad m => MonadGit m where
     getCurrentBranch :: GitRepository -> m Text
     getCurrentHead :: GitRepository -> m Committish
     renameCurrentBranch :: GitRepository -> Text -> m ()
-    pushRefs :: GitRepository -> [Refspec] -> m ()
+    pushRefs :: GitRepository -> [PushSpec] -> m ()
 
 class Monad m => MonadGitServer m where
-    createOrUpdatePullRequest :: GitRepository -> PullRequestSettings -> Committish -> Text -> Text -> m ()
+    createOrUpdatePullRequest :: GitRepository -> PullRequestSettings -> Committish -> Text -> Text -> Text -> m ()
 
 instance Pretty Committish where
     pretty (Committish c) = pretty c
-
-branchRef :: Text -> Ref
-branchRef = Ref BranchRef

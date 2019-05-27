@@ -366,7 +366,6 @@ renameTemplateBranch template oldBranch newBranch interactive =
         templateInformation <- loadTemplateInformation template repo
         mainBranch          <- getTemplateBranch templateInformation oldBranch
         let bis = branchesInformation templateInformation
-        let refspec b c = Refspec (Just c) (Just $ branchRef b) (branchRef b)
         let
             renameOnBranch bi = do
                 checkoutBranch repo (branchName bi) Nothing
@@ -378,10 +377,23 @@ renameTemplateBranch template oldBranch newBranch interactive =
                              (formatTemplateYaml newDescriptor)
                 commit_ repo (commitRenameBranchMessage oldBranch newBranch)
         let childBranches = filter (isChildBranch oldBranch) bis
-        let deleteOld     = Refspec Nothing Nothing (branchRef oldBranch)
-        pushNew      <- refspec newBranch <$> renameOnBranch mainBranch
+        let deleteOld = DeleteBranch { destinationRef = BranchRef oldBranch }
+        pushNew <-
+            renameOnBranch mainBranch
+                <&> \c -> CreateBranch { sourceCommit   = c
+                                       , destinationRef = BranchRef newBranch
+                                       }
         pushChildren <- traverse
-            (\bi -> refspec (branchName bi) <$> renameOnBranch bi)
+            (\bi -> renameOnBranch bi <&> \c -> UpdateBranch
+                { sourceCommit     = c
+                , destinationRef   = BranchRef $ branchName bi
+                , pullRequestRef   = BranchRef $ branchName bi
+                , pullRequestTitle = pullRequestRenameBranchTitle
+                                         (branchName bi)
+                                         oldBranch
+                                         newBranch
+                }
+            )
             childBranches
         return $ deleteOld : pushNew : pushChildren
 
@@ -408,9 +420,15 @@ propagateTemplateBranchChanges template sourceBranch pushMode =
         let keepNeedsMerge bi =
                 gitDiffHasCommits repo (branchCommit branch) (branchCommit bi)
                     <&> \needs -> if needs then Just bi else Nothing
-        let refspec bi = Refspec (Just $ branchCommit branch)
-                                 (Just $ branchRef $ prBranch bi)
-                                 (branchRef $ branchName bi)
+        let
+            refspec bi = UpdateBranch
+                { sourceCommit     = branchCommit branch
+                , destinationRef   = BranchRef $ branchName bi
+                , pullRequestRef   = BranchRef $ prBranch bi
+                , pullRequestTitle = pullRequestBranchIntoBranchTitle
+                                         sourceBranch
+                                         (branchName bi)
+                }
         needsMerge <- catMaybes <$> traverse keepNeedsMerge childBranches
         return $ fmap refspec needsMerge
 
@@ -449,9 +467,15 @@ changeTemplateVariableValue template oldValue newValue interactive =
                              (formatTemplateYaml newDescriptor)
                 c <- commit_ repo
                              (commitChangeVariableMessage oldValue newValue)
-                return $ Refspec (Just c)
-                                 (Just $ branchRef $ branchName bi)
-                                 (branchRef $ branchName bi)
+                return UpdateBranch
+                    { sourceCommit     = c
+                    , destinationRef   = BranchRef $ branchName bi
+                    , pullRequestRef   = BranchRef $ branchName bi
+                    , pullRequestTitle = pullRequestChangeVariableTitle
+                                             (branchName bi)
+                                             oldValue
+                                             newValue
+                    }
         traverse changeOnBranch branches
 
 runTemplateChange
@@ -465,19 +489,18 @@ runTemplateChange
     => Text
     -> Bool
     -> RemoteChangeMode
-    -> (GitRepository -> m [Refspec])
+    -> (GitRepository -> m [PushSpec])
     -> m ()
 runTemplateChange template interactive changeMode f =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
-        let confirmCommit refspec@(Refspec Nothing _ _) = return refspec
-            confirmCommit refspec@(Refspec (Just c) sourceRef (Ref _ ref)) = do
+        let confirmUpdate src (BranchRef ref) = do
                 msg <- changesForBranchMessage ref <$> gitLogDiff
                     repo
-                    c
+                    src
                     (Committish $ "remotes/origin/" <> ref)
                 sayLn msg
                 if not interactive
-                    then return refspec
+                    then return src
                     else do
                         shouldRunShell <- confirm confirmShellToAmendMessage
                                                   (Just False)
@@ -485,13 +508,23 @@ runTemplateChange template interactive changeMode f =
                             then do
                                 runShell (repositoryPath repo)
                                 newCommit <- getCurrentHead repo
-                                return $ Refspec
-                                    { sourceCommit   = Just newCommit
-                                    , sourceRef      = sourceRef
-                                    , destinationRef = destinationRef refspec
-                                    }
-                            else return refspec
-        let pullRequest _ (Refspec Nothing Nothing (Ref BranchRef dst)) = do
+                                return newCommit
+                            else return src
+            confirmCommit refspec@(DeleteBranch _) = return refspec
+            confirmCommit refspec@CreateBranch { sourceCommit = src, destinationRef = dst }
+                = confirmUpdate src dst
+                    <&> \src -> CreateBranch { sourceCommit   = src
+                                             , destinationRef = dst
+                                             }
+
+            confirmCommit refspec@UpdateBranch { sourceCommit = src, destinationRef = dst, pullRequestRef = prRef, pullRequestTitle = title }
+                = confirmUpdate src dst <&> \src -> UpdateBranch
+                    { sourceCommit     = src
+                    , destinationRef   = dst
+                    , pullRequestRef   = prRef
+                    , pullRequestTitle = title
+                    }
+        let pullRequest _ (DeleteBranch (BranchRef dst)) = do
                 sayLn $ deleteBranchManually dst
                 return
                     $  Left
@@ -500,10 +533,20 @@ runTemplateChange template interactive changeMode f =
                     $  "Branch "
                     <> dst
                     <> " not deleted."
-            pullRequest settings (Refspec (Just c) (Just (Ref BranchRef src)) (Ref BranchRef dst))
+            pullRequest _ (CreateBranch _ (BranchRef dst)) = do
+                sayLn $ createBranchManually dst
+                return
+                    $  Left
+                    $  SomeException
+                    $  TenpuretoException
+                    $  "Branch "
+                    <> dst
+                    <> " not created."
+            pullRequest settings UpdateBranch { sourceCommit = c, destinationRef = BranchRef dst, pullRequestRef = BranchRef src, pullRequestTitle = title }
                 = try $ createOrUpdatePullRequest repo
                                                   settings
                                                   c
+                                                  title
                                                   ("tenpureto/" <> src)
                                                   dst
         let pushRefsToServer PushDirectly changes = pushRefs repo changes
@@ -517,10 +560,17 @@ runTemplateChange template interactive changeMode f =
         if null changes
             then sayLn noRelevantTemplateChanges
             else do
-                let (deletes, updates) =
-                        partition (isNothing . sourceRef) changes
-                shouldPush <- confirm (confirmPushMessage deletes updates)
-                                      (Just False)
+                let collectPushRefs DeleteBranch { destinationRef = r } (deletes, creates, updates)
+                        = (r : deletes, creates, updates)
+                    collectPushRefs CreateBranch { destinationRef = r } (deletes, creates, updates)
+                        = (deletes, r : creates, updates)
+                    collectPushRefs UpdateBranch { destinationRef = r } (deletes, creates, updates)
+                        = (deletes, creates, r : updates)
+                    (deletes, creates, updates) =
+                        foldr collectPushRefs ([], [], []) changes
+                shouldPush <- confirm
+                    (confirmPushMessage deletes creates updates)
+                    (Just False)
                 if shouldPush
                     then pushRefsToServer changeMode changes
                     else throwM CancelledException

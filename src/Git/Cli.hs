@@ -27,9 +27,8 @@ import           Logging
 import           Git                            ( RepositoryUrl(..)
                                                 , GitRepository(..)
                                                 , Committish(..)
-                                                , RefType(..)
-                                                , Ref(..)
-                                                , Refspec(..)
+                                                , BranchRef(..)
+                                                , PushSpec(..)
                                                 )
 
 gitCmd
@@ -245,9 +244,9 @@ commit repo message = do
 findCommitByRef
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
-    -> Ref
+    -> BranchRef
     -> m (Maybe Committish)
-findCommitByRef repo (Ref BranchRef branch) =
+findCommitByRef repo (BranchRef branch) =
     gitCmdStdout repo ["rev-parse", "--verify", branch] <&> outputToCommittish
 
 findCommitByMessage
@@ -345,12 +344,15 @@ renameCurrentBranch repo name =
 pushRefs
     :: (MonadIO m, MonadThrow m, MonadLog m)
     => GitRepository
-    -> [Refspec]
+    -> [PushSpec]
     -> m ()
 pushRefs repo refs =
     gitRepoCmd repo (["push", "--atomic", "origin"] ++ fmap refspec refs)
         >>= unitOrThrow
   where
-    ref (Ref BranchRef dst) = "refs/heads/" <> dst
-    refspec (Refspec Nothing               _ dst) = ":" <> ref dst
-    refspec (Refspec (Just (Committish c)) _ dst) = c <> ":" <> ref dst
+    ref (BranchRef dst) = "refs/heads/" <> dst
+    refspec CreateBranch { sourceCommit = (Committish c), destinationRef = dst }
+        = c <> ":" <> ref dst
+    refspec UpdateBranch { sourceCommit = (Committish c), destinationRef = dst }
+        = c <> ":" <> ref dst
+    refspec DeleteBranch { destinationRef = dst } = ":" <> ref dst
