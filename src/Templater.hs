@@ -16,6 +16,7 @@ import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Maybe
 import           Data.Foldable
+import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import           Logging
@@ -26,8 +27,12 @@ import           System.IO                      ( hClose )
 import qualified Data.Text.ICU                 as ICU
 import           Data.Text.Encoding
 import           Data.Text.ICU.Replace
+import           System.FilePath.Glob
+
 import           Templater.CaseConversion
 import           Git
+
+import           Debug.Trace
 
 data TemplaterSettings = TemplaterSettings
     { templaterFromVariables :: InsOrdHashMap Text Text
@@ -35,8 +40,9 @@ data TemplaterSettings = TemplaterSettings
     , templaterExcludes :: Set Text
     }
 
-newtype CompiledTemplaterSettings = CompiledTemplaterSettings
+data CompiledTemplaterSettings = CompiledTemplaterSettings
     { translate :: Text -> Text
+    , shouldExclude :: Path Rel File -> Bool
     }
 
 data TemplaterException = TemplaterException
@@ -61,8 +67,10 @@ expandReplacements fv tv = concatMap expandReplacement
 
 compileSettings
     :: MonadLog m => TemplaterSettings -> m CompiledTemplaterSettings
-compileSettings TemplaterSettings { templaterFromVariables = tfv, templaterToVariables = ttv, templaterExcludes = _ }
-    = let replacements = expandReplacements tfv ttv
+compileSettings TemplaterSettings { templaterFromVariables = tfv, templaterToVariables = ttv, templaterExcludes = ex }
+    = let
+          replacements = expandReplacements tfv ttv
+          excludes     = compileExcludes ex
       in
           do
               logDebug $ "From variables:" <+> align
@@ -85,8 +93,11 @@ compileSettings TemplaterSettings { templaterFromVariables = tfv, templaterToVar
                               | (f, t) <- replacements
                               ]
                           )
+              logDebug $ "Excludes:" <+> align
+                  (sep (fmap pretty (Set.toList ex)))
               return CompiledTemplaterSettings
-                  { translate = replaceVariables replacements
+                  { translate     = replaceVariables replacements
+                  , shouldExclude = excludes
                   }
 
 replaceVariables :: [(Text, Text)] -> Text -> Text
@@ -123,6 +134,25 @@ translateFile
     -> m (Path Rel File)
 translateFile settings =
     parseRelFile . T.unpack . translate settings . T.pack . fromRelFile
+
+compileExcludes :: Set Text -> Path Rel File -> Bool
+compileExcludes excludes =
+    let
+        handleLeadingSlash p =
+            maybe (pure $ "**/" <> p) pure (T.stripPrefix "/" p)
+        handleTrailingSlash p = maybe [p, p <> "/**"]
+                                      (\p -> pure $ p <> "/**")
+                                      (T.stripSuffix "/" p)
+        transformPattern = handleLeadingSlash >=> handleTrailingSlash
+        patterns =
+            fmap (simplify . compile . T.unpack)
+                $   transformPattern
+                =<< Set.toList excludes
+        matches :: [FilePath -> Bool]
+        matches = fmap match patterns
+        fab ?? a = fmap ($ a) fab
+    in
+        or . (??) matches . fromRelFile
 
 copyAbsFile
     :: (MonadIO m, MonadLog m)
@@ -202,7 +232,8 @@ copy settings repo dst =
     let src = repositoryPath repo
     in  do
             files <- listFiles repo
-            traverse (copyRelFile settings src dst) files
+            let includedFiles = mfilter (not . shouldExclude settings) files
+            traverse (copyRelFile settings src dst) includedFiles
 
 move
     :: (MonadIO m, MonadMask m, MonadLog m, MonadGit m)
@@ -215,8 +246,9 @@ move settings repo =
             logDebug $ "Moving" <+> pretty a <+> "to" <+> pretty (dir </> b)
             renameFile a (dir </> b)
     in  do
-            files       <- listFiles repo
-            moveResults <- traverse (moveRelFile settings dir dir) files
+            files <- listFiles repo
+            let includedFiles = mfilter (not . shouldExclude settings) files
+            moveResults <- traverse (moveRelFile settings dir dir) includedFiles
             let oldFiles = fmap fst moveResults
                 actions  = fmap snd moveResults
             traverse_ renameFile' actions

@@ -81,11 +81,11 @@ makeFinalUpdateConfiguration False = inputUpdateConfiguration
 
 buildTemplaterSettings
     :: TemplateYaml -> FinalProjectConfiguration -> TemplaterSettings
-buildTemplaterSettings TemplateYaml { variables = templateValues } FinalProjectConfiguration { variableValues = values }
+buildTemplaterSettings TemplateYaml { variables = templateValues, excludes = templateExcludes } FinalProjectConfiguration { variableValues = values }
     = TemplaterSettings
         { templaterFromVariables = templateValues
         , templaterToVariables   = (InsOrdHashMap.fromList . Map.toList) values
-        , templaterExcludes      = Set.empty
+        , templaterExcludes      = templateExcludes
         }
 
 createProject
@@ -289,6 +289,7 @@ replaceBranchInYaml :: Text -> Text -> TemplateYaml -> TemplateYaml
 replaceBranchInYaml old new descriptor = TemplateYaml
     { variables = variables descriptor
     , features  = replaceInSet old new (features descriptor)
+    , excludes  = excludes descriptor
     }
 
 replaceInFunctor :: (Functor f, Eq a) => a -> a -> f a -> f a
@@ -298,6 +299,7 @@ replaceVariableInYaml :: Text -> Text -> TemplateYaml -> TemplateYaml
 replaceVariableInYaml old new descriptor = TemplateYaml
     { variables = replaceInFunctor old new (variables descriptor)
     , features  = features descriptor
+    , excludes  = excludes descriptor
     }
 
 commit_ :: (MonadThrow m, MonadGit m) => GitRepository -> Text -> m Committish
@@ -507,8 +509,7 @@ runTemplateChange template interactive changeMode f =
                         if shouldRunShell
                             then do
                                 runShell (repositoryPath repo)
-                                newCommit <- getCurrentHead repo
-                                return newCommit
+                                getCurrentHead repo
                             else return src
             confirmCommit refspec@(DeleteBranch _) = return refspec
             confirmCommit refspec@CreateBranch { sourceCommit = src, destinationRef = dst }

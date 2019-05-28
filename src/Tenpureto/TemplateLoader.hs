@@ -45,6 +45,7 @@ data BranchFilter = BranchFilterChildOf Text | BranchFilterParentOf Text
 data TemplateYaml = TemplateYaml
         { variables :: InsOrdHashMap Text Text
         , features :: Set Text
+        , excludes :: Set Text
         }
         deriving (Show, Eq)
 
@@ -187,16 +188,24 @@ instance FromJSON TemplateYaml where
             <*> v
             .:? "features"
             .!= Set.empty
+            <*> v
+            .:? "excludes"
+            .!= Set.empty
     parseJSON _ = fail "Invalid template YAML definition"
 
 instance ToJSON TemplateYaml where
-    toJSON TemplateYaml { variables = v, features = f } =
-        Y.object ["variables" .= v, "features" .= f]
+    toJSON TemplateYaml { variables = v, features = f } = Y.object
+        $ catMaybes ["variables" .?= v, "features" .?= f, "excludes" .?= f]
+        where a .?= b = if b == mempty then Nothing else Just (a .= b)
 
 instance Semigroup TemplateYaml where
     (<>) a b = TemplateYaml { variables = variables a <> variables b
                             , features  = features a <> features b
+                            , excludes  = excludes a <> excludes b
                             }
 
 instance Monoid TemplateYaml where
-    mempty = TemplateYaml { variables = mempty, features = mempty }
+    mempty = TemplateYaml { variables = mempty
+                          , features  = mempty
+                          , excludes  = mempty
+                          }

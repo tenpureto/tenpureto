@@ -31,6 +31,7 @@ dependencies:
 - yaml
 - aeson
 - dotgen
+- Glob
 
 library:
   source-dirs: src
