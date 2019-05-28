@@ -364,7 +364,7 @@ renameTemplateBranch
     -> Bool
     -> m ()
 renameTemplateBranch template oldBranch newBranch interactive =
-    runTemplateChange template interactive PushDirectly $ \repo -> do
+    runTemplateChange template interactive False PushDirectly $ \repo -> do
         templateInformation <- loadTemplateInformation template repo
         mainBranch          <- getTemplateBranch templateInformation oldBranch
         let bis = branchesInformation templateInformation
@@ -410,9 +410,10 @@ propagateTemplateBranchChanges
     => Text
     -> Text
     -> RemoteChangeMode
+    -> Bool
     -> m ()
-propagateTemplateBranchChanges template sourceBranch pushMode =
-    runTemplateChange template False pushMode $ \repo -> do
+propagateTemplateBranchChanges template sourceBranch pushMode unattended =
+    runTemplateChange template False unattended pushMode $ \repo -> do
         templateInformation <- loadTemplateInformation template repo
         branch <- getTemplateBranch templateInformation sourceBranch
         let childBranches = getTemplateBranches
@@ -448,7 +449,7 @@ changeTemplateVariableValue
     -> Bool
     -> m ()
 changeTemplateVariableValue template oldValue newValue interactive =
-    runTemplateChange template interactive PushDirectly $ \repo -> do
+    runTemplateChange template interactive False PushDirectly $ \repo -> do
         bis <- branchesInformation <$> loadTemplateInformation template repo
         templaterSettings <- compileSettings $ TemplaterSettings
             { templaterFromVariables = InsOrdHashMap.singleton "Variable"
@@ -490,10 +491,11 @@ runTemplateChange
        )
     => Text
     -> Bool
+    -> Bool
     -> RemoteChangeMode
     -> (GitRepository -> m [PushSpec])
     -> m ()
-runTemplateChange template interactive changeMode f =
+runTemplateChange template interactive unattended changeMode f =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
         let confirmUpdate src (BranchRef ref) = do
                 msg <- changesForBranchMessage ref <$> gitLogDiff
@@ -569,9 +571,11 @@ runTemplateChange template interactive changeMode f =
                         = (deletes, creates, r : updates)
                     (deletes, creates, updates) =
                         foldr collectPushRefs ([], [], []) changes
-                shouldPush <- confirm
-                    (confirmPushMessage deletes creates updates)
-                    (Just False)
+                shouldPush <- if unattended
+                    then return True
+                    else confirm
+                        (confirmPushMessage deletes creates updates)
+                        (Just False)
                 if shouldPush
                     then pushRefsToServer changeMode changes
                     else throwM CancelledException

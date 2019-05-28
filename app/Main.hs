@@ -94,11 +94,12 @@ data Command
             , enableDebugLogging :: Bool
             }
     | TemplatePropagateBranchChanges
-        { templateName :: Text
-        , branchName :: Text
-        , remoteChangeMode :: RemoteChangeMode
-        , enableDebugLogging :: Bool
-        }
+            { templateName :: Text
+            , branchName :: Text
+            , remoteChangeMode :: RemoteChangeMode
+            , runUnattended :: Bool
+            , enableDebugLogging :: Bool
+            }
     | TemplateChangeVariable
             { templateName :: Text
             , oldVariableValue :: Text
@@ -249,6 +250,7 @@ propagateBranchChanges =
         <$> templateNameOption
         <*> branchNameOption
         <*> remoteChangeModeOptionSet
+        <*> unattendedSwitch
         <*> debugSwitch
 
 changeVariableCommand :: Parser Command
@@ -318,8 +320,8 @@ run TemplateListBranches { templateName = t, branchFilters = bfs, enableDebugLog
     = runAppM d $ listTemplateBranches t bfs
 run TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d $ renameTemplateBranch t on nn i
-run TemplatePropagateBranchChanges { templateName = t, branchName = b, remoteChangeMode = cm, enableDebugLogging = d }
-    = runAppM d $ propagateTemplateBranchChanges t b cm
+run TemplatePropagateBranchChanges { templateName = t, branchName = b, remoteChangeMode = cm, runUnattended = u, enableDebugLogging = d }
+    = runAppM d $ propagateTemplateBranchChanges t b cm u
 run TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d $ changeTemplateVariableValue t ov nv i
 
