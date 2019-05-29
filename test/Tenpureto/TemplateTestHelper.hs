@@ -9,24 +9,29 @@ import           Tenpureto.TemplateLoader       ( TemplateInformation(..)
                                                 , TemplateBranchInformation(..)
                                                 )
 
-branch :: Text -> [Text] -> TemplateBranchInformation
-branch name deps = TemplateBranchInformation
+anonymousBranch :: Text -> [Text] -> TemplateBranchInformation
+anonymousBranch name deps = TemplateBranchInformation
     { branchName       = name
     , branchCommit     = Committish "undefined"
-    , isBaseBranch     = False
-    , isFeatureBranch  = False
-    , requiredBranches = Set.insert name $ Set.fromList deps
-    , branchVariables  = mempty
-    , templateYaml     = mempty
-    }
-
-mergeBranch :: Text -> [Text] -> TemplateBranchInformation
-mergeBranch name deps = TemplateBranchInformation
-    { branchName       = name
-    , branchCommit     = Committish "undefined"
-    , isBaseBranch     = False
-    , isFeatureBranch  = False
     , requiredBranches = Set.fromList deps
     , branchVariables  = mempty
     , templateYaml     = mempty
     }
+
+branch :: Text -> [Text] -> TemplateBranchInformation
+branch name deps = anonymousBranch name (name : deps)
+
+baseBranch :: Text -> TemplateBranchInformation
+baseBranch name = branch name []
+
+childBranch :: Text -> [TemplateBranchInformation] -> TemplateBranchInformation
+childBranch name parents =
+    branch name (Set.toList $ mconcat $ fmap requiredBranches parents)
+
+renamedBranch :: Text -> TemplateBranchInformation -> TemplateBranchInformation
+renamedBranch name parent =
+    anonymousBranch name (Set.toList $ requiredBranches parent)
+
+mergeBranch :: Text -> [TemplateBranchInformation] -> TemplateBranchInformation
+mergeBranch name branches =
+    anonymousBranch name (Set.toList $ mconcat $ fmap requiredBranches branches)

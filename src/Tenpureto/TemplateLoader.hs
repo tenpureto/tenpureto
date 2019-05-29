@@ -52,8 +52,6 @@ data TemplateYaml = TemplateYaml
 data TemplateBranchInformation = TemplateBranchInformation
     { branchName :: Text
     , branchCommit :: Committish
-    , isBaseBranch :: Bool
-    , isFeatureBranch :: Bool
     , requiredBranches :: Set Text
     , branchVariables :: InsOrdHashMap Text Text
     , templateYaml :: TemplateYaml
@@ -98,12 +96,16 @@ loadBranchConfiguration repo branch = runMaybeT $ do
     return $ TemplateBranchInformation
         { branchName       = branch
         , branchCommit     = branchHead
-        , isBaseBranch     = fb == Set.singleton branch
-        , isFeatureBranch  = Set.member branch fb
         , requiredBranches = fb
         , branchVariables  = variables info
         , templateYaml     = info
         }
+
+isBaseBranch :: TemplateBranchInformation -> Bool
+isBaseBranch b = requiredBranches b == Set.singleton (branchName b)
+
+isFeatureBranch :: TemplateBranchInformation -> Bool
+isFeatureBranch b = branchName b `Set.member` requiredBranches b
 
 parseTemplateYaml :: ByteString -> Either Text TemplateYaml
 parseTemplateYaml yaml =
@@ -124,13 +126,16 @@ findTemplateBranch template branch =
 
 getBranchParents :: TemplateInformation -> TemplateBranchInformation -> Set Text
 getBranchParents template branch =
-    let getAncestors :: TemplateBranchInformation -> [TemplateBranchInformation]
-        getAncestors b = filter
-            (flip Set.isProperSubsetOf (requiredBranches b) . requiredBranches)
-            (branchesInformation template)
+    let
+        isAncestor b =
+            flip Set.isProperSubsetOf (requiredBranches b) . requiredBranches
+        getAncestors b =
+            (filter isFeatureBranch . filter (isAncestor b))
+                (branchesInformation template)
         ancestors         = getAncestors branch
         indirectAncestors = mconcat $ getAncestors <$> ancestors
-    in  Set.fromList (fmap branchName ancestors)
+    in
+        Set.fromList (fmap branchName ancestors)
             `Set.difference` Set.fromList (fmap branchName indirectAncestors)
 
 getBranchChildren

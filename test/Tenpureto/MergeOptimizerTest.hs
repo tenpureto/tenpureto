@@ -31,19 +31,28 @@ test_reorderBranches =
 test_includeMergeBranches :: [TestTree]
 test_includeMergeBranches =
     [ testCase "should include merges of two base branches"
-        $   includeMergeBranches (TemplateInformation [a, b, c, z]) [a, b, c]
-        @?= [a, b, c, z]
+        $   (branchName <$> includeMergeBranches
+                (TemplateInformation [a, b, c, z])
+                [a, b, c]
+            )
+        @?= (branchName <$> [a, b, c, z])
     , testCase "should not include merges with additional data"
-        $   includeMergeBranches (TemplateInformation [a, b, c, y]) [a, b, c]
-        @?= [a, b, c]
+        $   (branchName <$> includeMergeBranches
+                (TemplateInformation [a, b, c, y])
+                [a, b, c]
+            )
+        @?= (branchName <$> [a, b, c])
     , testCase "should not include useless merges"
-        $   includeMergeBranches (TemplateInformation [a, b, c, x]) [a, b, c]
-        @?= [a, b, c]
+        $   (branchName <$> includeMergeBranches
+                (TemplateInformation [a, b, c, x])
+                [a, b, c]
+            )
+        @?= (branchName <$> [a, b, c])
     ]
   where
-    a = branch "a" []
-    b = branch "b" []
-    c = branch "c" []
-    z = mergeBranch "z" ["a", "b"]
-    y = branch "y" ["a", "b"]
-    x = mergeBranch "x" ["a"]
+    a = baseBranch "a"
+    b = baseBranch "b"
+    c = baseBranch "c"
+    z = mergeBranch "z" [a, b]
+    y = childBranch "y" [a, b]
+    x = renamedBranch "x" a
