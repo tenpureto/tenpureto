@@ -26,12 +26,18 @@ RUN stack --no-terminal install
 
 FROM ubuntu:18.04
 
-# stack
 RUN apt-get update && apt-get install -y \
+    curl \
     git \
     graphviz \
     libicu60 \
     && rm -rf /var/lib/apt/lists/*
+
+ENV HUB_VERSION=2.11.2
+RUN mkdir /tmp/hub && \
+    (curl -SL https://github.com/github/hub/releases/download/v${HUB_VERSION}/hub-linux-amd64-${HUB_VERSION}.tgz | tar --strip 1 -zxC /tmp/hub) && \
+    install -m 755 /tmp/hub/bin/hub /usr/bin/hub && \
+    rm -rf /tmp/hub
 
 COPY --from=build /root/.local/bin/tenpureto /usr/local/bin/
 COPY docker/gitconfig /root/.gitconfig
