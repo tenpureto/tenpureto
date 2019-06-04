@@ -42,7 +42,7 @@ rpm_arch          = x86_64
 
 deb_version       = $(metadata_git_version)
 deb_repository    = deb-snapshots
-deb_distributions = bionic
+deb_distributions = bionic buster
 deb_arch          = amd64
 
 rpm_amzn2_family  = amzn
@@ -60,6 +60,7 @@ clean:
 	rm -rf dist
 	OS_DISTRIBUTION="amzn2" $(docker_compose) down --remove-orphans --rmi local
 	OS_DISTRIBUTION="bionic" $(docker_compose) down --remove-orphans --rmi local
+	OS_DISTRIBUTION="buster" $(docker_compose) down --remove-orphans --rmi local
 
 .PHONY: build
 build-deps:
