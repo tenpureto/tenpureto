@@ -37,7 +37,7 @@ export JFROG_CLI_OFFER_CONFIG=false
 
 rpm_version       = $(subst -,_,$(metadata_git_version))
 rpm_repository    = rpm-snapshots
-rpm_distributions = amzn2
+rpm_distributions = amzn2 centos7
 rpm_arch          = x86_64
 
 deb_version       = $(metadata_git_version)
@@ -47,6 +47,9 @@ deb_arch          = amd64
 
 rpm_amzn2_family  = amzn
 rpm_amzn2_release = 2
+
+rpm_centos7_family  = centos
+rpm_centos7_release = 7
 
 .PHONY: default
 default: build

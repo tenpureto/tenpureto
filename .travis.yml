@@ -60,6 +60,9 @@ jobs:
       name: Amazon Linux 2
       env: OS=amzn2
     - <<: *package
+      name: CentOS 7
+      env: OS=centos7
+    - <<: *package
       name: Ubuntu 18.04
       env: OS=bionic
     - <<: *package
