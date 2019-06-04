@@ -90,19 +90,19 @@ stage: $(staging_package) $(staging_bash_completions_package) $(staging_zsh_comp
 
 define package_rule
 
-.PHONY: package-$(1)-$(2)
-package-$(1)-$(2): export DOCKER_USER=$(shell id -u)
-package-$(1)-$(2): export DOCKER_GROUP=$(shell id -g)
-package-$(1)-$(2): export OS_DISTRIBUTION=$(2)
-package-$(1)-$(2):
+.PHONY: package-$(2)
+package-$(2): export DOCKER_USER=$(shell id -u)
+package-$(2): export DOCKER_GROUP=$(shell id -g)
+package-$(2): export OS_DISTRIBUTION=$(2)
+package-$(2):
 	mkdir -p .build/$(2)/staging .build/$(2)/.stack-work .build/$(2)/.stack dist
 	$(docker_compose) build
 	$(docker_compose) run --rm agent sh -c "make package-$(1)"
 
-.PHONY: bintray-upload-$(1)-$(2)
-bintray-upload-$(1)-$(2): rpm_package=$(package)-$(rpm_version)-1.$(2).$(rpm_arch).rpm
-bintray-upload-$(1)-$(2): deb_package=$(package)_$(deb_version)-$(2)_$(deb_arch).deb
-bintray-upload-$(1)-$(2): package-$(1)-$(2)
+.PHONY: bintray-upload-$(2)
+bintray-upload-$(2): rpm_package=$(package)-$(rpm_version)-1.$(2).$(rpm_arch).rpm
+bintray-upload-$(2): deb_package=$(package)_$(deb_version)-$(2)_$(deb_arch).deb
+bintray-upload-$(2): package-$(1)-$(2)
 ifeq ($(1),rpm)
 	jfrog bt upload --user $(BINTRAY_API_USER) \
 	                --key $(BINTRAY_API_KEY) \

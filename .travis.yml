@@ -29,10 +29,21 @@ before_install:
   - pushd ~/.local/bin && (curl -fL https://getcli.jfrog.io | sh) && popd
   - docker login -u "${BINTRAY_API_USER}" -p "${BINTRAY_API_KEY}" tenpureto-docker-snapshots.bintray.io
 
+.package: &package
+  stage: package
+  script:
+    - make bintray-cache-pull-$OS || true
+    - make $PACKAGE_ACTION-$OS
+    - "[[ $TRAVIS_BRANCH == master ]] && make bintray-cache-push-$OS || true"
+  cache:
+    directories:
+      - .build/$OS/.stack
+
 jobs:
   include:
 
     - stage: test
+      name: Test
       before_install:
         - mkdir -p ~/.local/bin
         - export PATH=$HOME/.local/bin:$PATH
@@ -45,26 +56,14 @@ jobs:
         directories:
           - $HOME/.stack
 
-    - stage: package
+    - <<: *package
       name: Amazon Linux 2
       env: OS=amzn2
-      script:
-        - make bintray-cache-pull-$OS || true
-        - make $PACKAGE_ACTION-rpm-$OS
-        - "[[ $TRAVIS_BRANCH == master ]] && make bintray-cache-push-$OS || true"
-      cache:
-        directories:
-          - .build/$OS/.stack
-    - name: Ubuntu 18.04
+    - <<: *package
+      name: Ubuntu 18.04
       env: OS=bionic
-      script:
-        - make bintray-cache-pull-$OS || true
-        - make $PACKAGE_ACTION-deb-$OS
-        - "[[ $TRAVIS_BRANCH == master ]] && make bintray-cache-push-$OS || true"
-      cache:
-        directories:
-          - .build/$OS/.stack
 
     - stage: publish
+      name: Native packages
       env: CACHE_NAME=publish
       script: make bintray-publish-rpm bintray-publish-deb
