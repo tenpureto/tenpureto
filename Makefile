@@ -106,7 +106,7 @@ package-$(2):
 .PHONY: bintray-upload-$(2)
 bintray-upload-$(2): rpm_package=$(package)-$(rpm_version)-1.$(2).$(rpm_arch).rpm
 bintray-upload-$(2): deb_package=$(package)_$(deb_version)-$(2)_$(deb_arch).deb
-bintray-upload-$(2): package-$(1)-$(2)
+bintray-upload-$(2): package-$(2)
 ifeq ($(1),rpm)
 	jfrog bt upload --user $(BINTRAY_API_USER) \
 	                --key $(BINTRAY_API_KEY) \
