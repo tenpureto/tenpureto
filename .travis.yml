@@ -27,6 +27,7 @@ before_install:
   - mkdir -p ~/.local/bin
   - export PATH=$HOME/.local/bin:$PATH
   - pushd ~/.local/bin && (curl -fL https://getcli.jfrog.io | sh) && popd
+  - docker login -u "${BINTRAY_API_USER}" -p "${BINTRAY_API_KEY}" tenpureto-docker-snapshots.bintray.io
 
 jobs:
   include:
@@ -47,13 +48,19 @@ jobs:
     - stage: package
       name: Amazon Linux 2
       env: OS=amzn2
-      script: make $PACKAGE_ACTION-rpm-$OS
+      script:
+        - make bintray-cache-pull-$OS || true
+        - make $PACKAGE_ACTION-rpm-$OS
+        - "[[ $TRAVIS_BRANCH == master ]] && make bintray-cache-push-$OS || true"
       cache:
         directories:
           - .build/$OS/.stack
     - name: Ubuntu 18.04
       env: OS=bionic
-      script: make $PACKAGE_ACTION-deb-$OS
+      script:
+        - make bintray-cache-pull-$OS || true
+        - make $PACKAGE_ACTION-deb-$OS
+        - "[[ $TRAVIS_BRANCH == master ]] && make bintray-cache-push-$OS || true"
       cache:
         directories:
           - .build/$OS/.stack

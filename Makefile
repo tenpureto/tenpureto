@@ -89,6 +89,7 @@ $(staging_zsh_completions_package): $(staging_package)
 stage: $(staging_package) $(staging_bash_completions_package) $(staging_zsh_completions_package)
 
 define package_rule
+
 .PHONY: package-$(1)-$(2)
 package-$(1)-$(2): export DOCKER_USER=$(shell id -u)
 package-$(1)-$(2): export DOCKER_GROUP=$(shell id -g)
@@ -116,6 +117,15 @@ else
 	                tenpureto/$(deb_repository)/$(package)/$(deb_version) \
 	                pool/main/t/$$(deb_package);deb_distribution=$(2)
 endif
+
+bintray-cache-pull-$(2): export OS_DISTRIBUTION=$(2)
+bintray-cache-pull-$(2):
+	$(docker_compose) pull
+
+bintray-cache-push-$(2): export OS_DISTRIBUTION=$(2)
+bintray-cache-push-$(2):
+	$(docker_compose) push
+
 endef
 
 $(foreach _distribution,$(rpm_distributions),$(eval $(call package_rule,rpm,$(_distribution))))

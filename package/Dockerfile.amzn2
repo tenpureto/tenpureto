@@ -1,4 +1,4 @@
-FROM amazonlinux:2
+FROM amazonlinux:2 AS build
 
 # stack
 RUN yum groupinstall -y "Development Tools"

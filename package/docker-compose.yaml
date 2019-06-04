@@ -3,8 +3,11 @@ services:
   agent:
     build:
       context: .
+      cache_from:
+        - tenpureto-docker-snapshots.bintray.io/tenpureto-package-agent:${OS_DISTRIBUTION}
       dockerfile: Dockerfile.${OS_DISTRIBUTION}
-    image: tenpureto-package-agent:${OS_DISTRIBUTION}
+      target: build
+    image: tenpureto-docker-snapshots.bintray.io/tenpureto-package-agent:${OS_DISTRIBUTION}
     environment:
       - OS_DISTRIBUTION
       - STACK_ROOT=/build/.stack
