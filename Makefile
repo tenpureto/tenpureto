@@ -166,6 +166,7 @@ package-deb: stage
 	    --description $(metadata_description) \
 	    --maintainer $(metadata_maintainer) \
 	    --depends git \
+	    --depends "$(shell package/deb-autodeps.sh $(staging_package))" \
 	    --deb-dist $(OS_DISTRIBUTION) \
 	    --deb-no-default-config-files \
 	    $(staging_package)=$(install_bin)/ \

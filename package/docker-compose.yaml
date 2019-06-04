@@ -11,7 +11,7 @@ services:
     environment:
       - OS_DISTRIBUTION
       - STACK_ROOT=/build/.stack
-      - LANG=en_US.UTF-8
+      - LANG=C.UTF-8
     volumes:
       - ..:/build:delegated
       - ../.build/${OS_DISTRIBUTION}/staging:/build/.build/staging:delegated
