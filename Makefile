@@ -119,7 +119,7 @@ else
 	                --deb $(2)/main/$(deb_arch) \
 	                $(dist)/$$(deb_package) \
 	                tenpureto/$(deb_repository)/$(package)/$(deb_version) \
-	                pool/main/t/$$(deb_package);deb_distribution=$(2)
+	                pool/main/t/$$(deb_package)
 endif
 
 bintray-cache-pull-$(2): export OS_DISTRIBUTION=$(2)
