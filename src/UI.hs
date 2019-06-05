@@ -106,9 +106,6 @@ unattendedProjectConfiguration templateInformation providedConfiguration =
         cfg = FinalProjectConfiguration <$> bis <*> v
     in  maybe (throwM UnattendedNotPossibleException) return cfg
 
-required :: (Monad m) => m (Maybe a) -> m a
-required input = input >>= maybe (required input) return
-
 inputTemplate :: MonadConsole m => m Text
 inputTemplate = ask "Template URL" Nothing
 
