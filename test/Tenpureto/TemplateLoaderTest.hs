@@ -12,6 +12,28 @@ import qualified Data.Set                      as Set
 import           Tenpureto.TemplateTestHelper
 import           Tenpureto.TemplateLoader
 
+test_managedBranches :: [TestTree]
+test_managedBranches =
+    [ testCase "include base branches"
+        $   managedBranches (TemplateInformation [a])
+        @?= [a]
+    , testCase "include child branches"
+        $   managedBranches (TemplateInformation [a, b])
+        @?= [a, b]
+    , testCase "not include renamed branches"
+        $   managedBranches (TemplateInformation [a, b, c])
+        @?= [a, b]
+    , testCase "include merge branches"
+        $   managedBranches (TemplateInformation [a, b, d, e])
+        @?= [a, b, d, e]
+    ]
+  where
+    a = baseBranch "a"
+    b = childBranch "b" [a]
+    c = renamedBranch "c" b
+    d = childBranch "d" [a]
+    e = mergeBranch "e" [b, d]
+
 test_getBranchParents :: [TestTree]
 test_getBranchParents =
     [ testCase "include parents"
@@ -47,6 +69,9 @@ test_getBranchChildren =
     [ testCase "include children"
         $   getBranchChildren (TemplateInformation [a, b]) a
         @?= Set.fromList ["b"]
+    , testCase "not include renamed children"
+        $   getBranchChildren (TemplateInformation [a, b, g]) a
+        @?= Set.fromList ["b"]
     , testCase "include merges"
         $   getBranchChildren (TemplateInformation [a, e, f]) a
         @?= Set.fromList ["f"]
@@ -67,6 +92,7 @@ test_getBranchChildren =
     d = renamedBranch "d" a
     e = baseBranch "e"
     f = mergeBranch "f" [a, e]
+    g = renamedBranch "g" b
 
 test_getTemplateBranches :: [TestTree]
 test_getTemplateBranches =

@@ -93,19 +93,35 @@ loadBranchConfiguration repo branch = runMaybeT $ do
     descriptor <- MaybeT $ getRepositoryFile repo branchHead templateYamlFile
     info       <- MaybeT . return . rightToMaybe $ parseTemplateYaml descriptor
     let fb = features info
-    return $ TemplateBranchInformation
-        { branchName       = branch
-        , branchCommit     = branchHead
-        , requiredBranches = fb
-        , branchVariables  = variables info
-        , templateYaml     = info
-        }
+    return $ TemplateBranchInformation { branchName       = branch
+                                       , branchCommit     = branchHead
+                                       , requiredBranches = fb
+                                       , branchVariables  = variables info
+                                       , templateYaml     = info
+                                       }
 
 isBaseBranch :: TemplateBranchInformation -> Bool
 isBaseBranch b = requiredBranches b == Set.singleton (branchName b)
 
 isFeatureBranch :: TemplateBranchInformation -> Bool
 isFeatureBranch b = branchName b `Set.member` requiredBranches b
+
+isMergeOf
+    :: TemplateBranchInformation
+    -> (TemplateBranchInformation, TemplateBranchInformation)
+    -> Bool
+isMergeOf b (x, y) =
+    (requiredBranches b == requiredBranches x <> requiredBranches y)
+        && (requiredBranches b /= requiredBranches x)
+        && (requiredBranches b /= requiredBranches y)
+
+isMergeBranch :: TemplateInformation -> TemplateBranchInformation -> Bool
+isMergeBranch t b = any (isMergeOf b) [ (x, y) | x <- fb, y <- fb, x /= y ]
+    where fb = filter isFeatureBranch (branchesInformation t)
+
+managedBranches :: TemplateInformation -> [TemplateBranchInformation]
+managedBranches t = filter (\b -> isFeatureBranch b || isMergeBranch t b)
+                           (branchesInformation t)
 
 parseTemplateYaml :: ByteString -> Either Text TemplateYaml
 parseTemplateYaml yaml =
@@ -126,23 +142,22 @@ findTemplateBranch template branch =
 
 getBranchParents :: TemplateInformation -> TemplateBranchInformation -> Set Text
 getBranchParents template branch =
-    let
-        isAncestor b =
-            flip Set.isProperSubsetOf (requiredBranches b) . requiredBranches
-        getAncestors b =
-            (filter isFeatureBranch . filter (isAncestor b))
-                (branchesInformation template)
+    let isAncestor b =
+                flip Set.isProperSubsetOf (requiredBranches b) . requiredBranches
+        getAncestors b = filter (isAncestor b) (managedBranches template)
         ancestors         = getAncestors branch
         indirectAncestors = mconcat $ getAncestors <$> ancestors
-    in
-        Set.fromList (fmap branchName ancestors)
-            `Set.difference` Set.fromList (fmap branchName indirectAncestors)
+    in  Set.fromList (fmap branchName ancestors) `Set.difference` Set.fromList
+            (fmap branchName indirectAncestors)
 
 getBranchChildren
     :: TemplateInformation -> TemplateBranchInformation -> Set Text
-getBranchChildren template branch = Set.fromList $ branchName <$> filter
-    (Set.member (branchName branch) . getBranchParents template)
-    (branchesInformation template)
+getBranchChildren template branch =
+    Set.fromList
+        $   branchName
+        <$> (filter (Set.member (branchName branch) . getBranchParents template)
+            )
+                (managedBranches template)
 
 getTemplateBranches
     :: [BranchFilter] -> TemplateInformation -> [TemplateBranchInformation]
