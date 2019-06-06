@@ -4,8 +4,9 @@ import           Data.List
 import qualified Data.Set                      as Set
 import           Data.Graph
 
-import           Tenpureto.TemplateLoader       ( TemplateInformation(..)
+import           Tenpureto.TemplateLoader       ( TemplateInformation
                                                 , TemplateBranchInformation(..)
+                                                , managedBranches
                                                 )
 
 import           Debug.Trace
@@ -24,7 +25,7 @@ includeMergeBranches
     -> [TemplateBranchInformation]
 includeMergeBranches template branches =
     let
-        allBranches  = branchesInformation template
+        allBranches  = managedBranches template
         mergeOptions = filter ((<) 1 . length) (subsequences branches)
         isMergeOf bi bis = foldMap requiredBranches bis == requiredBranches bi
         isMerge bi = any (isMergeOf bi) mergeOptions
