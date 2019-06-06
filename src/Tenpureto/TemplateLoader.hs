@@ -214,8 +214,9 @@ instance FromJSON TemplateYaml where
     parseJSON _ = fail "Invalid template YAML definition"
 
 instance ToJSON TemplateYaml where
-    toJSON TemplateYaml { variables = v, features = f } = Y.object
-        $ catMaybes ["variables" .?= v, "features" .?= f, "excludes" .?= f]
+    toJSON TemplateYaml { variables = v, features = f, excludes = e } =
+        Y.object $ catMaybes
+            ["variables" .?= v, "features" .?= f, "excludes" .?= e]
         where a .?= b = if b == mempty then Nothing else Just (a .= b)
 
 instance Semigroup TemplateYaml where
