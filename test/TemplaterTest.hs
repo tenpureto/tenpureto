@@ -74,12 +74,20 @@ test_excludes =
             [ testCase "should match a dir" $ assertMatches "a/" [relfile|a/b|]
             , testCase "should not match a file"
                 $ assertNotMatches "a/" [relfile|b/a|]
+            , testCase "should match a file in a dir"
+                $ assertMatches "a/" [relfile|a/b|]
+            , testCase "should match a file in a dir when starts with a dot"
+                $ assertMatches ".a/" [relfile|.a/b|]
             ]
         , testGroup
             "path"
             [ testCase "should match a file in a dir"
                 $ assertMatches "a" [relfile|b/a|]
             , testCase "should match a file" $ assertMatches "a" [relfile|a/b|]
+            , testCase "should match a file in a dir"
+                $ assertMatches "a" [relfile|a/b|]
+            , testCase "should match a file in a dir when starts with a dot"
+                $ assertMatches ".a" [relfile|.a/b|]
             ]
         , testCase "should not match invalid patterns"
             $ assertNotMatches "[" [relfile|a|]

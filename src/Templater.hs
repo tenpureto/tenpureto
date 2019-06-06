@@ -32,8 +32,6 @@ import           System.FilePath.Glob
 import           Templater.CaseConversion
 import           Git
 
-import           Debug.Trace
-
 data TemplaterSettings = TemplaterSettings
     { templaterFromVariables :: InsOrdHashMap Text Text
     , templaterToVariables :: InsOrdHashMap Text Text
@@ -138,8 +136,7 @@ translateFile settings =
 compileExcludes :: Set Text -> Path Rel File -> Bool
 compileExcludes excludes =
     let
-        handleLeadingSlash p =
-            maybe (pure $ "**/" <> p) pure (T.stripPrefix "/" p)
+        handleLeadingSlash p = maybe [p, "**/" <> p] pure (T.stripPrefix "/" p)
         handleTrailingSlash p = maybe [p, p <> "/**"]
                                       (\p -> pure $ p <> "/**")
                                       (T.stripSuffix "/" p)
