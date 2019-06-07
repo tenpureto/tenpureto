@@ -41,9 +41,9 @@ askUntil prompt defans confirm = ask prompt defans <&> confirm >>= reprompt
 
 say :: MonadIO m => Doc AnsiStyle -> m ()
 say message = liftIO $ do
-    width <- fmap TS.width <$> TS.size
+    w <- fmap TS.width <$> TS.size
     let layoutOptions =
-            LayoutOptions (maybe Unbounded (flip AvailablePerLine 1.0) width)
+            LayoutOptions (maybe Unbounded (flip AvailablePerLine 1.0) w)
         render = renderIO stdout . layoutPretty layoutOptions
     render message
     hFlush stdout

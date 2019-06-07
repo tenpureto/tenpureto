@@ -5,7 +5,6 @@ module Data where
 import           Data.Text                      ( Text )
 import           Data.Set                       ( Set )
 import           Data.Map                       ( Map )
-import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
 
 import           Control.Applicative
 

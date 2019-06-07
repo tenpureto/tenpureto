@@ -12,7 +12,6 @@ import           Data
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Bool
-import           Data.Tuple
 import           Data.Maybe
 import           Data.List
 import           Data.Set                       ( Set )
@@ -23,10 +22,7 @@ import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
 import           Data.Functor
-import           Data.Monoid
 import           Text.Printf
-import           Control.Applicative
-import           Control.Monad
 import           Control.Monad.Catch
 import           Control.Monad.IO.Class
 import           Console
@@ -34,7 +30,12 @@ import           Path
 import           Path.IO
 
 import           Git                            ( Committish(..) )
-import           Tenpureto.TemplateLoader
+import           Tenpureto.TemplateLoader       ( TemplateInformation(..)
+                                                , TemplateBranchInformation(..)
+                                                , isBaseBranch
+                                                , isFeatureBranch
+                                                , findTemplateBranch
+                                                )
 
 data UIException = UnattendedNotPossibleException | InvalidInputException | InterruptedInputException deriving (Exception)
 
@@ -121,9 +122,8 @@ resolveTargetDir path = catch
     (\e -> let _ = (e :: PathException) in parseAbsDir path)
 
 withDefaults :: Ord a => InsOrdHashMap a b -> Map a b -> InsOrdHashMap a b
-withDefaults variables defaults = InsOrdHashMap.mapWithKey
-    (\k v -> fromMaybe v (Map.lookup k defaults))
-    variables
+withDefaults vars defaults =
+    InsOrdHashMap.mapWithKey (\k v -> fromMaybe v (Map.lookup k defaults)) vars
 
 inputTemplateConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)
@@ -191,7 +191,7 @@ inputBaseBranch
     => [TemplateBranchInformation]
     -> Maybe Text
     -> m Text
-inputBaseBranch [single] selected = return (branchName single)
+inputBaseBranch [single] _        = return (branchName single)
 inputBaseBranch branches selected = do
     selection <- inputBranch "Base branches"
                              "Select a base branch"
@@ -223,8 +223,8 @@ inputVariables
     :: (MonadIO m, MonadMask m, MonadConsole m)
     => InsOrdHashMap Text Text
     -> m (Map Text Text)
-inputVariables variables =
-    Map.fromList <$> traverse inputVariable (InsOrdHashMap.toList variables)
+inputVariables vars =
+    Map.fromList <$> traverse inputVariable (InsOrdHashMap.toList vars)
 
 inputProjectConfiguration
     :: (MonadIO m, MonadMask m, MonadConsole m)

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -11,7 +12,6 @@ import           Test.SmallCheck
 import           Test.SmallCheck.Series
 
 import           Data.Maybe
-import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Text.ICU                 as ICU
 import           Data.Foldable

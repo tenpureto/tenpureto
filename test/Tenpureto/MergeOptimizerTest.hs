@@ -4,8 +4,6 @@ module Tenpureto.MergeOptimizerTest where
 
 import           Test.Tasty
 import           Test.Tasty.HUnit
-import           Test.SmallCheck
-import           Test.SmallCheck.Series
 
 import           Tenpureto.TemplateTestHelper
 import           Tenpureto.TemplateLoader       ( TemplateInformation(..)

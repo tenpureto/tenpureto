@@ -9,8 +9,6 @@ import           Tenpureto.TemplateLoader       ( TemplateInformation
                                                 , managedBranches
                                                 )
 
-import           Debug.Trace
-
 reorderBranches :: [TemplateBranchInformation] -> [TemplateBranchInformation]
 reorderBranches branches =
     let edge bi = (bi, branchName bi, Set.toList (requiredBranches bi))

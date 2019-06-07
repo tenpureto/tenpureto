@@ -10,17 +10,14 @@ import           Data.ByteString.Lazy           ( ByteString )
 import qualified Data.ByteString.Lazy          as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
-import qualified Data.Text.Encoding            as E
 import           Control.Monad
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 import           Data.Functor
-import           Data.Foldable
 import           Data.Either.Combinators
 import           Path
 import           Path.IO
 import           System.Exit
-import           System.Process.Typed
 
 import           Tenpureto.Exec
 import           Logging
@@ -191,8 +188,8 @@ mergeBranch repo branch resolve = do
         repo
         ["merge", "--no-commit", "--no-ff", branch]
     case mergeResult of
-        ExitSuccess      -> return ()
-        ExitFailure code -> listConflicts repo >>= resolve
+        ExitSuccess   -> return ()
+        ExitFailure _ -> listConflicts repo >>= resolve
 
 writeAddFile
     :: (MonadIO m, MonadThrow m, MonadLog m)
@@ -305,21 +302,21 @@ populateRerereFromMerge
     => GitRepository
     -> Committish
     -> m ()
-populateRerereFromMerge repo (Committish commit) = do
+populateRerereFromMerge repo (Committish c) = do
     parents <- T.words . decodeUtf8 <$> gitCmdStdout
         repo
-        ["rev-list", "--max-count=1", "--parents", commit]
+        ["rev-list", "--max-count=1", "--parents", c]
     rerunMerge parents
   where
     rerunMerge :: (MonadIO m, MonadThrow m, MonadLog m) => [Text] -> m ()
-    rerunMerge [c, p1, p2] = do
+    rerunMerge [mc, p1, p2] = do
         gitRepoCmd repo ["checkout", p1] >>= unitOrThrow
         (mergeResult, _, _) <- gitRepoCmd repo ["merge", "--no-commit", p2]
         case mergeResult of
             ExitSuccess   -> return ()
             ExitFailure _ -> do
                 gitRepoCmd repo ["rerere"] >>= unitOrThrow
-                gitRepoCmd repo ["checkout", c, "--", "."] >>= unitOrThrow
+                gitRepoCmd repo ["checkout", mc, "--", "."] >>= unitOrThrow
                 gitRepoCmd repo ["rerere"] >>= unitOrThrow
                 gitRepoCmd repo ["reset", "--hard"] >>= unitOrThrow
     rerunMerge _ = return ()

@@ -10,7 +10,6 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
-import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
@@ -100,21 +99,21 @@ compileSettings TemplaterSettings { templaterFromVariables = tfv, templaterToVar
 
 replaceVariables :: [(Text, Text)] -> Text -> Text
 replaceVariables []    = id
-replaceVariables rules = replaceAll regex replace
+replaceVariables rules = replaceAll regex replacement
   where
     rulesMap = Map.fromList rules
     quote text = "\\Q" <> T.replace "\\E" "\\\\E" text <> "\\E"
     regex = ICU.regex [] $ T.intercalate "|" $ fmap (quote . fst) rules
-    findReplacement match = fromMaybe matchText (Map.lookup matchText rulesMap)
-        where matchText = fold $ ICU.group 0 match
-    replace = rtfn findReplacement
+    findReplacement mtch = fromMaybe matchText (Map.lookup matchText rulesMap)
+        where matchText = fold $ ICU.group 0 mtch
+    replacement = rtfn findReplacement
 
 data FileContent = BinaryContent ByteString
                  | TextContent Text (Text -> ByteString)
 
 mapContent :: (Text -> Text) -> FileContent -> FileContent
 mapContent f (TextContent t enc) = TextContent (f t) enc
-mapContent f (BinaryContent b  ) = BinaryContent b
+mapContent _ (BinaryContent b  ) = BinaryContent b
 
 detectEncoding :: ByteString -> FileContent
 detectEncoding bs = case decodeUtf8' bs of
@@ -137,9 +136,8 @@ compileExcludes :: Set Text -> Path Rel File -> Bool
 compileExcludes excludes =
     let
         handleLeadingSlash p = maybe [p, "**/" <> p] pure (T.stripPrefix "/" p)
-        handleTrailingSlash p = maybe [p, p <> "/**"]
-                                      (\p -> pure $ p <> "/**")
-                                      (T.stripSuffix "/" p)
+        handleTrailingSlash p =
+            maybe [p, p <> "/**"] (pure . (<> "/**")) (T.stripSuffix "/" p)
         transformPattern = handleLeadingSlash >=> handleTrailingSlash
         patterns =
             fmap (simplify . compile . T.unpack)

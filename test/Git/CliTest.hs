@@ -30,21 +30,22 @@ withTempRepository
 withTempRepository f = withSystemTempDir "tenpureto"
     $ \dir -> withCurrentDir dir $ (initRepository >=> f) dir
 
-data CmdException = CmdException { code :: Int, stdOut :: Text, stdErr :: Text } deriving Show
+data CmdException = CmdException { exitCode :: Int, stdOut :: Text, stdErr :: Text } deriving Show
 instance Exception CmdException
 
-cmd c = do
-    logInfo $ "Running " <+> pretty c
-    (exitCode, out, err) <- (readProcess . setStdin closed . shell) (T.unpack c)
+testCmd :: (MonadIO m, MonadThrow m, MonadLog m) => Text -> m ()
+testCmd cmd = do
+    logInfo $ "Running " <+> pretty cmd
+    (code, out, err) <- (readProcess . setStdin closed . shell) (T.unpack cmd)
     logDebug $ prefixed "err> " (decodeUtf8 err)
     logDebug $ prefixed "out> " (decodeUtf8 out)
-    case exitCode of
+    case code of
         ExitSuccess -> return ()
-        ExitFailure code ->
-            throwM $ CmdException code (decodeUtf8 out) (decodeUtf8 err)
+        ExitFailure c ->
+            throwM $ CmdException c (decodeUtf8 out) (decodeUtf8 err)
 
-cmds :: (MonadIO m, MonadThrow m, MonadLog m) => [Text] -> m ()
-cmds = traverse_ cmd
+testCmds :: (MonadIO m, MonadThrow m, MonadLog m) => [Text] -> m ()
+testCmds = traverse_ testCmd
 
 readCmd :: MonadIO m => GitRepository -> String -> m Text
 readCmd (GitRepository dir) cmd =
@@ -55,7 +56,7 @@ readCmd (GitRepository dir) cmd =
 test_populateRerereFromMerge :: IO [TestTree]
 test_populateRerereFromMerge = discardLogging $ sequence
     [ withTempRepository $ \repo -> do
-        cmds
+        testCmds
             [ "git commit --allow-empty -m base"
             , "git commit --allow-empty -m commit2"
             ]
@@ -66,7 +67,7 @@ test_populateRerereFromMerge = discardLogging $ sequence
             $   rerere
             @?= ([], [])
     , withTempRepository $ \repo -> do
-        cmds initMergeConflict
+        testCmds initMergeConflict
         populateRerereFromMerge repo (Committish "HEAD")
         rerere <- listDir [reldir|.git/rr-cache|]
         return
@@ -74,9 +75,9 @@ test_populateRerereFromMerge = discardLogging $ sequence
             $   length (fst rerere)
             @?= 1
     , withTempRepository $ \repo -> do
-        cmds initMergeConflict
+        testCmds initMergeConflict
         populateRerereFromMerge repo (Committish "HEAD")
-        cmds ["git checkout branch1", "git merge branch2 || true"]
+        testCmds ["git checkout branch1", "git merge branch2 || true"]
         content <- liftIO $ readFile "file"
         return
             $   testCase "should allow resolution reuse"

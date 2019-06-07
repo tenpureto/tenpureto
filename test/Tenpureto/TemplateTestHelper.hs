@@ -5,8 +5,7 @@ import           Data.Text                      ( Text )
 import qualified Data.Set                      as Set
 
 import           Git                            ( Committish(..) )
-import           Tenpureto.TemplateLoader       ( TemplateInformation(..)
-                                                , TemplateBranchInformation(..)
+import           Tenpureto.TemplateLoader       ( TemplateBranchInformation(..)
                                                 )
 
 anonymousBranch :: Text -> [Text] -> TemplateBranchInformation

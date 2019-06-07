@@ -13,14 +13,11 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
-import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
-import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
-import           Control.Monad.Trans
 import qualified Data.Text.ICU                 as ICU
 import           Data.Functor
 import           Path
@@ -106,7 +103,7 @@ createProject projectConfiguration unattended =
                                                template
                                                (repositoryPath project)
                       addFiles project files
-                      commit
+                      _ <- commit
                           project
                           (commitCreateMessage finalTemplateConfiguration)
                       sayLn $ projectCreated dst
@@ -152,7 +149,7 @@ updateProject projectConfiguration unattended = do
                                           mergeBranch project
                                                       c
                                                       (const (return ()))
-                                          commit
+                                          _ <- commit
                                               project
                                               (commitUpdateMergeMessage
                                                   finalTemplateConfiguration
@@ -220,17 +217,16 @@ loadExistingProjectConfiguration projectPath =
         logInfo
             $   "Loading template configuration from"
             <+> pretty templateYamlFile
-        templateYamlContent    <- getWorkingCopyFile project templateYamlFile
-        previousTemplateCommit <- findCommitByMessage project
-                                                      commitMessagePattern
+        templateYamlContent <- getWorkingCopyFile project templateYamlFile
+        previousCommit <- findCommitByMessage project commitMessagePattern
         previousCommitMessage <- traverse (getCommitMessage project)
-                                          previousTemplateCommit
+                                          previousCommit
         let yaml = templateYamlContent >>= (rightToMaybe . parseTemplateYaml)
         return PreliminaryProjectConfiguration
             { preSelectedTemplate       = extractTemplateName
                                               =<< previousCommitMessage
             , preTargetDirectory        = Just projectPath
-            , prePreviousTemplateCommit = previousTemplateCommit
+            , prePreviousTemplateCommit = previousCommit
             , preSelectedBranches       = fmap features yaml
             , preVariableValues         = fmap
                                               ( Map.fromList
@@ -248,7 +244,7 @@ prepareTemplate
     -> m TemplateYaml
 prepareTemplate repository template configuration =
     let
-        resolve descriptor []        = return ()
+        resolve _          []        = return ()
         resolve descriptor conflicts = if templateYamlFile `elem` conflicts
             then
                 writeAddFile repository
@@ -267,7 +263,7 @@ prepareTemplate repository template configuration =
         mergeTemplateBranch a b = do
             let d = ((<>) a . templateYaml) b
             mergeBranch repository ("origin/" <> branchName b) (resolve d)
-            commit repository ("Merge " <> branchName b)
+            _ <- commit repository ("Merge " <> branchName b)
             return d
         branchesToMerge =
             reorderBranches $ includeMergeBranches template $ projectBranches
@@ -320,11 +316,6 @@ generateTemplateGraph template =
         templateInformation <- loadTemplateInformation template repo
         let nodeAttributes branch =
                 [("label", T.unpack (branchName branch)), ("shape", "box")]
-        let nodeParents branch =
-                Set.toList
-                    . Set.delete (branchName branch)
-                    . requiredBranches
-                    $ branch
         let relevantBranches = filter
                 (\b -> isBaseBranch b || isFeatureBranch b)
                 (branchesInformation templateInformation)
@@ -514,15 +505,13 @@ runTemplateChange template interactive unattended changeMode f =
                                 getCurrentHead repo
                             else return src
             confirmCommit refspec@(DeleteBranch _) = return refspec
-            confirmCommit refspec@CreateBranch { sourceCommit = src, destinationRef = dst }
-                = confirmUpdate src dst
-                    <&> \src -> CreateBranch { sourceCommit   = src
-                                             , destinationRef = dst
-                                             }
+            confirmCommit CreateBranch { sourceCommit = src, destinationRef = dst }
+                = confirmUpdate src dst <&> \c ->
+                    CreateBranch { sourceCommit = c, destinationRef = dst }
 
-            confirmCommit refspec@UpdateBranch { sourceCommit = src, destinationRef = dst, pullRequestRef = prRef, pullRequestTitle = title }
-                = confirmUpdate src dst <&> \src -> UpdateBranch
-                    { sourceCommit     = src
+            confirmCommit UpdateBranch { sourceCommit = src, destinationRef = dst, pullRequestRef = prRef, pullRequestTitle = title }
+                = confirmUpdate src dst <&> \c -> UpdateBranch
+                    { sourceCommit     = c
                     , destinationRef   = dst
                     , pullRequestRef   = prRef
                     , pullRequestTitle = title
@@ -563,12 +552,12 @@ runTemplateChange template interactive unattended changeMode f =
         if null changes
             then sayLn noRelevantTemplateChanges
             else do
-                let collectPushRefs DeleteBranch { destinationRef = r } (deletes, creates, updates)
-                        = (r : deletes, creates, updates)
-                    collectPushRefs CreateBranch { destinationRef = r } (deletes, creates, updates)
-                        = (deletes, r : creates, updates)
-                    collectPushRefs UpdateBranch { destinationRef = r } (deletes, creates, updates)
-                        = (deletes, creates, r : updates)
+                let collectPushRefs DeleteBranch { destinationRef = r } (d, c, u)
+                        = (r : d, c, u)
+                    collectPushRefs CreateBranch { destinationRef = r } (d, c, u)
+                        = (d, r : c, u)
+                    collectPushRefs UpdateBranch { destinationRef = r } (d, c, u)
+                        = (d, c, r : u)
                     (deletes, creates, updates) =
                         foldr collectPushRefs ([], [], []) changes
                 shouldPush <- if unattended

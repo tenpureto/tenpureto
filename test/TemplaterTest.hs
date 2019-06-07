@@ -21,13 +21,13 @@ test_translateFile = discardLogging $ do
         , templaterToVariables   = InsOrdHashMap.singleton "A" "xxx-yyy"
         , templaterExcludes      = Set.empty
         }
-    let move = first show . translateFile settings
+    let mv = first show . translateFile settings
     return
         [ testCase "should replace in file name"
-        $   move [relfile|a-bbb-ccc-ddd-e.txt|]
+        $   mv [relfile|a-bbb-ccc-ddd-e.txt|]
         @?= Right [relfile|a-xxx-yyy-e.txt|]
         , testCase "should replace in path"
-        $   move [relfile|a/bbb/ccc/ddd/e/f.txt|]
+        $   mv [relfile|a/bbb/ccc/ddd/e/f.txt|]
         @?= Right [relfile|a/xxx/yyy/e/f.txt|]
         ]
 

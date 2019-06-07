@@ -4,8 +4,6 @@ module Tenpureto.TemplateLoaderTest where
 
 import           Test.Tasty
 import           Test.Tasty.HUnit
-import           Test.SmallCheck
-import           Test.SmallCheck.Series
 
 import qualified Data.Set                      as Set
 
@@ -59,8 +57,6 @@ test_getBranchParents =
     a = baseBranch "a"
     b = childBranch "b" [a]
     c = childBranch "c" [b]
-    d = childBranch "d" [a]
-    e = mergeBranch "e" [b, d]
     f = renamedBranch "f" b
     g = anonymousBranch "g" []
 

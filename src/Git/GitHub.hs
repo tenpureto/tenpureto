@@ -6,10 +6,8 @@ module Git.GitHub where
 import           Data.List.NonEmpty             ( NonEmpty(..) )
 import           Data.Maybe
 import           Data.List
-import qualified Data.ByteString               as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
-import qualified Data.Text.Encoding            as E
 import           Data.Aeson                     ( FromJSON
                                                 , ToJSON
                                                 , (.=)
@@ -19,19 +17,14 @@ import           Data.Aeson                     ( FromJSON
                                                 )
 import qualified Data.Aeson                    as Aeson
 import           Data.ByteString.Lazy           ( ByteString )
-import           Data.Functor
 import           Control.Monad.IO.Class
 import           Control.Monad.Catch
 
-import           System.Environment
 import           System.Exit
 import           Path
 
-import           Git                            ( RepositoryUrl(..)
-                                                , GitRepository(..)
+import           Git                            ( GitRepository(..)
                                                 , Committish(..)
-                                                , PushSpec
-                                                , BranchRef(..)
                                                 , PullRequestSettings(..)
                                                 )
 import           Logging
@@ -54,9 +47,11 @@ data PullRequest = PullRequest { pullRequestNumber :: Int, pullRequestAssignees 
 
 instance FromJSON PullRequestAssignee where
     parseJSON (Aeson.Object v) = PullRequestAssignee <$> v .: "login"
+    parseJSON _                = fail "Invalid pull request assignee response"
 
 instance FromJSON PullRequestLabel where
     parseJSON (Aeson.Object v) = PullRequestLabel <$> v .: "name"
+    parseJSON _                = fail "Invalid pull request label response"
 
 instance FromJSON PullRequest where
     parseJSON (Aeson.Object v) =
@@ -75,7 +70,7 @@ data ReferenceInputPayload = ReferenceInputPayload { referenceSha :: Text, refer
 
 instance ToJSON ReferenceInputPayload where
     toJSON ReferenceInputPayload { referenceSha = sha, referenceRef = ref } =
-        Aeson.object $ ["sha" .= sha] ++ catMaybes [fmap ("ref" .=) ref]
+        Aeson.object $ ("sha" .= sha) : catMaybes [fmap ("ref" .=) ref]
 
 data PullRequestInputPayload = PullRequestInputPayload { pullRequestHead :: Text, pullRequestBase :: Text, pullRequestTitle :: Maybe Text }
 
@@ -130,14 +125,14 @@ createOrUpdateReference
     -> Text
     -> m ()
 createOrUpdateReference repo (Committish c) reference = do
-    (exitCode, stdout, stderr) <- hubApiCmd
+    (code, _, stderr) <- hubApiCmd
         repo
         ApiPost
         "/repos/{owner}/{repo}/git/refs"
         ReferenceInputPayload { referenceSha = c
                               , referenceRef = Just ("refs/heads/" <> reference)
                               }
-    case exitCode of
+    case code of
         ExitSuccess -> return ()
         ExitFailure 22 ->
             hubApiCmd
@@ -171,7 +166,7 @@ createOrUpdatePullRequest repo settings (Committish c) title source target = do
         >>= stdoutOrThrow
         >>= parseApiResponse
     pullRequest <- case exitingPullRequests of
-        [pullRequest] -> return pullRequest
+        pullRequest : _ -> return pullRequest
         [] ->
             hubApiCmd
                     repo

@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -33,9 +34,9 @@ initPrintToTerminal False = return $ const (return ())
 initPrintToTerminal True  = printToTerminal . fmap TS.width <$> TS.size
 
 printToTerminal :: Maybe Int -> LogMessage -> IO ()
-printToTerminal width message =
-    let layoutOptions = LayoutOptions
-            (maybe Unbounded (flip AvailablePerLine 1.0) width)
+printToTerminal w message =
+    let layoutOptions =
+                LayoutOptions (maybe Unbounded (flip AvailablePerLine 1.0) w)
         text        = discardSeverity message <> "\n"
         style       = color Black
         reannotated = reAnnotate (const mempty) text

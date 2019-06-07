@@ -22,7 +22,6 @@ import           Data.Yaml                      ( FromJSON(..)
                                                 , (.!=)
                                                 , (.=)
                                                 )
-import           Data.Foldable
 import           Data.Bifunctor
 
 import           Control.Monad.Catch
@@ -162,24 +161,21 @@ getBranchChildren template branch =
 getTemplateBranches
     :: [BranchFilter] -> TemplateInformation -> [TemplateBranchInformation]
 getTemplateBranches [] ti = branchesInformation ti
-getTemplateBranches (head : tail) ti =
-    filter (applyBranchFilter head ti) $ getTemplateBranches tail ti
-  where
-    applyBranchFilter
-        :: BranchFilter
-        -> TemplateInformation
-        -> TemplateBranchInformation
-        -> Bool
-    applyBranchFilter (BranchFilterChildOf parentBranch) ti =
-        let parentNames = maybe Set.empty
-                                (getBranchChildren ti)
-                                (findTemplateBranch ti parentBranch)
-        in  \b -> Set.member (branchName b) parentNames
-    applyBranchFilter (BranchFilterParentOf childBranch) ti =
-        let parentNames = maybe Set.empty
-                                (getBranchParents ti)
-                                (findTemplateBranch ti childBranch)
-        in  \b -> Set.member (branchName b) parentNames
+getTemplateBranches (h : t) ti =
+    filter (applyBranchFilter h ti) $ getTemplateBranches t ti
+
+applyBranchFilter
+    :: BranchFilter -> TemplateInformation -> TemplateBranchInformation -> Bool
+applyBranchFilter (BranchFilterChildOf parentBranch) ti =
+    let parentNames = maybe Set.empty
+                            (getBranchChildren ti)
+                            (findTemplateBranch ti parentBranch)
+    in  \b -> Set.member (branchName b) parentNames
+applyBranchFilter (BranchFilterParentOf childBranch) ti =
+    let parentNames = maybe Set.empty
+                            (getBranchParents ti)
+                            (findTemplateBranch ti childBranch)
+    in  \b -> Set.member (branchName b) parentNames
 
 instance Pretty TemplateBranchInformation where
     pretty cfg = (align . vsep)

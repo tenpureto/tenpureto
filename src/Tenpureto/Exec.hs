@@ -37,13 +37,13 @@ decodeUtf8 = E.decodeUtf8 . BS.toStrict
 
 stdoutOrThrow
     :: MonadThrow m => (ExitCode, ByteString, ByteString) -> m ByteString
-stdoutOrThrow (ExitSuccess, out, err) = return out
-stdoutOrThrow (ExitFailure code, out, err) =
+stdoutOrThrow (ExitSuccess, out, _) = return out
+stdoutOrThrow (ExitFailure code, _, err) =
     throwM $ ExecException code (decodeUtf8 err)
 
 maybeStdout :: (ExitCode, ByteString, ByteString) -> Maybe ByteString
-maybeStdout (ExitSuccess     , out, err) = Just out
-maybeStdout (ExitFailure code, out, err) = Nothing
+maybeStdout (ExitSuccess  , out, _) = Just out
+maybeStdout (ExitFailure _, _  , _) = Nothing
 
 unitOrThrow :: MonadThrow m => (ExitCode, ByteString, ByteString) -> m ()
 unitOrThrow a = void (stdoutOrThrow a)
@@ -59,10 +59,10 @@ runCmd
 runCmd (cmd :| args) = do
     logInfo $ "Running" <+> pretty cmd <+> fillSep (map pretty args)
     let process = setStdin closed $ proc (T.unpack cmd) (map T.unpack args)
-    (exitCode, out, err) <- liftIO $ readProcess process
+    (code, out, err) <- liftIO $ readProcess process
     logDebug $ prefixed "err> " (decodeUtf8 err)
     logDebug $ prefixed "out> " (decodeUtf8 out)
-    return (exitCode, out, err)
+    return (code, out, err)
 
 runInteractiveCmd
     :: (MonadIO m, MonadThrow m, MonadLog m) => NonEmpty Text -> m ExitCode
@@ -85,7 +85,7 @@ runInputCmd (cmd :| args) input = do
     logDebug $ prefixed "in> " (decodeUtf8 input)
     let process = setStdin (byteStringInput input)
             $ proc (T.unpack cmd) (map T.unpack args)
-    (exitCode, out, err) <- liftIO $ readProcess process
+    (code, out, err) <- liftIO $ readProcess process
     logDebug $ prefixed "err> " (decodeUtf8 err)
     logDebug $ prefixed "out> " (decodeUtf8 out)
-    return (exitCode, out, err)
+    return (code, out, err)
