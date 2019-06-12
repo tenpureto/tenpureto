@@ -7,6 +7,7 @@ import           Data.Graph
 import           Tenpureto.TemplateLoader       ( TemplateInformation
                                                 , TemplateBranchInformation(..)
                                                 , managedBranches
+                                                , isMergeOf
                                                 )
 
 reorderBranches :: [TemplateBranchInformation] -> [TemplateBranchInformation]
@@ -25,7 +26,6 @@ includeMergeBranches template branches =
     let
         allBranches  = managedBranches template
         mergeOptions = filter ((<) 1 . length) (subsequences branches)
-        isMergeOf bi bis = foldMap requiredBranches bis == requiredBranches bi
         isMerge bi = any (isMergeOf bi) mergeOptions
     in
         nub $ branches ++ filter isMerge allBranches

@@ -105,18 +105,17 @@ isBaseBranch b = requiredBranches b == Set.singleton (branchName b)
 isFeatureBranch :: TemplateBranchInformation -> Bool
 isFeatureBranch b = branchName b `Set.member` requiredBranches b
 
-isMergeOf
-    :: TemplateBranchInformation
-    -> (TemplateBranchInformation, TemplateBranchInformation)
-    -> Bool
-isMergeOf b (x, y) =
-    (requiredBranches b == requiredBranches x <> requiredBranches y)
-        && (requiredBranches b /= requiredBranches x)
-        && (requiredBranches b /= requiredBranches y)
+isMergeOf :: TemplateBranchInformation -> [TemplateBranchInformation] -> Bool
+isMergeOf bi bis =
+    foldMap requiredBranches bis
+        == requiredBranches bi
+        && all ((/=) (requiredBranches bi) . requiredBranches) bis
 
 isMergeBranch :: TemplateInformation -> TemplateBranchInformation -> Bool
-isMergeBranch t b = any (isMergeOf b) [ (x, y) | x <- fb, y <- fb, x /= y ]
-    where fb = filter isFeatureBranch (branchesInformation t)
+isMergeBranch t b = any (isMergeOf b) mergeOptions
+    where
+        fb = filter isFeatureBranch (branchesInformation t)
+        mergeOptions = filter ((<) 1 . length) (subsequences fb)
 
 managedBranches :: TemplateInformation -> [TemplateBranchInformation]
 managedBranches t = filter (\b -> isFeatureBranch b || isMergeBranch t b)

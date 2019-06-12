@@ -34,6 +34,12 @@ test_includeMergeBranches =
                 [a, b, c]
             )
         @?= (branchName <$> [a, b, c, z])
+    , testCase "should include merges of three base branches"
+        $   (branchName <$> includeMergeBranches
+                (TemplateInformation [a, b, c, q])
+                [a, b, c]
+            )
+        @?= (branchName <$> [a, b, c, q])
     , testCase "should not include merges with additional data"
         $   (branchName <$> includeMergeBranches
                 (TemplateInformation [a, b, c, y])
@@ -54,3 +60,4 @@ test_includeMergeBranches =
     z = mergeBranch "z" [a, b]
     y = childBranch "y" [a, b]
     x = renamedBranch "x" a
+    q = mergeBranch "q" [a, b, c]
