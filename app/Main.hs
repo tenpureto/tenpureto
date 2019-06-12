@@ -93,7 +93,7 @@ data Command
             , enableInteractivity :: Bool
             , enableDebugLogging :: Bool
             }
-    | TemplatePropagateBranchChanges
+    | TemplatePropagateChanges
             { templateName :: Text
             , branchName :: Text
             , remoteChangeMode :: RemoteChangeMode
@@ -244,9 +244,9 @@ renameBranchCommand =
         <*> interactiveSwitch
         <*> debugSwitch
 
-propagateBranchChanges :: Parser Command
-propagateBranchChanges =
-    TemplatePropagateBranchChanges
+propagateChanges :: Parser Command
+propagateChanges =
+    TemplatePropagateChanges
         <$> templateNameOption
         <*> branchNameOption
         <*> remoteChangeModeOptionSet
@@ -283,8 +283,8 @@ templateCommands = hsubparser
            "rename-branch"
            (info renameBranchCommand (progDesc "Rename a template branch"))
     <> command
-           "propagate-branch-changes"
-           (info propagateBranchChanges
+           "propagate-changes"
+           (info propagateChanges
                  (progDesc "Merge a template branch into child branches")
            )
     )
@@ -320,7 +320,7 @@ run TemplateListBranches { templateName = t, branchFilters = bfs, enableDebugLog
     = runAppM d $ listTemplateBranches t bfs
 run TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d $ renameTemplateBranch t on nn i
-run TemplatePropagateBranchChanges { templateName = t, branchName = b, remoteChangeMode = cm, runUnattended = u, enableDebugLogging = d }
+run TemplatePropagateChanges { templateName = t, branchName = b, remoteChangeMode = cm, runUnattended = u, enableDebugLogging = d }
     = runAppM d $ propagateTemplateBranchChanges t b cm u
 run TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d $ changeTemplateVariableValue t ov nv i

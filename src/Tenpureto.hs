@@ -410,21 +410,27 @@ propagateTemplateBranchChanges template sourceBranch pushMode unattended =
         let childBranches = getTemplateBranches
                 [BranchFilterChildOf sourceBranch]
                 templateInformation
+        let parentBranches = getTemplateBranches
+                [BranchFilterParentOf sourceBranch]
+                templateInformation
         let prBranch bi = branchName branch <> "/" <> branchName bi
-        let keepNeedsMerge bi =
-                gitDiffHasCommits repo (branchCommit branch) (branchCommit bi)
-                    <&> \needs -> if needs then Just bi else Nothing
+        let keepNeedsMerge src dst =
+                gitDiffHasCommits repo (branchCommit src) (branchCommit dst)
+                    <&> \needs -> if needs then Just (src, dst) else Nothing
         let
-            refspec bi = UpdateBranch
-                { sourceCommit     = branchCommit branch
-                , destinationRef   = BranchRef $ branchName bi
-                , pullRequestRef   = BranchRef $ prBranch bi
+            pushspec (src, dst) = UpdateBranch
+                { sourceCommit     = branchCommit src
+                , destinationRef   = BranchRef $ branchName dst
+                , pullRequestRef   = BranchRef $ prBranch dst
                 , pullRequestTitle = pullRequestBranchIntoBranchTitle
-                                         sourceBranch
-                                         (branchName bi)
+                                         (branchName src)
+                                         (branchName dst)
                 }
-        needsMerge <- catMaybes <$> traverse keepNeedsMerge childBranches
-        return $ fmap refspec needsMerge
+        mergesToChildren <-
+            catMaybes <$> traverse (keepNeedsMerge branch) childBranches
+        mergesFromParents <-
+            catMaybes <$> traverse (flip keepNeedsMerge branch) parentBranches
+        return $ fmap pushspec (mergesFromParents <> mergesToChildren)
 
 changeTemplateVariableValue
     :: ( MonadIO m
