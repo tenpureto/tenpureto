@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Tenpureto.TemplateLoaderTest where
 
 import           Test.Tasty

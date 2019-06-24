@@ -1,9 +1,12 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE DeriveAnyClass #-}
+module Tenpureto
+    ( module Tenpureto
+    , TenpuretoException(..)
+    )
+where
 
-module Tenpureto where
+import           Polysemy
+import           Polysemy.Error
+import           Polysemy.Resource
 
 import           Data.List
 import           Data.Maybe
@@ -16,65 +19,44 @@ import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
-import           Control.Monad.IO.Class
-import           Control.Monad.Catch
 import qualified Data.Text.ICU                 as ICU
 import           Data.Functor
-import           Path
-import           Path.IO
-import           System.Process.Typed
 import           Text.Dot
 
-import           Data
-import           Git
-import           Console
-import           UI
-import           Logging
-import           Templater
+import           Tenpureto.Data
 import           Tenpureto.Messages
+import           Tenpureto.Effects.Logging
+import           Tenpureto.Effects.Terminal
+import           Tenpureto.Effects.FileSystem
+import           Tenpureto.Effects.Process
+import           Tenpureto.Effects.Git
+import           Tenpureto.Effects.UI
 import           Tenpureto.TemplateLoader
 import           Tenpureto.MergeOptimizer
-
-data TenpuretoException = InvalidTemplateBranchException Text Text
-                        | CancelledException
-                        | TenpuretoException Text
-                        | MultipleExceptions [SomeException]
-                        deriving (Exception)
-
-instance Show TenpuretoException where
-    show (InvalidTemplateBranchException branch reason) =
-        T.unpack $ "Branch \"" <> branch <> "\" is not valid: " <> reason
-    show CancelledException           = "Cancelled"
-    show (TenpuretoException message) = T.unpack message
-    show (MultipleExceptions errors ) = show (map show errors)
+import           Tenpureto.Templater
+import           Tenpureto.Internal
 
 data RemoteChangeMode = PushDirectly
                       | UpstreamPullRequest { pullRequestSettings :: PullRequestSettings }
 
 makeFinalTemplateConfiguration
-    :: (MonadMask m, MonadIO m, MonadConsole m)
-    => Bool
-    -> PreliminaryProjectConfiguration
-    -> m FinalTemplateConfiguration
-makeFinalTemplateConfiguration True  = unattendedTemplateConfiguration
-makeFinalTemplateConfiguration False = inputTemplateConfiguration
+    :: Member UI r
+    => PreliminaryProjectConfiguration
+    -> Sem r FinalTemplateConfiguration
+makeFinalTemplateConfiguration = inputTemplateConfiguration
 
 makeFinalProjectConfiguration
-    :: (MonadMask m, MonadIO m, MonadConsole m)
-    => Bool
-    -> TemplateInformation
+    :: Member UI r
+    => TemplateInformation
     -> PreliminaryProjectConfiguration
-    -> m FinalProjectConfiguration
-makeFinalProjectConfiguration True  = unattendedProjectConfiguration
-makeFinalProjectConfiguration False = inputProjectConfiguration
+    -> Sem r FinalProjectConfiguration
+makeFinalProjectConfiguration = inputProjectConfiguration
 
 makeFinalUpdateConfiguration
-    :: (MonadMask m, MonadIO m, MonadConsole m)
-    => Bool
-    -> PreliminaryProjectConfiguration
-    -> m FinalUpdateConfiguration
-makeFinalUpdateConfiguration True  = unattendedUpdateConfiguration
-makeFinalUpdateConfiguration False = inputUpdateConfiguration
+    :: Member UI r
+    => PreliminaryProjectConfiguration
+    -> Sem r FinalUpdateConfiguration
+makeFinalUpdateConfiguration = inputUpdateConfiguration
 
 buildTemplaterSettings
     :: TemplateYaml -> FinalProjectConfiguration -> TemplaterSettings
@@ -86,17 +68,18 @@ buildTemplaterSettings TemplateYaml { variables = templateValues, excludes = tem
         }
 
 createProject
-    :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
+    :: Members
+           '[Git, UI, FileSystem, Terminal, Logging, Resource, Error
+               TenpuretoException]
+           r
     => PreliminaryProjectConfiguration
-    -> Bool
-    -> m ()
-createProject projectConfiguration unattended =
-    withPreparedTemplate projectConfiguration unattended
+    -> Sem r ()
+createProject projectConfiguration =
+    withPreparedTemplate projectConfiguration
         $ \template finalTemplateConfiguration templaterSettings ->
               let dst = targetDirectory finalTemplateConfiguration
               in
                   do
-                      createDir dst
                       project          <- initRepository dst
                       compiledSettings <- compileSettings templaterSettings
                       files            <- copy compiledSettings
@@ -109,19 +92,20 @@ createProject projectConfiguration unattended =
                       sayLn $ projectCreated dst
 
 updateProject
-    :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
+    :: Members
+           '[Git, UI, Terminal, FileSystem, Logging, Resource, Error
+               TenpuretoException]
+           r
     => PreliminaryProjectConfiguration
-    -> Bool
-    -> m ()
-updateProject projectConfiguration unattended = do
+    -> Sem r ()
+updateProject projectConfiguration = do
     finalUpdateConfiguration <- makeFinalUpdateConfiguration
-        unattended
         projectConfiguration
     logDebug
         $  "Final update configuration"
         <> line
         <> (indent 4 . pretty) finalUpdateConfiguration
-    withPreparedTemplate projectConfiguration unattended
+    withPreparedTemplate projectConfiguration
         $ \template finalTemplateConfiguration templaterSettings ->
               withRepository (targetDirectory finalTemplateConfiguration)
                   $ \project ->
@@ -146,41 +130,51 @@ updateProject projectConfiguration unattended = do
                                           logInfo
                                               $   "Updated template commit:"
                                               <+> pretty c
-                                          mergeBranch project
-                                                      c
-                                                      (const (return ()))
-                                          _ <- commit
-                                              project
-                                              (commitUpdateMergeMessage
-                                                  finalTemplateConfiguration
-                                              )
-                                          sayLn $ projectUpdated
-                                              (repositoryPath project)
+                                          mergeResult <- mergeBranch project c
+                                          case mergeResult of
+                                              MergeSuccess -> do
+                                                  _ <- commit
+                                                      project
+                                                      (commitUpdateMergeMessage
+                                                          finalTemplateConfiguration
+                                                      )
+                                                  sayLn
+                                                      $ projectUpdated
+                                                            (repositoryPath
+                                                                project
+                                                            )
+                                              MergeConflicts _ ->
+                                                  sayLn
+                                                      $ projectUpdatedWithConflicts
+                                                            (repositoryPath
+                                                                project
+                                                            )
                                       Nothing ->
                                           sayLn noRelevantTemplateChanges
 
 withPreparedTemplate
-    :: (MonadIO m, MonadMask m, MonadGit m, MonadConsole m, MonadLog m)
+    :: Members
+           '[Git, UI, Terminal, Logging, FileSystem, Resource, Error
+               TenpuretoException]
+           r
     => PreliminaryProjectConfiguration
-    -> Bool
     -> (  GitRepository
        -> FinalTemplateConfiguration
        -> TemplaterSettings
-       -> m ()
+       -> Sem r ()
        )
-    -> m ()
-withPreparedTemplate projectConfiguration unattended block = do
+    -> Sem r ()
+withPreparedTemplate projectConfiguration block = do
     logDebug
         $  "Preliminary project configuration:"
         <> line
         <> (indent 4 . pretty) projectConfiguration
     finalTemplateConfiguration <- makeFinalTemplateConfiguration
-        unattended
         projectConfiguration
     withClonedRepository
             (buildRepositoryUrl $ selectedTemplate finalTemplateConfiguration)
         $ \repository -> do
-              templateInformation <- loadTemplateInformation
+              templateInformation <- loadTemplateInformation'
                   (selectedTemplate finalTemplateConfiguration)
                   repository
               logDebug
@@ -188,7 +182,6 @@ withPreparedTemplate projectConfiguration unattended block = do
                   <> line
                   <> (indent 4 . pretty) templateInformation
               finalProjectConfiguration <- makeFinalProjectConfiguration
-                  unattended
                   templateInformation
                   projectConfiguration
               logDebug
@@ -209,9 +202,9 @@ withPreparedTemplate projectConfiguration unattended block = do
               block repository finalTemplateConfiguration templaterSettings
 
 loadExistingProjectConfiguration
-    :: (MonadGit m, MonadLog m)
+    :: Members '[Git, Logging] r
     => Path Abs Dir
-    -> m PreliminaryProjectConfiguration
+    -> Sem r PreliminaryProjectConfiguration
 loadExistingProjectConfiguration projectPath =
     withRepository projectPath $ \project -> do
         logInfo
@@ -237,11 +230,11 @@ loadExistingProjectConfiguration projectPath =
             }
 
 prepareTemplate
-    :: (MonadIO m, MonadThrow m, MonadGit m, MonadConsole m, MonadLog m)
+    :: Members '[Git, UI, Terminal, Logging, Error TenpuretoException] r
     => GitRepository
     -> TemplateInformation
     -> FinalProjectConfiguration
-    -> m TemplateYaml
+    -> Sem r TemplateYaml
 prepareTemplate repository template configuration =
     let
         resolve _          []        = return ()
@@ -262,7 +255,10 @@ prepareTemplate repository template configuration =
             return $ templateYaml a
         mergeTemplateBranch a b = do
             let d = ((<>) a . templateYaml) b
-            mergeBranch repository ("origin/" <> branchName b) (resolve d)
+            mergeResult <- mergeBranch repository ("origin/" <> branchName b)
+            case mergeResult of
+                MergeSuccess             -> return ()
+                MergeConflicts conflicts -> resolve d conflicts
             _ <- commit repository ("Merge " <> branchName b)
             return d
         branchesToMerge =
@@ -270,9 +266,7 @@ prepareTemplate repository template configuration =
                 configuration
     in
         case branchesToMerge of
-            [] ->
-                throwM $ TenpuretoException
-                    "Cannot create a project from an empty selection"
+            []    -> throw TenpuretoEmptySelection
             h : t -> do
                 logInfo $ "Merging branches:" <> line <> (indent 4 . pretty)
                     (fmap branchName branchesToMerge)
@@ -298,22 +292,24 @@ replaceVariableInYaml old new descriptor = TemplateYaml
     , excludes  = excludes descriptor
     }
 
-commit_ :: (MonadThrow m, MonadGit m) => GitRepository -> Text -> m Committish
+commit_
+    :: Members '[Git, Error TenpuretoException] r
+    => GitRepository
+    -> Text
+    -> Sem r Committish
 commit_ repo message =
-    commit repo message
-        >>= maybe
-                (throwM $ TenpuretoException
-                    "Failed to create a rename commit: empty changeset"
-                )
-                return
+    commit repo message >>= maybe (throw TenpuretoEmptyChangeset) return
 
 generateTemplateGraph
-    :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    :: Members
+           '[Git, Terminal, FileSystem, Logging, Resource, Error
+               TenpuretoException]
+           r
     => Text
-    -> m ()
+    -> Sem r ()
 generateTemplateGraph template =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
-        templateInformation <- loadTemplateInformation template repo
+        templateInformation <- loadTemplateInformation' template repo
         let nodeAttributes branch =
                 [("label", T.unpack (branchName branch)), ("shape", "box")]
         let relevantBranches = filter
@@ -328,35 +324,35 @@ generateTemplateGraph template =
                         nodes
                     *> attribute ("layout", "dot")
                     *> attribute ("rankdir", "LR")
-        liftIO $ putStrLn (showDot graph)
+        sayLn $ pretty (showDot graph)
 
 listTemplateBranches
-    :: (MonadIO m, MonadMask m, MonadGit m, MonadLog m, MonadConsole m)
+    :: Members
+           '[Git, Terminal, FileSystem, Logging, Resource, Error
+               TenpuretoException]
+           r
     => Text
     -> [BranchFilter]
-    -> m ()
+    -> Sem r ()
 listTemplateBranches template branchFilters =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
-        templateInformation <- loadTemplateInformation template repo
+        templateInformation <- loadTemplateInformation' template repo
         let branches = getTemplateBranches branchFilters templateInformation
-        liftIO $ traverse_ (putStrLn . T.unpack . branchName) branches
+        traverse_ (sayLn . pretty . branchName) branches
 
 renameTemplateBranch
-    :: ( MonadIO m
-       , MonadMask m
-       , MonadGit m
-       , MonadGitServer m
-       , MonadLog m
-       , MonadConsole m
-       )
+    :: Members
+           '[Git, GitServer, UI, Terminal, FileSystem, Process, Logging, Resource, Error
+               TenpuretoException]
+           r
     => Text
     -> Text
     -> Text
     -> Bool
-    -> m ()
+    -> Sem r ()
 renameTemplateBranch template oldBranch newBranch interactive =
-    runTemplateChange template interactive False PushDirectly $ \repo -> do
-        templateInformation <- loadTemplateInformation template repo
+    runTemplateChange template interactive PushDirectly $ \repo -> do
+        templateInformation <- loadTemplateInformation' template repo
         mainBranch          <- getTemplateBranch templateInformation oldBranch
         let bis = branchesInformation templateInformation
         let
@@ -391,21 +387,17 @@ renameTemplateBranch template oldBranch newBranch interactive =
         return $ deleteOld : pushNew : pushChildren
 
 propagateTemplateBranchChanges
-    :: ( MonadIO m
-       , MonadMask m
-       , MonadGit m
-       , MonadGitServer m
-       , MonadLog m
-       , MonadConsole m
-       )
+    :: Members
+           '[Git, GitServer, UI, Terminal, FileSystem, Process, Logging, Resource, Error
+               TenpuretoException]
+           r
     => Text
     -> Text
     -> RemoteChangeMode
-    -> Bool
-    -> m ()
-propagateTemplateBranchChanges template sourceBranch pushMode unattended =
-    runTemplateChange template False unattended pushMode $ \repo -> do
-        templateInformation <- loadTemplateInformation template repo
+    -> Sem r ()
+propagateTemplateBranchChanges template sourceBranch pushMode =
+    runTemplateChange template False pushMode $ \repo -> do
+        templateInformation <- loadTemplateInformation' template repo
         branch <- getTemplateBranch templateInformation sourceBranch
         let childBranches = getTemplateBranches
                 [BranchFilterChildOf sourceBranch]
@@ -433,21 +425,18 @@ propagateTemplateBranchChanges template sourceBranch pushMode unattended =
         return $ fmap pushspec (mergesFromParents <> mergesToChildren)
 
 changeTemplateVariableValue
-    :: ( MonadIO m
-       , MonadMask m
-       , MonadGit m
-       , MonadGitServer m
-       , MonadLog m
-       , MonadConsole m
-       )
+    :: Members
+           '[Git, GitServer, UI, Terminal, FileSystem, Process, Logging, Resource, Error
+               TenpuretoException]
+           r
     => Text
     -> Text
     -> Text
     -> Bool
-    -> m ()
+    -> Sem r ()
 changeTemplateVariableValue template oldValue newValue interactive =
-    runTemplateChange template interactive False PushDirectly $ \repo -> do
-        bis <- branchesInformation <$> loadTemplateInformation template repo
+    runTemplateChange template interactive PushDirectly $ \repo -> do
+        bis <- branchesInformation <$> loadTemplateInformation' template repo
         templaterSettings <- compileSettings $ TemplaterSettings
             { templaterFromVariables = InsOrdHashMap.singleton "Variable"
                                                                oldValue
@@ -479,20 +468,16 @@ changeTemplateVariableValue template oldValue newValue interactive =
         traverse changeOnBranch branches
 
 runTemplateChange
-    :: ( MonadIO m
-       , MonadMask m
-       , MonadGit m
-       , MonadGitServer m
-       , MonadLog m
-       , MonadConsole m
-       )
+    :: Members
+           '[Git, GitServer, UI, Terminal, Process, FileSystem, Logging, Resource, Error
+               TenpuretoException]
+           r
     => Text
     -> Bool
-    -> Bool
     -> RemoteChangeMode
-    -> (GitRepository -> m [PushSpec])
-    -> m ()
-runTemplateChange template interactive unattended changeMode f =
+    -> (GitRepository -> Sem r [PushSpec])
+    -> Sem r ()
+runTemplateChange template interactive changeMode f =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
         let confirmUpdate src (BranchRef ref) = do
                 msg <- changesForBranchMessage ref <$> gitLogDiff
@@ -503,8 +488,7 @@ runTemplateChange template interactive unattended changeMode f =
                 if not interactive
                     then return src
                     else do
-                        shouldRunShell <- confirm confirmShellToAmendMessage
-                                                  (Just False)
+                        shouldRunShell <- confirmShellToAmend
                         if shouldRunShell
                             then do
                                 runShell (repositoryPath repo)
@@ -524,36 +508,24 @@ runTemplateChange template interactive unattended changeMode f =
                     }
         let pullRequest _ (DeleteBranch (BranchRef dst)) = do
                 sayLn $ deleteBranchManually dst
-                return
-                    $  Left
-                    $  SomeException
-                    $  TenpuretoException
-                    $  "Branch "
-                    <> dst
-                    <> " not deleted."
+                return $ Left $ TenpuretoBranchNotDeleted dst
             pullRequest _ (CreateBranch _ (BranchRef dst)) = do
                 sayLn $ createBranchManually dst
-                return
-                    $  Left
-                    $  SomeException
-                    $  TenpuretoException
-                    $  "Branch "
-                    <> dst
-                    <> " not created."
+                return $ Left $ TenpuretoBranchNotCreated dst
             pullRequest settings UpdateBranch { sourceCommit = c, destinationRef = BranchRef dst, pullRequestRef = BranchRef src, pullRequestTitle = title }
-                = try $ createOrUpdatePullRequest repo
-                                                  settings
-                                                  c
-                                                  title
-                                                  ("tenpureto/" <> src)
-                                                  dst
+                = runError $ createOrUpdatePullRequest repo
+                                                       settings
+                                                       c
+                                                       title
+                                                       ("tenpureto/" <> src)
+                                                       dst
         let pushRefsToServer PushDirectly changes = pushRefs repo changes
             pushRefsToServer UpstreamPullRequest { pullRequestSettings = settings } changes
                 = do
                     errors <- lefts <$> traverse (pullRequest settings) changes
                     case errors of
                         [] -> return ()
-                        e  -> throwM $ MultipleExceptions e
+                        e  -> throw $ MultipleExceptions e
         changes <- f repo >>= traverse confirmCommit
         if null changes
             then sayLn noRelevantTemplateChanges
@@ -566,17 +538,10 @@ runTemplateChange template interactive unattended changeMode f =
                         = (d, c, r : u)
                     (deletes, creates, updates) =
                         foldr collectPushRefs ([], [], []) changes
-                shouldPush <- if unattended
-                    then return True
-                    else confirm
-                        (confirmPushMessage deletes creates updates)
-                        (Just False)
+                shouldPush <- confirmPush deletes creates updates
                 if shouldPush
                     then pushRefsToServer changeMode changes
-                    else throwM CancelledException
-
-runShell :: MonadIO m => Path Abs Dir -> m ()
-runShell dir = runProcess_ $ setWorkingDir (toFilePath dir) $ shell "$SHELL"
+                    else throw CancelledException
 
 commitMessagePattern :: Text
 commitMessagePattern = "^Template: .*$"
@@ -606,11 +571,11 @@ hasVariableValue value bi =
     value `elem` InsOrdHashMap.elems (branchVariables bi)
 
 getTemplateBranch
-    :: MonadThrow m
+    :: Member (Error TenpuretoException) r
     => TemplateInformation
     -> Text
-    -> m TemplateBranchInformation
+    -> Sem r TemplateBranchInformation
 getTemplateBranch templateInformation branch = maybe
-    (throwM $ InvalidTemplateBranchException branch "branch not found")
+    (throw $ TemplateBranchNotFoundException branch)
     return
     (findTemplateBranch templateInformation branch)

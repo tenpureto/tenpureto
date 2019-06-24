@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Tenpureto.MergeOptimizerTest where
 
 import           Test.Tasty

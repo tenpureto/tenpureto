@@ -1,67 +1,30 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Main where
+
+import           Polysemy
+import           Polysemy.Error
+import           Polysemy.Resource
 
 import           Options.Applicative
 import           Data.Semigroup                 ( (<>) )
 import           Data.Foldable
-import           Control.Monad.IO.Class
-import           Control.Monad.Catch
 import           Data.Maybe
 import           Data.Text                      ( Text )
 import           Data.Version
-import           Console
-import qualified Console.Terminal              as Terminal
-import           Git
-import qualified Git.Cli                       as GC
-import qualified Git.GitHub                    as GH
-import           Data
-import           Logging
-import           Tenpureto
+
+import           System.Exit
+
+import           Tenpureto.Data
+import           Tenpureto.Effects.Git
+import           Tenpureto.Effects.Logging
+import           Tenpureto.Effects.Terminal
+import           Tenpureto.Effects.FileSystem
+import           Tenpureto.Effects.Process
+import           Tenpureto.Effects.UI
 import           Tenpureto.TemplateLoader       ( BranchFilter(..) )
-import           UI                             ( resolveTargetDir )
+import           Tenpureto
+
 import           Paths_tenpureto                ( version )
 
-newtype AppM a = AppM { unAppM :: LoggingT IO a }
-    deriving (Functor, Applicative, Monad, MonadIO, MonadThrow, MonadCatch, MonadMask, MonadLog)
-
-runAppM :: Bool -> AppM a -> IO a
-runAppM withDebug app =
-    initPrintToTerminal withDebug >>= runLoggingT (unAppM app)
-
-instance MonadGit AppM where
-    withClonedRepository    = GC.withClonedRepository
-    withRepository          = GC.withRepository
-    withNewWorktree         = GC.withNewWorktree
-    initRepository          = GC.initRepository
-    listBranches            = GC.listBranches
-    checkoutBranch          = GC.checkoutBranch
-    mergeBranch             = GC.mergeBranch
-    runMergeTool            = GC.runMergeTool
-    getRepositoryFile       = GC.getRepositoryFile
-    getWorkingCopyFile      = GC.getWorkingCopyFile
-    writeAddFile            = GC.writeAddFile
-    addFiles                = GC.addFiles
-    commit                  = GC.commit
-    findCommitByRef         = GC.findCommitByRef
-    findCommitByMessage     = GC.findCommitByMessage
-    getCommitMessage        = GC.getCommitMessage
-    gitDiffHasCommits       = GC.gitDiffHasCommits
-    gitLogDiff              = GC.gitLogDiff
-    listFiles               = GC.listFiles
-    populateRerereFromMerge = GC.populateRerereFromMerge
-    getCurrentBranch        = GC.getCurrentBranch
-    getCurrentHead          = GC.getCurrentHead
-    renameCurrentBranch     = GC.renameCurrentBranch
-    pushRefs                = GC.pushRefs
-
-instance MonadGitServer AppM where
-    createOrUpdatePullRequest = GH.createOrUpdatePullRequest
-
-instance MonadConsole AppM where
-    ask      = Terminal.ask
-    askUntil = Terminal.askUntil
-    sayLn    = Terminal.sayLn
 
 data Command
     = Create
@@ -289,22 +252,63 @@ templateCommands = hsubparser
            )
     )
 
-run :: Command -> IO ()
-run Create { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
-    = runAppM d $ do
-        resolvedTd <- traverse resolveTargetDir td
-        createProject
-            PreliminaryProjectConfiguration
-                { preSelectedTemplate       = t
-                , preTargetDirectory        = resolvedTd
-                , prePreviousTemplateCommit = Nothing
-                , preSelectedBranches       = Nothing
-                , preVariableValues         = Nothing
-                }
-            u
-run Update { maybeTemplateName = t, maybeTargetDirectory = td, maybePreviousCommit = pc, runUnattended = u, enableDebugLogging = d }
-    = runAppM d $ do
-        resolvedTd    <- resolveTargetDir (fromMaybe "." td)
+runAppM
+    :: Bool
+    -> Bool
+    -> Sem
+           '[GitServer, Git, Process, Logging, UI, FileSystem, Error
+               UIException, Error GitException, Error TenpuretoException, TerminalInput, Terminal, Resource, Lift
+               IO]
+           ()
+    -> IO ()
+runAppM withDebug unattended =
+    (runM .@ runResourceInIO)
+        . runTerminalIO
+        . runTenpuretoException
+        . runError @TenpuretoException
+        . runErrorAsAnother TenpuretoGitException
+        . runErrorAsAnother TenpuretoUIException
+        . runFileSystemIO
+        . runUI unattended
+        . runLoggingTerminal (if withDebug then Debug else Silent)
+        . runProcessIO
+        . withProcessLogging
+        . runGit
+        . runGitHub
+
+runTenpuretoException
+    :: Members '[Lift IO, Terminal] r
+    => Sem r (Either TenpuretoException ())
+    -> Sem r ()
+runTenpuretoException = (=<<) handleResult
+  where
+    handleResult (Right ()) = return ()
+    handleResult (Left  e ) = do
+        sayLn $ pretty e
+        sendM $ exitWith (ExitFailure 1)
+
+runUI
+    :: Members '[FileSystem, Terminal, TerminalInput, Error UIException] r
+    => Bool
+    -> Sem (UI ': r) a
+    -> Sem r a
+runUI False = runUIInTerminal
+runUI True  = runUIUnattended
+
+runCommand :: Command -> IO ()
+runCommand Create { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
+    = runAppM d u $ do
+        resolvedTd <- traverse resolveDir td
+        createProject PreliminaryProjectConfiguration
+            { preSelectedTemplate       = t
+            , preTargetDirectory        = resolvedTd
+            , prePreviousTemplateCommit = Nothing
+            , preSelectedBranches       = Nothing
+            , preVariableValues         = Nothing
+            }
+runCommand Update { maybeTemplateName = t, maybeTargetDirectory = td, maybePreviousCommit = pc, runUnattended = u, enableDebugLogging = d }
+    = runAppM d u $ do
+        resolvedTd    <- resolveDir (fromMaybe "." td)
         currentConfig <- loadExistingProjectConfiguration resolvedTd
         let inputConfig = PreliminaryProjectConfiguration
                 { preSelectedTemplate       = t
@@ -313,20 +317,20 @@ run Update { maybeTemplateName = t, maybeTargetDirectory = td, maybePreviousComm
                 , preSelectedBranches       = Nothing
                 , preVariableValues         = Nothing
                 }
-        updateProject (inputConfig <> currentConfig) u
-run TemplateGraph { templateName = t, enableDebugLogging = d } =
-    runAppM d $ generateTemplateGraph t
-run TemplateListBranches { templateName = t, branchFilters = bfs, enableDebugLogging = d }
-    = runAppM d $ listTemplateBranches t bfs
-run TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableInteractivity = i, enableDebugLogging = d }
-    = runAppM d $ renameTemplateBranch t on nn i
-run TemplatePropagateChanges { templateName = t, branchName = b, remoteChangeMode = cm, runUnattended = u, enableDebugLogging = d }
-    = runAppM d $ propagateTemplateBranchChanges t b cm u
-run TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
-    = runAppM d $ changeTemplateVariableValue t ov nv i
+        updateProject (inputConfig <> currentConfig)
+runCommand TemplateGraph { templateName = t, enableDebugLogging = d } =
+    runAppM d True $ generateTemplateGraph t
+runCommand TemplateListBranches { templateName = t, branchFilters = bfs, enableDebugLogging = d }
+    = runAppM d True $ listTemplateBranches t bfs
+runCommand TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableInteractivity = i, enableDebugLogging = d }
+    = runAppM d False $ renameTemplateBranch t on nn i
+runCommand TemplatePropagateChanges { templateName = t, branchName = b, remoteChangeMode = cm, runUnattended = u, enableDebugLogging = d }
+    = runAppM d u $ propagateTemplateBranchChanges t b cm
+runCommand TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
+    = runAppM d False $ changeTemplateVariableValue t ov nv i
 
 main :: IO ()
-main = run =<< customExecParser p opts
+main = customExecParser p opts >>= runCommand
   where
     commands = hsubparser
         (  command

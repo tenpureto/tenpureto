@@ -1,8 +1,10 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module Tenpureto.TemplateLoader where
+
+import           Polysemy
+import           Polysemy.Error
 
 import           Data.List
 import           Data.Maybe
@@ -23,21 +25,22 @@ import           Data.Yaml                      ( FromJSON(..)
                                                 , (.=)
                                                 )
 import           Data.Bifunctor
-
-import           Control.Monad.Catch
 import           Control.Monad.Trans.Maybe
 
 import           Path
 
-import           Git
-import           Logging
+import           Tenpureto.Effects.Logging
+import           Tenpureto.Effects.Git
 
-data TenpuretoTemplateException = InvalidTemplateException Text Text
-                                    deriving (Exception)
+import           Tenpureto.Orphanage            ( )
 
-instance Show TenpuretoTemplateException where
-    show (InvalidTemplateException template reason) =
-        T.unpack $ "Template \"" <> template <> "\" is not valid: " <> reason
+data TenpuretoTemplateException = NoBaseBranchesException { errorRepository :: Text }
+
+instance Pretty TenpuretoTemplateException where
+    pretty (NoBaseBranchesException repo) =
+        "Repository"
+            <+> dquotes (pretty repo)
+            <+> "does not contain template branches"
 
 data BranchFilter = BranchFilterChildOf Text | BranchFilterParentOf Text
 
@@ -63,29 +66,29 @@ newtype TemplateInformation = TemplateInformation
     deriving (Show, Eq)
 
 loadTemplateInformation
-    :: (MonadThrow m, MonadGit m)
+    :: Members '[Git, Error TenpuretoTemplateException] r
     => Text
     -> GitRepository
-    -> m TemplateInformation
-loadTemplateInformation repositoryName repository = do
-    branches             <- listBranches repository
-    branchConfigurations <- traverse (loadBranchConfiguration repository)
+    -> Sem r TemplateInformation
+loadTemplateInformation repositoryName repo = do
+    branches             <- listBranches repo
+    branchConfigurations <- traverse (loadBranchConfiguration repo)
         $ sort branches
     let bi = catMaybes branchConfigurations
     if hasBaseBranches bi
         then return ()
-        else throwM $ InvalidTemplateException repositoryName
-                                               "no base branches found"
+        else throw
+            $ NoBaseBranchesException { errorRepository = repositoryName }
     return $ TemplateInformation { branchesInformation = bi }
   where
     hasBaseBranches :: [TemplateBranchInformation] -> Bool
     hasBaseBranches = any isBaseBranch
 
 loadBranchConfiguration
-    :: (MonadThrow m, MonadGit m)
+    :: Members '[Git, Error TenpuretoTemplateException] r
     => GitRepository
     -> Text
-    -> m (Maybe TemplateBranchInformation)
+    -> Sem r (Maybe TemplateBranchInformation)
 loadBranchConfiguration repo branch = runMaybeT $ do
     branchHead <- MaybeT
         $ findCommitByRef repo (BranchRef $ T.pack "remotes/origin/" <> branch)
@@ -113,9 +116,9 @@ isMergeOf bi bis =
 
 isMergeBranch :: TemplateInformation -> TemplateBranchInformation -> Bool
 isMergeBranch t b = any (isMergeOf b) mergeOptions
-    where
-        fb = filter isFeatureBranch (branchesInformation t)
-        mergeOptions = filter ((<) 1 . length) (subsequences fb)
+  where
+    fb           = filter isFeatureBranch (branchesInformation t)
+    mergeOptions = filter ((<) 1 . length) (subsequences fb)
 
 managedBranches :: TemplateInformation -> [TemplateBranchInformation]
 managedBranches t = filter (\b -> isFeatureBranch b || isMergeBranch t b)

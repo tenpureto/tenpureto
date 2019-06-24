@@ -1,11 +1,9 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveAnyClass #-}
+module Tenpureto.Templater where
 
-module Templater where
+import           Polysemy
+import           Polysemy.Resource
 
 import           Data.ByteString                ( ByteString )
-import qualified Data.ByteString               as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Set                       ( Set )
@@ -16,20 +14,17 @@ import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Maybe
 import           Data.Foldable
 import           Control.Monad
-import           Control.Monad.IO.Class
-import           Control.Monad.Catch
-import           Logging
-import           Path
-import           Path.IO
-import qualified System.Directory              as Directory
-import           System.IO                      ( hClose )
 import qualified Data.Text.ICU                 as ICU
 import           Data.Text.Encoding
 import           Data.Text.ICU.Replace
 import           System.FilePath.Glob
 
+import           Tenpureto.Effects.Logging
+import           Tenpureto.Effects.FileSystem
+import           Tenpureto.Effects.Git
+import           Tenpureto.Orphanage            ( )
+
 import           Templater.CaseConversion
-import           Git
 
 data TemplaterSettings = TemplaterSettings
     { templaterFromVariables :: InsOrdHashMap Text Text
@@ -43,7 +38,7 @@ data CompiledTemplaterSettings = CompiledTemplaterSettings
     }
 
 data TemplaterException = TemplaterException
-    deriving (Show, Exception)
+    deriving Show
 
 expandReplacement :: (Text, Text) -> [(Text, Text)]
 expandReplacement (a, b) =
@@ -63,7 +58,7 @@ expandReplacements fv tv = concatMap expandReplacement
     $ InsOrdHashMap.elems (InsOrdHashMap.intersectionWith (,) fv tv)
 
 compileSettings
-    :: MonadLog m => TemplaterSettings -> m CompiledTemplaterSettings
+    :: Member Logging r => TemplaterSettings -> Sem r CompiledTemplaterSettings
 compileSettings TemplaterSettings { templaterFromVariables = tfv, templaterToVariables = ttv, templaterExcludes = ex }
     = let
           replacements = expandReplacements tfv ttv
@@ -125,10 +120,10 @@ contentToByteString (TextContent t enc) = enc t
 contentToByteString (BinaryContent bs ) = bs
 
 translateFile
-    :: MonadThrow m
+    :: Member FileSystem r
     => CompiledTemplaterSettings
     -> Path Rel File
-    -> m (Path Rel File)
+    -> Sem r (Path Rel File)
 translateFile settings =
     parseRelFile . T.unpack . translate settings . T.pack . fromRelFile
 
@@ -150,22 +145,20 @@ compileExcludes excludes =
         or . (??) matches . fromRelFile
 
 copyAbsFile
-    :: (MonadIO m, MonadLog m)
+    :: (Member FileSystem r, Member Logging r)
     => CompiledTemplaterSettings
     -> Path Abs File
     -> Path Abs File
-    -> (ByteString -> m ())
-    -> m ()
+    -> (ByteString -> Sem r ())
+    -> Sem r ()
 copyAbsFile settings src dst write = do
     logDebug $ "Copying" <+> pretty src <+> "to" <+> pretty dst
     ensureDir (parent dst)
     symlink <- isSymlink src
     if symlink
-        then liftIO $ Directory.getSymbolicLinkTarget (toFilePath src) >>= flip
-            Directory.createDirectoryLink
-            (toFilePath dst)
+        then getSymbolicLinkDirTarget src >>= flip createDirectoryLink dst
         else do
-            byteContent <- liftIO $ BS.readFile (toFilePath src)
+            byteContent <- readFileAsByteString src
             let content           = detectEncoding byteContent
                 translatedContent = mapContent (translate settings) content
                 translated        = contentToByteString translatedContent
@@ -173,12 +166,12 @@ copyAbsFile settings src dst write = do
             copyPermissions src dst
 
 copyRelFile
-    :: (MonadIO m, MonadThrow m, MonadLog m)
+    :: (Member FileSystem r, Member Logging r)
     => CompiledTemplaterSettings
     -> Path Abs Dir
     -> Path Abs Dir
     -> Path Rel File
-    -> m (Path Rel File)
+    -> Sem r (Path Rel File)
 copyRelFile settings src dst srcFile = do
     dstFile <- translateFile settings srcFile
     let srcAbsFile = src </> srcFile
@@ -186,43 +179,37 @@ copyRelFile settings src dst srcFile = do
     copyAbsFile settings
                 srcAbsFile
                 dstAbsFile
-                (liftIO . BS.writeFile (toFilePath dstAbsFile))
+                (writeFileAsByteString dstAbsFile)
     return dstFile
 
 moveRelFile
-    :: (MonadIO m, MonadMask m, MonadLog m)
+    :: (Member Resource r, Member FileSystem r, Member Logging r)
     => CompiledTemplaterSettings
     -> Path Abs Dir
     -> Path Abs Dir
     -> Path Rel File
-    -> m (Path Rel File, (Path Abs File, Path Rel File))
+    -> Sem r (Path Rel File, (Path Abs File, Path Rel File))
 moveRelFile settings src dst srcFile = do
     dstFile <- translateFile settings srcFile
     let srcAbsFile = src </> srcFile
         dstAbsFile = dst </> dstFile
         dstFileDir = parent dstAbsFile
     ensureDir dstFileDir
-    bracket
-            (liftIO $ openBinaryTempFile dstFileDir
-                                         (toFilePath (filename dstFile))
-            )
-            (liftIO . hClose . snd)
+    bracket (openBinaryTempFile dstFileDir (toFilePath (filename dstFile)))
+            (hClose . snd)
         $ \(tmpFile, tmpHandle) -> do
-              copyAbsFile settings
-                          srcAbsFile
-                          tmpFile
-                          (liftIO . BS.hPut tmpHandle)
+              copyAbsFile settings srcAbsFile tmpFile (hPutByteString tmpHandle)
               copyPermissions srcAbsFile tmpFile
               logDebug $ "Removing" <+> pretty srcAbsFile
               removeFile srcAbsFile
               return (srcFile, (tmpFile, dstFile))
 
 copy
-    :: (MonadIO m, MonadThrow m, MonadLog m, MonadGit m)
+    :: (Member FileSystem r, Member Logging r, Member Git r)
     => CompiledTemplaterSettings
     -> GitRepository
     -> Path Abs Dir
-    -> m [Path Rel File]
+    -> Sem r [Path Rel File]
 copy settings repo dst =
     let src = repositoryPath repo
     in  do
@@ -231,10 +218,10 @@ copy settings repo dst =
             traverse (copyRelFile settings src dst) includedFiles
 
 move
-    :: (MonadIO m, MonadMask m, MonadLog m, MonadGit m)
+    :: (Member Resource r, Member FileSystem r, Member Logging r, Member Git r)
     => CompiledTemplaterSettings
     -> GitRepository
-    -> m [Path Rel File]
+    -> Sem r [Path Rel File]
 move settings repo =
     let dir = repositoryPath repo
         renameFile' (a, b) = do

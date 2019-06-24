@@ -1,10 +1,9 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Tenpureto.TemplateTestHelper where
 
 import           Data.Text                      ( Text )
 import qualified Data.Set                      as Set
 
-import           Git                            ( Committish(..) )
+import           Tenpureto.Effects.Git          ( Committish(..) )
 import           Tenpureto.TemplateLoader       ( TemplateBranchInformation(..)
                                                 )
 

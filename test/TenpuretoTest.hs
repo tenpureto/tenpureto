@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 
 module TenpuretoTest where
@@ -8,10 +7,11 @@ import           Test.Tasty.HUnit
 
 import           Path
 
-import           Data
-import           Git
-import           Tenpureto
+import           Tenpureto.Data
 import           Tenpureto.Messages
+import           Tenpureto.Effects.Git
+
+import           Tenpureto
 
 test_extractTemplateName :: [TestTree]
 test_extractTemplateName =

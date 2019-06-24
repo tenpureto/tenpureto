@@ -20,10 +20,7 @@ dependencies:
 - directory
 - containers
 - insert-ordered-containers
-- exceptions
-- mtl
 - transformers
-- logging-effect
 - prettyprinter
 - prettyprinter-ansi-terminal
 - terminal-size
@@ -33,6 +30,23 @@ dependencies:
 - aeson
 - dotgen
 - Glob
+- polysemy >= 0.5.0.1
+- polysemy-plugin
+
+ghc-options: -O2 -fplugin=Polysemy.Plugin -flate-specialise -fspecialise-aggressively
+
+default-extensions:
+- DataKinds
+- FlexibleContexts
+- GADTs
+- LambdaCase
+- PolyKinds
+- RankNTypes
+- ScopedTypeVariables
+- TypeApplications
+- TypeOperators
+- TypeFamilies
+- OverloadedStrings
 
 library:
   source-dirs: src

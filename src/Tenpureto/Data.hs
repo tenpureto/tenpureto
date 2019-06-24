@@ -1,6 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
-
-module Data where
+module Tenpureto.Data where
 
 import           Data.Text                      ( Text )
 import           Data.Set                       ( Set )
@@ -8,11 +6,11 @@ import           Data.Map                       ( Map )
 
 import           Control.Applicative
 
-import           Path
-
-import           Git                            ( Committish )
-import           Logging
+import           Tenpureto.Effects.Git
+import           Tenpureto.Effects.Logging
 import           Tenpureto.TemplateLoader
+
+import           Tenpureto.Orphanage            ( )
 
 data PreliminaryProjectConfiguration = PreliminaryProjectConfiguration
         { preSelectedTemplate :: Maybe Text
@@ -39,6 +37,7 @@ data FinalProjectConfiguration = FinalProjectConfiguration
         , variableValues :: Map Text Text
         }
         deriving (Show)
+
 
 instance Semigroup PreliminaryProjectConfiguration where
     (<>) a b = PreliminaryProjectConfiguration

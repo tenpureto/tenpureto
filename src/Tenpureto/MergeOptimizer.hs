@@ -23,9 +23,7 @@ includeMergeBranches
     -> [TemplateBranchInformation]
     -> [TemplateBranchInformation]
 includeMergeBranches template branches =
-    let
-        allBranches  = managedBranches template
+    let allBranches  = managedBranches template
         mergeOptions = filter ((<) 1 . length) (subsequences branches)
         isMerge bi = any (isMergeOf bi) mergeOptions
-    in
-        nub $ branches ++ filter isMerge allBranches
+    in  nub $ branches ++ filter isMerge allBranches
