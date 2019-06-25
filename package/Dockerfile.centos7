@@ -9,7 +9,7 @@ RUN yum install -y ruby-devel rubygems hostname
 RUN gem install --no-ri --no-rdoc fpm
 
 # ghc dependencies
-RUN yum install -y gmp-devel
+RUN yum install -y gmp-devel ncurses-devel
 
 # tenpureto dependencies
 RUN yum install -y libicu-devel
