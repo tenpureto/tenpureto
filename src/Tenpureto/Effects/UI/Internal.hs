@@ -32,8 +32,8 @@ inputTemplate = ask "Template URL" Nothing
 inputTarget :: Members '[TerminalInput, FileSystem] r => Sem r (Path Abs Dir)
 inputTarget = ask "Target directory" Nothing <&> T.unpack >>= resolveDir
 
-inputPreviousCommit :: Member TerminalInput r => Sem r Committish
-inputPreviousCommit = ask "Previous template commit" Nothing <&> Committish
+inputPreviousCommit :: Member TerminalInput r => Sem r ParentCommit
+inputPreviousCommit = ask "Previous template commit" Nothing <&> (ExistingParentCommit . Committish)
 
 templateBranchesByNames
     :: TemplateInformation -> Set Text -> [TemplateBranchInformation]

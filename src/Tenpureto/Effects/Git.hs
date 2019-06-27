@@ -4,6 +4,7 @@ module Tenpureto.Effects.Git
     ( module Tenpureto.Effects.Git
     , Text
     , Committish(..)
+    , ParentCommit(..)
     , GitRepository(..)
     , GitException
     , RepositoryLocation(..)
@@ -28,7 +29,7 @@ import qualified Data.Text                     as T
 import           Data.Functor
 import           Data.List
 import           Data.Text.Prettyprint.Doc
-import           Control.Monad
+import           System.Random
 
 import           Path
 
@@ -60,8 +61,8 @@ data MergeResult = MergeSuccessCommitted
 data Git m a where
     InitRepository ::Path Abs Dir -> Git m GitRepository
     AddRepositoryOrigin ::GitRepository -> RepositoryLocation -> Git m ()
-    InitWorktree ::GitRepository -> Committish -> Path Abs Dir -> Git m GitRepository
-    DeleteWorktree ::GitRepository -> Path Abs Dir -> Git m ()
+    InitWorktree ::GitRepository -> ParentCommit -> Path Abs Dir -> Git m (GitRepository, Maybe Text)
+    DeleteWorktree ::GitRepository -> Path Abs Dir -> Maybe Text -> Git m ()
     ListBranches ::GitRepository -> Git m [Text]
     CheckoutBranch ::GitRepository -> Text -> Maybe Text -> Git m ()
     MergeBranch ::GitRepository -> MergeStrategy -> Text -> Text -> Git m MergeResult
@@ -114,7 +115,7 @@ withClonedRepository
     => RepositoryLocation
     -> (GitRepository -> Sem r a)
     -> Sem r a
-withClonedRepository location f = withSystemTempDir "tenpureto" $ \dir -> do
+withClonedRepository location f =  withSystemTempDir "tenpureto" $ \dir -> do
     repo <- initRepository dir
     addRepositoryOrigin repo location
     f repo
@@ -122,14 +123,17 @@ withClonedRepository location f = withSystemTempDir "tenpureto" $ \dir -> do
 withNewWorktree
     :: Members '[Resource, FileSystem, Git] r
     => GitRepository
-    -> Committish
+    -> ParentCommit
     -> (GitRepository -> Sem r a)
     -> Sem r a
-withNewWorktree repo c f =
-    withSystemTempDir "tenpureto" (initWorktree repo c >=> f)
+withNewWorktree repo c f = do
+    bracket
+        (createSystemTempDir "tenpureto" >>= initWorktree repo c)
+        (\(GitRepository dir, tempBranch) -> deleteWorktree repo dir tempBranch)
+        (\(worktree, _) -> f worktree)
 
 runGit
-    :: Members '[FileSystem, Process, Error GitException] r
+    :: Members '[FileSystem, Process, Error GitException, Embed IO] r
     => Sem (Git ': r) a
     -> Sem r a
 runGit = interpret $ \case
@@ -144,17 +148,36 @@ runGit = interpret $ \case
             >>= asUnit
         gitRepoCmd repo ["fetch", "origin"] >>= asUnit
 
-    InitWorktree repo (Committish c) dir -> do
+    InitWorktree repo (ExistingParentCommit (Committish c)) dir -> do
         gitRepoCmd
                 repo
                 ["worktree", "add", "--no-checkout", T.pack (toFilePath dir), c]
             >>= asUnit
-        return $ GitRepository dir
+        return $ (GitRepository dir, Nothing)
 
-    DeleteWorktree repo dir -> do
+    InitWorktree repo OrphanCommit dir -> do
+        gitRepoCmd
+                repo
+                [ "worktree"
+                , "add"
+                , "--no-checkout"
+                , "--detach"
+                , T.pack (toFilePath dir)
+                ]
+            >>= asUnit
+        branchSuffix <- embed randomIO
+        let branch = "tenpureto-temp-" <> (T.pack . show) (branchSuffix :: Word)
+        gitRepoCmd (GitRepository dir) ["checkout", "--orphan", branch]
+            >>= asUnit
+        return $ (GitRepository dir, Just branch)
+
+    DeleteWorktree repo dir tempBranch -> do
         -- "git worktree remove" required too modern git
         removeDirRecur dir
         gitRepoCmd repo ["worktree", "prune"] >>= asUnit
+        case tempBranch of
+            Just branch -> gitRepoCmd repo ["branch", "--delete", "--force", branch] >>= asUnit
+            Nothing -> return ()
 
     ListBranches repo ->
         gitRepoCmd
@@ -175,7 +198,12 @@ runGit = interpret $ \case
     MergeBranch repo strategy branch message -> do
         (mergeResult, _, _) <- gitRepoCmd
             repo
-            (  ["merge", "--no-commit", "--message", message]
+            (  [ "merge"
+               , "--no-commit"
+               , "--allow-unrelated-histories"
+               , "--message"
+               , message
+               ]
             <> options strategy
             <> [branch]
             )

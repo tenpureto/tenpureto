@@ -15,7 +15,8 @@ import           Data.Foldable
 import           Tenpureto.Data
 import           Tenpureto.Messages
 import           Tenpureto.TemplateLoader
-import           Tenpureto.Effects.Git          ( BranchRef )
+import           Tenpureto.Effects.Git          ( BranchRef
+                                                )
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Terminal
 import           Tenpureto.Effects.UI.Internal

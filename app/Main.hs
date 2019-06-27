@@ -46,6 +46,12 @@ data Command
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
             }
+    | Adopt
+            { maybeTemplateName :: Maybe Text
+            , maybeTargetDirectory :: Maybe FilePath
+            , runUnattended :: Bool
+            , enableDebugLogging :: Bool
+            }
     | TemplateGraph
             { templateName :: Text
             , branchFilter :: BranchFilter
@@ -236,6 +242,14 @@ updateCommand =
         <*> unattendedSwitch
         <*> debugSwitch
 
+adoptCommand :: Parser Command
+adoptCommand =
+    Adopt
+        <$> optional templateNameOption
+        <*> optional targetArgument
+        <*> unattendedSwitch
+        <*> debugSwitch
+
 templateGraphCommand :: Parser Command
 templateGraphCommand =
     TemplateGraph
@@ -393,11 +407,24 @@ runCommand Update { maybeTemplateName = t, maybeTargetDirectory = td, maybeProje
             inputConfig = PreliminaryProjectConfiguration
                 { preSelectedTemplate            = t
                 , preTargetDirectory             = Just resolvedTd
-                , prePreviousTemplateCommit      = fmap Committish pc
+                , prePreviousTemplateCommit      = fmap (ExistingParentCommit . Committish) pc
                 , preSelectedBranches            = Set.map yamlFeatureName
                                                    .   yamlFeatures
                                                    <$> maybeYaml
                 , preVariableValues              = yamlVariables <$> maybeYaml
+                , preVariableDefaultReplacements = mempty
+                }
+        updateProject (inputConfig <> currentConfig)
+runCommand Adopt { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
+    = runAppM d u $ do
+        resolvedTd    <- resolveDir (fromMaybe "." td)
+        currentConfig <- loadExistingProjectConfiguration resolvedTd
+        let inputConfig = PreliminaryProjectConfiguration
+                { preSelectedTemplate            = t
+                , preTargetDirectory             = Just resolvedTd
+                , prePreviousTemplateCommit      = Just OrphanCommit
+                , preSelectedBranches            = Nothing
+                , preVariableValues              = Nothing
                 , preVariableDefaultReplacements = mempty
                 }
         updateProject (inputConfig <> currentConfig)
@@ -431,6 +458,12 @@ runOptParser = do
                "update"
                (info updateCommand
                      (progDesc "Update a project for a template")
+               )
+        <> command
+               "adopt"
+               (info
+                   adoptCommand
+                   (progDesc "Adopt an existing project to use a template")
                )
         <> command "template"
                    (info templateCommands (progDesc "Manage a template"))
