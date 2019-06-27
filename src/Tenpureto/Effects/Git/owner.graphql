@@ -1,0 +1,7 @@
+query {
+  repository(owner: "{owner}", name: "{repo}") {
+    owner {
+      login
+    }
+  }
+}

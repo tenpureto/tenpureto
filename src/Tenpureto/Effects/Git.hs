@@ -254,10 +254,11 @@ runGitHub = interpret $ \case
     CreateOrUpdatePullRequest repo settings (Committish c) title source target
         -> do
             createOrUpdateReference repo (Committish c) source
+            owner <- hubApiGraphQL repo hubOwnerQuery [] >>= asApiResponse
             exitingPullRequests <-
                 hubApiGetCmd repo
                              "/repos/{owner}/{repo}/pulls"
-                             [("head", source), ("base", target)]
+                             [("head", (ownerLogin owner) <> ":" <> source), ("base", target)]
                     >>= asApiResponse
             pullRequest <- case exitingPullRequests of
                 pullRequest : _ -> return pullRequest

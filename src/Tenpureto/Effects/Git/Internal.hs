@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Tenpureto.Effects.Git.Internal where
 
 import           Polysemy
@@ -19,6 +21,7 @@ import           Data.Aeson                     ( FromJSON
                                                 , (.!=)
                                                 )
 import qualified Data.Aeson                    as Aeson
+import           Data.FileEmbed
 
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Process
@@ -127,6 +130,8 @@ apiMethod :: ApiMethod -> Text
 apiMethod ApiPost  = "POST"
 apiMethod ApiPatch = "PATCH"
 
+newtype RepositoryOwner = RepositoryOwner { ownerLogin :: Text }
+
 newtype PullRequestAssignee = PullRequestAssignee { assigneeLogin :: Text }
 newtype PullRequestLabel = PullRequestLabel { labelName :: Text }
 data PullRequest = PullRequest { pullRequestNumber :: Int, pullRequestAssignees :: [PullRequestAssignee], pullRequestLabels :: [PullRequestLabel] }
@@ -137,6 +142,10 @@ data IssueInputPayload = IssueInputPayload { setIssueAssignees :: [Text], setIss
 
 instance Pretty Committish where
     pretty (Committish c) = pretty c
+
+instance FromJSON RepositoryOwner where
+    parseJSON (Aeson.Object v) = RepositoryOwner <$> ((v .: "data") >>= (.: "repository") >>= (.: "owner") >>= (.: "login"))
+    parseJSON _                = fail "Invalid repository owner response"
 
 instance FromJSON PullRequestAssignee where
     parseJSON (Aeson.Object v) = PullRequestAssignee <$> v .: "login"
@@ -216,6 +225,18 @@ hubApiGetCmd (GitRepository path) endpoint fields = runCmd
     ++ (fields >>= \(key, value) -> ["--raw-field", key <> "=" <> value])
     )
 
+hubApiGraphQL
+    :: Member Process r
+    => GitRepository
+    -> Text
+    -> [(Text, Text)]
+    -> Sem r CmdResult
+hubApiGraphQL (GitRepository path) query fields = runCmd
+    (  "hub"
+    :| ["-C", T.pack (toFilePath path), "api", "graphql", "--field", "query=" <> query]
+    ++ (fields >>= \(key, value) -> ["--raw-field", key <> "=" <> value])
+    )
+
 createOrUpdateReference
     :: Members '[Process, Error GitException] r
     => GitRepository
@@ -243,3 +264,6 @@ createOrUpdateReference repo (Committish c) reference = do
                 >>= asUnit
         ExitFailure other ->
             throw $ HubExecException other (Just out) (Just err)
+
+hubOwnerQuery :: Text
+hubOwnerQuery = $(embedStringFile "src/Tenpureto/Effects/Git/owner.graphql")
