@@ -65,15 +65,19 @@ newtype TemplateInformation = TemplateInformation
     }
     deriving (Show, Eq)
 
+internalBranchPrefix :: Text
+internalBranchPrefix = "tenpureto/"
+
 loadTemplateInformation
     :: Members '[Git, Error TenpuretoTemplateException] r
     => Text
     -> GitRepository
     -> Sem r TemplateInformation
 loadTemplateInformation repositoryName repo = do
-    branches             <- listBranches repo
+    allBranches             <- listBranches repo
+    let branches = filter (not . T.isPrefixOf internalBranchPrefix) allBranches
     branchConfigurations <- traverse (loadBranchConfiguration repo)
-        $ sort branches
+        $ sort $ branches
     let bi = catMaybes branchConfigurations
     if hasBaseBranches bi
         then return ()

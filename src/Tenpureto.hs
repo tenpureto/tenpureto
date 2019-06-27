@@ -517,7 +517,7 @@ runTemplateChange template interactive changeMode f =
                                                        settings
                                                        c
                                                        title
-                                                       ("tenpureto/" <> src)
+                                                       (internalBranchPrefix <> src)
                                                        dst
         let pushRefsToServer PushDirectly changes = pushRefs repo changes
             pushRefsToServer UpstreamPullRequest { pullRequestSettings = settings } changes
