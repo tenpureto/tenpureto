@@ -393,37 +393,52 @@ propagateTemplateBranchChanges
                TenpuretoException]
            r
     => Text
-    -> Text
+    -> [BranchFilter]
     -> RemoteChangeMode
     -> Sem r ()
-propagateTemplateBranchChanges template sourceBranch pushMode =
+propagateTemplateBranchChanges template branchFilters pushMode =
     runTemplateChange template False pushMode $ \repo -> do
         templateInformation <- loadTemplateInformation repo
-        branch <- getTemplateBranch templateInformation sourceBranch
-        let childBranches = getTemplateBranches
-                [BranchFilterChildOf sourceBranch]
-                templateInformation
-        let parentBranches = getTemplateBranches
-                [BranchFilterParentOf sourceBranch]
-                templateInformation
-        let prBranch bi = branchName branch <> "/" <> branchName bi
-        let keepNeedsMerge src dst =
-                gitDiffHasCommits repo (branchCommit src) (branchCommit dst)
-                    <&> \needs -> if needs then Just (src, dst) else Nothing
-        let
-            pushspec (src, dst) = UpdateBranch
-                { sourceCommit     = branchCommit src
-                , destinationRef   = BranchRef $ branchName dst
-                , pullRequestRef   = BranchRef $ prBranch dst
+        let branches = getTemplateBranches branchFilters templateInformation
+        let toBranches =
+                [ (a, b)
+                | b <- branches
+                , a <- getTemplateBranches
+                    [BranchFilterParentOf (branchName b)]
+                    templateInformation
+                ]
+        let fromBranches =
+                [ (a, b)
+                | a <- branches
+                , b <- getTemplateBranches
+                    [BranchFilterChildOf (branchName a)]
+                    templateInformation
+                ]
+        let pairs = nub (toBranches ++ fromBranches)
+        catMaybes <$> traverse (propagateFromBranch repo) pairs
+  where
+    propagateFromBranch
+        :: Members '[Git] r
+        => GitRepository
+        -> (TemplateBranchInformation, TemplateBranchInformation)
+        -> Sem r (Maybe PushSpec)
+    propagateFromBranch repo (fromBranch, toBranch) = do
+        needsMerge <- gitDiffHasCommits repo
+                                        (branchCommit fromBranch)
+                                        (branchCommit toBranch)
+        return $ if needsMerge
+            then Just $ UpdateBranch
+                { sourceCommit     = branchCommit fromBranch
+                , destinationRef   = BranchRef $ branchName toBranch
+                , pullRequestRef   = BranchRef
+                                     $  branchName fromBranch
+                                     <> "/"
+                                     <> branchName toBranch
                 , pullRequestTitle = pullRequestBranchIntoBranchTitle
-                                         (branchName src)
-                                         (branchName dst)
+                                         (branchName fromBranch)
+                                         (branchName toBranch)
                 }
-        mergesToChildren <-
-            catMaybes <$> traverse (keepNeedsMerge branch) childBranches
-        mergesFromParents <-
-            catMaybes <$> traverse (flip keepNeedsMerge branch) parentBranches
-        return $ fmap pushspec (mergesFromParents <> mergesToChildren)
+            else Nothing
 
 changeTemplateVariableValue
     :: Members

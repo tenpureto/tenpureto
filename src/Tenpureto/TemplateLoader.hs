@@ -34,7 +34,9 @@ import           Tenpureto.Effects.Git
 
 import           Tenpureto.Orphanage            ( )
 
-data BranchFilter = BranchFilterChildOf Text | BranchFilterParentOf Text
+data BranchFilter = BranchFilterEqualTo Text
+                  | BranchFilterChildOf Text
+                  | BranchFilterParentOf Text
 
 data TemplateYamlFeature = TemplateYamlFeature
         { featureName :: Text
@@ -166,6 +168,7 @@ getTemplateBranches (h : t) ti =
 
 applyBranchFilter
     :: BranchFilter -> TemplateInformation -> TemplateBranchInformation -> Bool
+applyBranchFilter (BranchFilterEqualTo name) _ = (==) name . branchName
 applyBranchFilter (BranchFilterChildOf parentBranch) ti =
     let parentNames = maybe Set.empty
                             (getBranchChildren ti)

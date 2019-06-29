@@ -58,7 +58,7 @@ data Command
             }
     | TemplatePropagateChanges
             { templateName :: Text
-            , branchName :: Text
+            , branchFilters :: [BranchFilter]
             , remoteChangeMode :: RemoteChangeMode
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
@@ -111,8 +111,8 @@ newBranchNameOption :: Parser Text
 newBranchNameOption =
     strOption (long "new-name" <> metavar "<branch>" <> help "New branch name")
 
-branchNameOption :: Parser Text
-branchNameOption = strOption
+branchFilterNameOption :: Parser BranchFilter
+branchFilterNameOption = BranchFilterEqualTo <$> strOption
     (long "branch" <> metavar "<branch>" <> help "Branch name to filter against"
     )
 
@@ -211,7 +211,7 @@ propagateChanges :: Parser Command
 propagateChanges =
     TemplatePropagateChanges
         <$> templateNameOption
-        <*> branchNameOption
+        <*> many branchFilterNameOption
         <*> remoteChangeModeOptionSet
         <*> unattendedSwitch
         <*> debugSwitch
@@ -324,8 +324,8 @@ runCommand TemplateListBranches { templateName = t, branchFilters = bfs, enableD
     = runAppM d True $ listTemplateBranches t bfs
 runCommand TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d False $ renameTemplateBranch t on nn i
-runCommand TemplatePropagateChanges { templateName = t, branchName = b, remoteChangeMode = cm, runUnattended = u, enableDebugLogging = d }
-    = runAppM d u $ propagateTemplateBranchChanges t b cm
+runCommand TemplatePropagateChanges { templateName = t, branchFilters = bfs, remoteChangeMode = cm, runUnattended = u, enableDebugLogging = d }
+    = runAppM d u $ propagateTemplateBranchChanges t bfs cm
 runCommand TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d False $ changeTemplateVariableValue t ov nv i
 

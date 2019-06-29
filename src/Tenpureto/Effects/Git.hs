@@ -33,12 +33,12 @@ import           Tenpureto.Effects.Git.Internal
 
 newtype RepositoryUrl = RepositoryUrl Text deriving (Eq, Show)
 
-newtype BranchRef = BranchRef { reference :: Text } deriving (Show)
+newtype BranchRef = BranchRef { reference :: Text } deriving (Eq, Show)
 
 data PushSpec = CreateBranch { sourceCommit :: Committish, destinationRef :: BranchRef }
               | UpdateBranch { sourceCommit :: Committish, destinationRef :: BranchRef, pullRequestRef :: BranchRef, pullRequestTitle :: Text }
               | DeleteBranch { destinationRef :: BranchRef }
-              deriving (Show)
+              deriving (Eq, Show)
 
 data PullRequestSettings = PullRequestSettings { pullRequestAddLabels :: [Text], pullRequestAssignTo :: [Text] }
 
@@ -256,9 +256,12 @@ runGitHub = interpret $ \case
             createOrUpdateReference repo (Committish c) source
             owner <- hubApiGraphQL repo hubOwnerQuery [] >>= asApiResponse
             exitingPullRequests <-
-                hubApiGetCmd repo
-                             "/repos/{owner}/{repo}/pulls"
-                             [("head", (ownerLogin owner) <> ":" <> source), ("base", target)]
+                hubApiGetCmd
+                        repo
+                        "/repos/{owner}/{repo}/pulls"
+                        [ ("head", (ownerLogin owner) <> ":" <> source)
+                        , ("base", target)
+                        ]
                     >>= asApiResponse
             pullRequest <- case exitingPullRequests of
                 pullRequest : _ -> return pullRequest
