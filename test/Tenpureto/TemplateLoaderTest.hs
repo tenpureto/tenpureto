@@ -4,6 +4,7 @@ import           Test.Tasty
 import           Test.Tasty.HUnit
 
 import qualified Data.Set                      as Set
+import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 
 import           Tenpureto.TemplateTestHelper
 import           Tenpureto.TemplateLoader
@@ -110,3 +111,40 @@ test_getTemplateBranches =
     d = childBranch "d" [a]
     e = baseBranch "e"
     c = childBranch "c" [b, e]
+
+test_parseTemplateYaml :: [TestTree]
+test_parseTemplateYaml =
+    [ testCase "parse variables"
+        $   parseTemplateYaml "variables: { \"Key\": \"value\" }"
+        @?= Right TemplateYaml
+                { variables = InsOrdHashMap.singleton "Key" "value"
+                , features  = Set.empty
+                , excludes  = Set.empty
+                }
+    , testCase "parse excludes"
+        $   parseTemplateYaml "excludes: [ \".*\" ]"
+        @?= Right TemplateYaml { variables = InsOrdHashMap.empty
+                               , features  = Set.empty
+                               , excludes  = Set.singleton ".*"
+                               }
+    , testCase "parse simple features"
+        $   parseTemplateYaml "features: [ \"a\" ]"
+        @?= Right TemplateYaml
+                { variables = InsOrdHashMap.empty
+                , features  = Set.singleton TemplateYamlFeature
+                                  { featureName   = "a"
+                                  , featureHidden = False
+                                  }
+                , excludes  = Set.empty
+                }
+    , testCase "parse extended features"
+        $   parseTemplateYaml "features: [ a: { hidden: true } ]"
+        @?= Right TemplateYaml
+                { variables = InsOrdHashMap.empty
+                , features  = Set.singleton TemplateYamlFeature
+                                  { featureName   = "a"
+                                  , featureHidden = True
+                                  }
+                , excludes  = Set.empty
+                }
+    ]

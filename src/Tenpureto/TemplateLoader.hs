@@ -4,7 +4,6 @@
 module Tenpureto.TemplateLoader where
 
 import           Polysemy
-import           Polysemy.Error
 
 import           Data.List
 import           Data.Maybe
@@ -17,6 +16,7 @@ import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
+import qualified Data.HashMap.Strict           as HashMap
 import qualified Data.Yaml                     as Y
 import           Data.Yaml                      ( FromJSON(..)
                                                 , ToJSON(..)
@@ -34,19 +34,17 @@ import           Tenpureto.Effects.Git
 
 import           Tenpureto.Orphanage            ( )
 
-data TenpuretoTemplateException = NoBaseBranchesException { errorRepository :: Text }
-
-instance Pretty TenpuretoTemplateException where
-    pretty (NoBaseBranchesException repo) =
-        "Repository"
-            <+> dquotes (pretty repo)
-            <+> "does not contain template branches"
-
 data BranchFilter = BranchFilterChildOf Text | BranchFilterParentOf Text
+
+data TemplateYamlFeature = TemplateYamlFeature
+        { featureName :: Text
+        , featureHidden :: Bool
+        }
+        deriving (Show, Eq, Ord)
 
 data TemplateYaml = TemplateYaml
         { variables :: InsOrdHashMap Text Text
-        , features :: Set Text
+        , features :: Set TemplateYamlFeature
         , excludes :: Set Text
         }
         deriving (Show, Eq)
@@ -57,6 +55,7 @@ data TemplateBranchInformation = TemplateBranchInformation
     , requiredBranches :: Set Text
     , branchVariables :: InsOrdHashMap Text Text
     , templateYaml :: TemplateYaml
+    , templateYamlFeature :: TemplateYamlFeature
     }
     deriving (Show, Eq)
 
@@ -69,27 +68,17 @@ internalBranchPrefix :: Text
 internalBranchPrefix = "tenpureto/"
 
 loadTemplateInformation
-    :: Members '[Git, Error TenpuretoTemplateException] r
-    => Text
-    -> GitRepository
-    -> Sem r TemplateInformation
-loadTemplateInformation repositoryName repo = do
-    allBranches             <- listBranches repo
+    :: Members '[Git] r => GitRepository -> Sem r TemplateInformation
+loadTemplateInformation repo = do
+    allBranches <- listBranches repo
     let branches = filter (not . T.isPrefixOf internalBranchPrefix) allBranches
-    branchConfigurations <- traverse (loadBranchConfiguration repo)
-        $ sort $ branches
+    branchConfigurations <-
+        traverse (loadBranchConfiguration repo) $ sort $ branches
     let bi = catMaybes branchConfigurations
-    if hasBaseBranches bi
-        then return ()
-        else throw
-            $ NoBaseBranchesException { errorRepository = repositoryName }
     return $ TemplateInformation { branchesInformation = bi }
-  where
-    hasBaseBranches :: [TemplateBranchInformation] -> Bool
-    hasBaseBranches = any isBaseBranch
 
 loadBranchConfiguration
-    :: Members '[Git, Error TenpuretoTemplateException] r
+    :: Members '[Git] r
     => GitRepository
     -> Text
     -> Sem r (Maybe TemplateBranchInformation)
@@ -99,18 +88,26 @@ loadBranchConfiguration repo branch = runMaybeT $ do
     descriptor <- MaybeT $ getRepositoryFile repo branchHead templateYamlFile
     info       <- MaybeT . return . rightToMaybe $ parseTemplateYaml descriptor
     let fb = features info
-    return $ TemplateBranchInformation { branchName       = branch
-                                       , branchCommit     = branchHead
-                                       , requiredBranches = fb
-                                       , branchVariables  = variables info
-                                       , templateYaml     = info
-                                       }
+    currentFeature <- MaybeT . return $ find ((==) branch . featureName) fb
+    return $ TemplateBranchInformation
+        { branchName          = branch
+        , branchCommit        = branchHead
+        , requiredBranches    = Set.map featureName fb
+        , branchVariables     = variables info
+        , templateYaml        = info
+        , templateYamlFeature = currentFeature
+        }
 
-isBaseBranch :: TemplateBranchInformation -> Bool
-isBaseBranch b = requiredBranches b == Set.singleton (branchName b)
+isBaseBranch :: TemplateInformation -> TemplateBranchInformation -> Bool
+isBaseBranch ti b = (Set.filter visible . requiredBranches) b
+    == Set.singleton (branchName b)
+    where visible = maybe False (not . isHiddenBranch) . findTemplateBranch ti
 
 isFeatureBranch :: TemplateBranchInformation -> Bool
 isFeatureBranch b = branchName b `Set.member` requiredBranches b
+
+isHiddenBranch :: TemplateBranchInformation -> Bool
+isHiddenBranch = featureHidden . templateYamlFeature
 
 isMergeOf :: TemplateBranchInformation -> [TemplateBranchInformation] -> Bool
 isMergeOf bi bis =
@@ -157,12 +154,9 @@ getBranchParents template branch =
 
 getBranchChildren
     :: TemplateInformation -> TemplateBranchInformation -> Set Text
-getBranchChildren template branch =
-    Set.fromList
-        $   branchName
-        <$> (filter (Set.member (branchName branch) . getBranchParents template)
-            )
-                (managedBranches template)
+getBranchChildren template branch = Set.fromList $ branchName <$> filter
+    (Set.member (branchName branch) . getBranchParents template)
+    (managedBranches template)
 
 getTemplateBranches
     :: [BranchFilter] -> TemplateInformation -> [TemplateBranchInformation]
@@ -186,20 +180,33 @@ applyBranchFilter (BranchFilterParentOf childBranch) ti =
 instance Pretty TemplateBranchInformation where
     pretty cfg = (align . vsep)
         [ "Branch name:      " <+> (align . pretty) (branchName cfg)
-        , "Base branch:      " <+> (align . pretty) (isBaseBranch cfg)
         , "Required branches:" <+> (align . pretty) (requiredBranches cfg)
         , "Branch variables: " <+> (align . pretty) (branchVariables cfg)
+        , "Hidden:           " <+> (align . pretty) (isHiddenBranch cfg)
         ]
 
 instance Pretty TemplateInformation where
     pretty cfg = (align . vsep)
         ["Branches:" <+> (align . pretty) (branchesInformation cfg)]
 
+instance Pretty TemplateYamlFeature where
+    pretty feature =
+        (align . vsep) ["Name:" <+> (align . pretty) (featureName feature)]
+
 instance Pretty TemplateYaml where
     pretty cfg = (align . vsep)
         [ "Variables:" <+> (align . pretty) (variables cfg)
         , "Features: " <+> (align . pretty) (features cfg)
         ]
+
+instance FromJSON TemplateYamlFeature where
+    parseJSON (Y.String v) =
+        pure $ TemplateYamlFeature { featureName = v, featureHidden = False }
+    parseJSON (Y.Object v) = case HashMap.toList v of
+        [(k, Y.Object vv)] ->
+            TemplateYamlFeature k <$> vv .:? "hidden" .!= False
+        _ -> fail "Invalid template YAML feature definition"
+    parseJSON _ = fail "Invalid template YAML feature definition"
 
 instance FromJSON TemplateYaml where
     parseJSON (Y.Object v) =
@@ -214,6 +221,9 @@ instance FromJSON TemplateYaml where
             .:? "excludes"
             .!= Set.empty
     parseJSON _ = fail "Invalid template YAML definition"
+
+instance ToJSON TemplateYamlFeature where
+    toJSON TemplateYamlFeature { featureName = n } = toJSON n
 
 instance ToJSON TemplateYaml where
     toJSON TemplateYaml { variables = v, features = f, excludes = e } =

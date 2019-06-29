@@ -20,10 +20,13 @@ import           Tenpureto.Effects.Terminal
 import           Tenpureto.Effects.UI.Internal
 
 data UIException = UnattendedNotPossible Text
+                 | NoBaseBranchesException
 
 instance Pretty UIException where
     pretty (UnattendedNotPossible missing) =
         "Input required when running in an unattended mode:" <+> pretty missing
+    pretty NoBaseBranchesException =
+        "Repository does not contain template branches"
 
 data ConflictResolutionStrategy = AlreadyResolved | MergeTool
 
@@ -38,7 +41,7 @@ data UI m a where
 makeSem ''UI
 
 runUIInTerminal
-    :: Members '[FileSystem, Terminal, TerminalInput] r
+    :: Members '[FileSystem, Error UIException, Terminal, TerminalInput] r
     => Sem (UI ': r) a
     -> Sem r a
 runUIInTerminal = interpret $ \case
@@ -52,11 +55,13 @@ runUIInTerminal = interpret $ \case
         -> FinalUpdateConfiguration <$> maybe inputPreviousCommit return mbc
 
     InputProjectConfiguration templateInformation providedConfiguration -> do
-        let bi        = branchesInformation templateInformation
-            bases     = filter isBaseBranch bi
+        let bi = filter (not . isHiddenBranch)
+                        (branchesInformation templateInformation)
+            bases     = filter (isBaseBranch templateInformation) bi
             features' = filter isFeatureBranch bi
             child base branch = Set.member base (requiredBranches branch)
-                && not (isBaseBranch branch)
+                && not (isBaseBranch templateInformation branch)
+        _    <- if null bases then throw NoBaseBranchesException else return ()
         base <- inputBaseBranch
             bases
             (preSelectedBaseBranch templateInformation providedConfiguration)

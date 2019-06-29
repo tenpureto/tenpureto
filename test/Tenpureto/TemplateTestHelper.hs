@@ -5,15 +5,19 @@ import qualified Data.Set                      as Set
 
 import           Tenpureto.Effects.Git          ( Committish(..) )
 import           Tenpureto.TemplateLoader       ( TemplateBranchInformation(..)
+                                                , TemplateYamlFeature(..)
                                                 )
 
 anonymousBranch :: Text -> [Text] -> TemplateBranchInformation
 anonymousBranch name deps = TemplateBranchInformation
-    { branchName       = name
-    , branchCommit     = Committish "undefined"
-    , requiredBranches = Set.fromList deps
-    , branchVariables  = mempty
-    , templateYaml     = mempty
+    { branchName          = name
+    , branchCommit        = Committish "undefined"
+    , requiredBranches    = Set.fromList deps
+    , branchVariables     = mempty
+    , templateYaml        = mempty
+    , templateYamlFeature = TemplateYamlFeature { featureName   = name
+                                                , featureHidden = False
+                                                }
     }
 
 branch :: Text -> [Text] -> TemplateBranchInformation

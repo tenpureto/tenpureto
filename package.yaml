@@ -19,6 +19,7 @@ dependencies:
 - path-io
 - directory
 - containers
+- unordered-containers
 - insert-ordered-containers
 - transformers
 - prettyprinter

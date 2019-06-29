@@ -37,7 +37,7 @@ preSelectedBaseBranch
     :: TemplateInformation -> PreliminaryProjectConfiguration -> Maybe Text
 preSelectedBaseBranch templateInformation providedConfiguration =
     let baseBranches = Set.fromList $ map branchName $ filter
-            isBaseBranch
+            (isBaseBranch templateInformation)
             (branchesInformation templateInformation)
         selected =
                 fromMaybe Set.empty (preSelectedBranches providedConfiguration)
@@ -54,7 +54,7 @@ preSelectedFeatureBranches
     -> Maybe (Set Text)
 preSelectedFeatureBranches templateInformation providedConfiguration =
     let featureBranches = Set.fromList $ map branchName $ filter
-            (not . isBaseBranch)
+            (not . isBaseBranch templateInformation)
             (branchesInformation templateInformation)
     in  fmap (Set.intersection featureBranches)
              (preSelectedBranches providedConfiguration)

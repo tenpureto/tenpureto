@@ -14,7 +14,6 @@ import           Data.Either
 import           Data.Either.Combinators
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
-import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
@@ -174,9 +173,7 @@ withPreparedTemplate projectConfiguration block = do
     withClonedRepository
             (buildRepositoryUrl $ selectedTemplate finalTemplateConfiguration)
         $ \repository -> do
-              templateInformation <- loadTemplateInformation'
-                  (selectedTemplate finalTemplateConfiguration)
-                  repository
+              templateInformation <- loadTemplateInformation repository
               logDebug
                   $  "Template information"
                   <> line
@@ -220,7 +217,7 @@ loadExistingProjectConfiguration projectPath =
                                               =<< previousCommitMessage
             , preTargetDirectory        = Just projectPath
             , prePreviousTemplateCommit = previousCommit
-            , preSelectedBranches       = fmap features yaml
+            , preSelectedBranches = fmap (Set.map featureName . features) yaml
             , preVariableValues         = fmap
                                               ( Map.fromList
                                               . InsOrdHashMap.toList
@@ -272,15 +269,18 @@ prepareTemplate repository template configuration =
                     (fmap branchName branchesToMerge)
                 checkoutTemplateBranch h >>= flip (foldlM mergeTemplateBranch) t
 
-replaceInSet :: Ord a => a -> a -> Set a -> Set a
-replaceInSet from to = Set.insert to . Set.delete from
-
-replaceBranchInYaml :: Text -> Text -> TemplateYaml -> TemplateYaml
-replaceBranchInYaml old new descriptor = TemplateYaml
+renameBranchInYaml :: Text -> Text -> TemplateYaml -> TemplateYaml
+renameBranchInYaml oldName newName descriptor = TemplateYaml
     { variables = variables descriptor
-    , features  = replaceInSet old new (features descriptor)
+    , features  = Set.map (renameBranch oldName newName) (features descriptor)
     , excludes  = excludes descriptor
     }
+  where
+    renameBranch old new b = if featureName b == old
+        then TemplateYamlFeature { featureName   = new
+                                 , featureHidden = featureHidden b
+                                 }
+        else b
 
 replaceInFunctor :: (Functor f, Eq a) => a -> a -> f a -> f a
 replaceInFunctor from to = fmap (\v -> if from == v then to else v)
@@ -309,11 +309,12 @@ generateTemplateGraph
     -> Sem r ()
 generateTemplateGraph template =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
-        templateInformation <- loadTemplateInformation' template repo
+        templateInformation <- loadTemplateInformation repo
         let nodeAttributes branch =
                 [("label", T.unpack (branchName branch)), ("shape", "box")]
-        let relevantBranches = filter
-                (\b -> isBaseBranch b || isFeatureBranch b)
+        let
+            relevantBranches = filter
+                (\b -> isBaseBranch templateInformation b || isFeatureBranch b)
                 (branchesInformation templateInformation)
         let nodes = map branchName relevantBranches `zip` relevantBranches
         let
@@ -336,7 +337,7 @@ listTemplateBranches
     -> Sem r ()
 listTemplateBranches template branchFilters =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
-        templateInformation <- loadTemplateInformation' template repo
+        templateInformation <- loadTemplateInformation repo
         let branches = getTemplateBranches branchFilters templateInformation
         traverse_ (sayLn . pretty . branchName) branches
 
@@ -352,7 +353,7 @@ renameTemplateBranch
     -> Sem r ()
 renameTemplateBranch template oldBranch newBranch interactive =
     runTemplateChange template interactive PushDirectly $ \repo -> do
-        templateInformation <- loadTemplateInformation' template repo
+        templateInformation <- loadTemplateInformation repo
         mainBranch          <- getTemplateBranch templateInformation oldBranch
         let bis = branchesInformation templateInformation
         let
@@ -360,7 +361,7 @@ renameTemplateBranch template oldBranch newBranch interactive =
                 checkoutBranch repo (branchName bi) Nothing
                 let descriptor = templateYaml bi
                     newDescriptor =
-                        replaceBranchInYaml oldBranch newBranch descriptor
+                        renameBranchInYaml oldBranch newBranch descriptor
                 writeAddFile repo
                              templateYamlFile
                              (formatTemplateYaml newDescriptor)
@@ -397,7 +398,7 @@ propagateTemplateBranchChanges
     -> Sem r ()
 propagateTemplateBranchChanges template sourceBranch pushMode =
     runTemplateChange template False pushMode $ \repo -> do
-        templateInformation <- loadTemplateInformation' template repo
+        templateInformation <- loadTemplateInformation repo
         branch <- getTemplateBranch templateInformation sourceBranch
         let childBranches = getTemplateBranches
                 [BranchFilterChildOf sourceBranch]
@@ -436,7 +437,7 @@ changeTemplateVariableValue
     -> Sem r ()
 changeTemplateVariableValue template oldValue newValue interactive =
     runTemplateChange template interactive PushDirectly $ \repo -> do
-        bis <- branchesInformation <$> loadTemplateInformation' template repo
+        bis <- branchesInformation <$> loadTemplateInformation repo
         templaterSettings <- compileSettings $ TemplaterSettings
             { templaterFromVariables = InsOrdHashMap.singleton "Variable"
                                                                oldValue
@@ -513,12 +514,13 @@ runTemplateChange template interactive changeMode f =
                 sayLn $ createBranchManually dst
                 return $ Left $ TenpuretoBranchNotCreated dst
             pullRequest settings UpdateBranch { sourceCommit = c, destinationRef = BranchRef dst, pullRequestRef = BranchRef src, pullRequestTitle = title }
-                = runError $ createOrUpdatePullRequest repo
-                                                       settings
-                                                       c
-                                                       title
-                                                       (internalBranchPrefix <> src)
-                                                       dst
+                = runError $ createOrUpdatePullRequest
+                    repo
+                    settings
+                    c
+                    title
+                    (internalBranchPrefix <> src)
+                    dst
         let pushRefsToServer PushDirectly changes = pushRefs repo changes
             pushRefsToServer UpstreamPullRequest { pullRequestSettings = settings } changes
                 = do
