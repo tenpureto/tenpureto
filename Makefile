@@ -3,7 +3,7 @@ MAKEFLAGS += --no-builtin-rules
 package = tenpureto
 
 stack         = stack
-stack_build   = $(stack) build
+stack_build   = $(stack) build --pedantic
 stack_install = $(stack) install
 
 dist = dist
