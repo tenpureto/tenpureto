@@ -17,6 +17,7 @@ import           Data.Text.Prettyprint.Doc.Render.Terminal
 import           Tenpureto.Effects.Terminal.Internal
 
 data Terminal m a where
+    TerminalWidth ::Terminal m (Maybe Int)
     SayLn ::Doc AnsiStyle -> Terminal m ()
 
 data TerminalInput m a where
@@ -48,7 +49,8 @@ runTerminalIO = runTerminalIOOutput . runTerminalIOInput
     runTerminalIOOutput
         :: Member (Lift IO) r => Sem (Terminal ': r) a -> Sem r a
     runTerminalIOOutput = interpret $ \case
-        SayLn msg -> sendM $ sayLnTerminal msg
+        TerminalWidth -> sendM getTerminalWidth
+        SayLn msg     -> sendM $ sayLnTerminal msg
     runTerminalIOInput
         :: Member (Lift IO) r => Sem (TerminalInput ': r) a -> Sem r a
     runTerminalIOInput = interpret $ \case

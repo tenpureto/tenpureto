@@ -14,9 +14,12 @@ import qualified System.Console.Terminal.Size  as TS
 layoutOptions :: Maybe Int -> LayoutOptions
 layoutOptions w = LayoutOptions $ maybe Unbounded (flip AvailablePerLine 1.0) w
 
+getTerminalWidth :: IO (Maybe Int)
+getTerminalWidth = fmap TS.width <$> TS.size
+
 renderToTerminal :: Doc AnsiStyle -> IO ()
 renderToTerminal msg = do
-    options <- layoutOptions . fmap TS.width <$> TS.size
+    options <- layoutOptions <$> getTerminalWidth
     renderIO stdout (layoutPretty options msg)
     hFlush stdout
 

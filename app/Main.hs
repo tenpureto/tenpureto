@@ -252,19 +252,20 @@ templateCommands = hsubparser
            )
     )
 
+runBaseM :: Sem '[TerminalInput, Terminal, Resource, Lift IO] a -> IO a
+runBaseM = (runM .@ runResourceInIO) . runTerminalIO
+
 runAppM
-    :: Bool
+    :: Members '[TerminalInput, Terminal, Resource, Lift IO] r
+    => Bool
     -> Bool
     -> Sem
-           '[GitServer, Git, Process, Logging, UI, FileSystem, Error
-               UIException, Error GitException, Error TenpuretoException, TerminalInput, Terminal, Resource, Lift
-               IO]
-           ()
-    -> IO ()
+           (GitServer ': Git ': Process ': Logging ': UI ': FileSystem ': Error
+               UIException ': Error GitException ': Error TenpuretoException ': r)
+           a
+    -> Sem r a
 runAppM withDebug unattended =
-    (runM .@ runResourceInIO)
-        . runTerminalIO
-        . runTenpuretoException
+        runTenpuretoException
         . runError @TenpuretoException
         . runErrorAsAnother TenpuretoGitException
         . runErrorAsAnother TenpuretoUIException
@@ -278,12 +279,12 @@ runAppM withDebug unattended =
 
 runTenpuretoException
     :: Members '[Lift IO, Terminal] r
-    => Sem r (Either TenpuretoException ())
-    -> Sem r ()
+    => Sem r (Either TenpuretoException a)
+    -> Sem r a
 runTenpuretoException = (=<<) handleResult
   where
-    handleResult (Right ()) = return ()
-    handleResult (Left  e ) = do
+    handleResult (Right a) = return a
+    handleResult (Left  e) = do
         sayLn $ pretty e
         sendM $ exitWith (ExitFailure 1)
 
@@ -295,7 +296,7 @@ runUI
 runUI False = runUIInTerminal
 runUI True  = runUIUnattended
 
-runCommand :: Command -> IO ()
+runCommand :: Members '[TerminalInput, Terminal, Resource, Lift IO] r => Command -> Sem r ()
 runCommand Create { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
     = runAppM d u $ do
         resolvedTd <- traverse resolveDir td
@@ -329,8 +330,12 @@ runCommand TemplatePropagateChanges { templateName = t, branchFilters = bfs, rem
 runCommand TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d False $ changeTemplateVariableValue t ov nv i
 
-main :: IO ()
-main = customExecParser p opts >>= runCommand
+runOptParser :: Members '[TerminalInput, Terminal, Resource, Lift IO] r => Sem r ()
+runOptParser = do
+    w <- fromMaybe 80 <$> terminalWidth
+    let p = prefs (showHelpOnEmpty <> columns w)
+    c <- sendM (customExecParser p opts)
+    runCommand c
   where
     commands = hsubparser
         (  command
@@ -347,4 +352,6 @@ main = customExecParser p opts >>= runCommand
                    (info templateCommands (progDesc "Manage a template"))
         )
     opts = info (commands <**> versionOption <**> helper) fullDesc
-    p    = prefs showHelpOnEmpty
+
+main :: IO ()
+main = runBaseM runOptParser
