@@ -10,6 +10,7 @@ where
 
 import           Polysemy
 
+import           Data.Bool
 import           Data.Text                      ( Text )
 import           Data.Text.Prettyprint.Doc
 import           Data.Text.Prettyprint.Doc.Render.Terminal
@@ -22,23 +23,23 @@ data Terminal m a where
 
 data TerminalInput m a where
     Ask ::Doc AnsiStyle -> Maybe Text -> TerminalInput m Text
-    AskUntil ::Doc AnsiStyle -> Maybe Text -> (Text -> Either (Doc AnsiStyle) a) -> TerminalInput m a
+    AskUntil ::s -> (s -> (Doc AnsiStyle, Maybe Text)) -> (s -> Text -> Either s a) -> TerminalInput m a
 
 makeSem ''Terminal
 makeSem ''TerminalInput
 
 
 confirm :: Member TerminalInput r => Doc AnsiStyle -> Maybe Bool -> Sem r Bool
-confirm request def = askUntil (request <+> "(y/n)?")
-                               (fmap defAns def)
-                               mapAnswer
+confirm msg def = askUntil Nothing request process
   where
-    mapAnswer x = case x of
-        "y" -> Right True
-        "n" -> Right False
-        _   -> Left "Please answer \"y\" or \"n\"."
-    defAns True  = "y"
-    defAns False = "n"
+    defAns = fmap (bool "n" "y") def
+    request Nothing = (msg <+> "(y/n)?", defAns)
+    request (Just _) =
+        ("Please answer \"y\" or \"n\"." <+> msg <+> "(y/n)?", defAns)
+    process = const mapAnswer
+    mapAnswer "y" = Right True
+    mapAnswer "n" = Right False
+    mapAnswer p   = Left (Just p)
 
 
 
@@ -54,5 +55,6 @@ runTerminalIO = runTerminalIOOutput . runTerminalIOInput
     runTerminalIOInput
         :: Member (Lift IO) r => Sem (TerminalInput ': r) a -> Sem r a
     runTerminalIOInput = interpret $ \case
-        Ask msg defans            -> sendM $ askTerminal msg defans
-        AskUntil msg defans reask -> sendM $ askTerminalUntil msg defans reask
+        Ask msg defans -> sendM $ askTerminal msg defans
+        AskUntil state request process ->
+            sendM $ askTerminalUntil state request process

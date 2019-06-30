@@ -10,6 +10,7 @@ import           Data.Maybe
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
 import           Data.Foldable
+import           Control.Monad
 
 import           Tenpureto.Data
 import           Tenpureto.Messages
@@ -61,7 +62,7 @@ runUIInTerminal = interpret $ \case
             features' = filter isFeatureBranch bi
             child base branch = Set.member base (requiredBranches branch)
                 && not (isBaseBranch templateInformation branch)
-        _    <- if null bases then throw NoBaseBranchesException else return ()
+        when (null bases) $ throw NoBaseBranchesException
         base <- inputBaseBranch
             bases
             (preSelectedBaseBranch templateInformation providedConfiguration)

@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module Tenpureto.Effects.Terminal.Internal where
 
 import           Data.Text                      ( Text )
@@ -8,6 +10,10 @@ import           Data.Functor
 
 import           System.IO                      ( stdout
                                                 , hFlush
+                                                )
+import           System.Console.ANSI            ( cursorUp
+                                                , setCursorColumn
+                                                , clearFromCursorToScreenEnd
                                                 )
 import qualified System.Console.Terminal.Size  as TS
 
@@ -26,23 +32,42 @@ renderToTerminal msg = do
 sayLnTerminal :: Doc AnsiStyle -> IO ()
 sayLnTerminal msg = renderToTerminal (msg <> "\n")
 
-askTerminal :: Doc AnsiStyle -> Maybe Text -> IO Text
-askTerminal prompt (Just defans) = do
-    renderToTerminal
+putDocTerminal :: Doc AnsiStyle -> IO Int
+putDocTerminal msg = do
+    options <- layoutOptions <$> getTerminalWidth
+    let text = renderStrict (layoutPretty options msg)
+    let h = length (T.lines text)
+    putStr (T.unpack text)
+    hFlush stdout
+    return h
+
+askTerminalH :: Doc AnsiStyle -> Maybe Text -> IO (Text, Int)
+askTerminalH prompt (Just defans) = do
+    h <- putDocTerminal
         $   prompt
         <+> annotate (color Black) ((brackets . pretty) defans)
         <>  " "
     input <- T.pack <$> getLine
-    return $ if T.null input then defans else input
-askTerminal prompt Nothing = do
-    renderToTerminal $ prompt <> " "
-    T.pack <$> getLine
+    return (if T.null input then defans else input) <&> (, h)
+askTerminalH prompt Nothing = do
+    h <- putDocTerminal $ prompt <> " "
+    T.pack <$> getLine <&> (, h)
+
+askTerminal :: Doc AnsiStyle -> Maybe Text -> IO Text
+askTerminal prompt defans = askTerminalH prompt defans <&> fst
 
 askTerminalUntil
-    :: Doc AnsiStyle -> Maybe Text -> (Text -> Either (Doc AnsiStyle) a) -> IO a
-askTerminalUntil prompt defans confirm =
-    askTerminal prompt defans <&> confirm >>= reprompt
+    :: s
+    -> (s -> (Doc AnsiStyle, Maybe Text))
+    -> (s -> Text -> Either s a)
+    -> IO a
+askTerminalUntil state request process = do
+    (ans, h) <- uncurry askTerminalH (request state)
+    reprompt h (process state ans)
   where
-    reprompt (Left prompt') =
-        askTerminalUntil (prompt' <+> prompt) defans confirm
-    reprompt (Right result) = return result
+    reprompt h (Left s) = do
+        cursorUp h
+        setCursorColumn 0
+        clearFromCursorToScreenEnd
+        askTerminalUntil s request process
+    reprompt _ (Right r) = return r

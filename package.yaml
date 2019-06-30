@@ -24,6 +24,7 @@ dependencies:
 - transformers
 - prettyprinter
 - prettyprinter-ansi-terminal
+- ansi-terminal
 - terminal-size
 - typed-process
 - optparse-applicative

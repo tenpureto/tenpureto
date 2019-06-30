@@ -65,80 +65,104 @@ branchesByNames templateInformation branches = filter
     (flip Set.member branches . branchName)
     (branchesInformation templateInformation)
 
-inputBranch
-    :: Members '[Terminal, TerminalInput] r
-    => Doc AnsiStyle
-    -> Doc AnsiStyle
-    -> [TemplateBranchInformation]
-    -> Set Text
-    -> Sem r (Maybe Text)
-inputBranch title request availableBranches selected =
-    let
-        indexedBranches :: [(Int, TemplateBranchInformation)]
-        indexedBranches = [1 ..] `zip` availableBranches
-        branchLineIndex :: Int -> String
-        branchLineIndex = printf "%2d) "
-        branchLineSelected :: TemplateBranchInformation -> Doc AnsiStyle
-        branchLineSelected branch =
-            let isSelected = Set.member (branchName branch) selected
-            in  bool "  " " *" isSelected
-        branchLineName :: TemplateBranchInformation -> Doc AnsiStyle
-        branchLineName = pretty . branchName
-        branchLine :: (Int, TemplateBranchInformation) -> Doc AnsiStyle
-        branchLine (index, branch) =
-            annotate (color Green) (branchLineSelected branch)
-                <> pretty (branchLineIndex index)
-                <> annotate (color White) (branchLineName branch)
-        branchByIndex :: Text -> Maybe TemplateBranchInformation
-        branchByIndex index =
-            find (\x -> T.unpack index == (show . fst) x) indexedBranches
-                <&> snd
-        validateInput :: Text -> Either (Doc AnsiStyle) Text
-        validateInput input = if T.null input || isJust (branchByIndex input)
-            then Right input
-            else Left (pretty input <> " is not a valid branch number.")
-        indexToBranch :: Text -> Maybe Text
-        indexToBranch index = branchByIndex index <&> branchName
-    in
-        do
-            sayLn title
-            traverse_ (sayLn . branchLine) indexedBranches
-            askUntil (request <> ":") Nothing validateInput <&> indexToBranch
+type InputBranchState = (Set Text, Maybe Text)
+
+inputBranchList :: [TemplateBranchInformation] -> Set Text -> Doc AnsiStyle
+inputBranchList availableBranches selectedBranches = vsep
+    $ fmap branchLine ([1 ..] `zip` availableBranches)
+  where
+    branchLineIndex :: Int -> String
+    branchLineIndex = printf "%2d) "
+    branchLineSelected :: TemplateBranchInformation -> Doc AnsiStyle
+    branchLineSelected branch =
+        bool "  " " *" (Set.member (branchName branch) selectedBranches)
+    branchLineName :: TemplateBranchInformation -> Doc AnsiStyle
+    branchLineName = pretty . branchName
+    branchLine :: (Int, TemplateBranchInformation) -> Doc AnsiStyle
+    branchLine (index, branch) =
+        annotate (color Green) (branchLineSelected branch)
+            <> pretty (branchLineIndex index)
+            <> annotate (color White) (branchLineName branch)
+
+branchByIndex
+    :: [TemplateBranchInformation] -> Text -> Maybe TemplateBranchInformation
+branchByIndex availableBranches index =
+    let isIndex :: (Int, a) -> Bool
+        isIndex = (==) index . T.pack . show . fst
+    in  find isIndex ([1 ..] `zip` availableBranches) <&> snd
 
 inputBaseBranch
     :: Members '[Terminal, TerminalInput] r
     => [TemplateBranchInformation]
     -> Maybe Text
     -> Sem r Text
-inputBaseBranch [single] _        = return (branchName single)
-inputBaseBranch branches selected = do
-    selection <- inputBranch "Base branches"
-                             "Select a base branch"
-                             branches
-                             (maybe Set.empty Set.singleton selected)
-    case selection of
-        Just branch -> return branch
-        Nothing     -> maybe (inputBaseBranch branches selected) return selected
-
-toggleBranch :: Text -> Set Text -> Set Text
-toggleBranch branch selected = bool (Set.insert branch selected)
-                                    (Set.delete branch selected)
-                                    (Set.member branch selected)
+inputBaseBranch availableBranches initialSelection = askUntil initial
+                                                              request
+                                                              process
+  where
+    initial :: Maybe Text
+    initial = Nothing
+    request :: Maybe Text -> (Doc AnsiStyle, Maybe Text)
+    request badInput =
+        let
+            doc =
+                "Base branches:\n"
+                    <> inputBranchList
+                           availableBranches
+                           (Set.fromList (maybeToList initialSelection))
+                    <> "\n"
+                    <> maybe
+                           ""
+                           (\x ->
+                               dquotes (pretty x)
+                                   <+> "is not a valid branch index. "
+                           )
+                           badInput
+                    <> "Select a base branch:"
+        in  (doc, Nothing)
+    process :: Maybe Text -> Text -> Either (Maybe Text) Text
+    process _ input = case branchByIndex availableBranches input of
+        Just bi -> Right $ branchName bi
+        Nothing -> Left $ Just input
 
 inputFeatureBranches
     :: Members '[Terminal, TerminalInput] r
     => [TemplateBranchInformation]
     -> Set Text
     -> Sem r (Set Text)
-inputFeatureBranches branches selected = do
-    selection <- inputBranch "Feature branches"
-                             "Add or remove a feature branch"
-                             branches
-                             selected
-    case selection of
-        Just branch ->
-            inputFeatureBranches branches (toggleBranch branch selected)
-        Nothing -> return selected
+inputFeatureBranches availableBranches initialSelection = askUntil initial
+                                                                   request
+                                                                   process
+  where
+    initial :: InputBranchState
+    initial = (initialSelection, Nothing)
+    request :: InputBranchState -> (Doc AnsiStyle, Maybe Text)
+    request (selected, badInput) =
+        let
+            doc =
+                "Feature branches:\n"
+                    <> inputBranchList availableBranches selected
+                    <> "\n"
+                    <> maybe
+                           ""
+                           (\x ->
+                               dquotes (pretty x)
+                                   <+> "is not a valid branch index. "
+                           )
+                           badInput
+                    <> "Add or remove a feature branch:"
+        in  (doc, Nothing)
+    process :: InputBranchState -> Text -> Either InputBranchState (Set Text)
+    process (selected, _) "" = Right selected
+    process (selected, _) input =
+        Left $ case branchByIndex availableBranches input of
+            Just bi ->
+                let branch      = branchName bi
+                    newSelected = if branch `Set.member` selected
+                        then branch `Set.delete` selected
+                        else branch `Set.insert` selected
+                in  (newSelected, Nothing)
+            Nothing -> (selected, Just input)
 
 withDefaults :: Ord a => InsOrdHashMap a b -> Map a b -> InsOrdHashMap a b
 withDefaults vars defaults =
