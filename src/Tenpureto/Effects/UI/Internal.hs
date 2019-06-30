@@ -4,7 +4,6 @@ module Tenpureto.Effects.UI.Internal where
 
 import           Polysemy
 
-import           Data.Bool
 import           Data.Maybe
 import qualified Data.Text                     as T
 import           Data.Set                       ( Set )
@@ -59,13 +58,23 @@ preSelectedFeatureBranches templateInformation providedConfiguration =
     in  fmap (Set.intersection featureBranches)
              (preSelectedBranches providedConfiguration)
 
-branchesByNames
+templateBranchesByNames
     :: TemplateInformation -> Set Text -> [TemplateBranchInformation]
-branchesByNames templateInformation branches = filter
-    (flip Set.member branches . branchName)
-    (branchesInformation templateInformation)
+templateBranchesByNames templateInformation =
+    filterBranchesByNames (branchesInformation templateInformation)
+
+filterBranchesByNames
+    :: [TemplateBranchInformation] -> Set Text -> [TemplateBranchInformation]
+filterBranchesByNames availableBranches branches =
+    filter (flip Set.member branches . branchName) availableBranches
 
 type InputBranchState = (Set Text, Maybe Text)
+
+branchSelection :: [TemplateBranchInformation] -> Set Text -> Set Text
+branchSelection availableBranches selectedBranches =
+    Set.unions
+        $   requiredBranches
+        <$> filterBranchesByNames availableBranches selectedBranches
 
 inputBranchList :: [TemplateBranchInformation] -> Set Text -> Doc AnsiStyle
 inputBranchList availableBranches selectedBranches = vsep
@@ -73,16 +82,27 @@ inputBranchList availableBranches selectedBranches = vsep
   where
     branchLineIndex :: Int -> String
     branchLineIndex = printf "%2d) "
-    branchLineSelected :: TemplateBranchInformation -> Doc AnsiStyle
+    transitivelySelected :: Set Text
+    transitivelySelected = branchSelection availableBranches selectedBranches
+    branchLineSelected
+        :: TemplateBranchInformation -> (Doc AnsiStyle, Doc AnsiStyle)
     branchLineSelected branch =
-        bool "  " " *" (Set.member (branchName branch) selectedBranches)
+        let name       = branchName branch
+            selected   = name `Set.member` selectedBranches
+            transitive = name `Set.member` transitivelySelected
+        in  case (selected, transitive) of
+                (True , _    ) -> (" *", "")
+                (False, True ) -> (" +", " [transitive dependency]")
+                (False, False) -> ("  ", "")
     branchLineName :: TemplateBranchInformation -> Doc AnsiStyle
     branchLineName = pretty . branchName
     branchLine :: (Int, TemplateBranchInformation) -> Doc AnsiStyle
     branchLine (index, branch) =
-        annotate (color Green) (branchLineSelected branch)
+        annotate (color Green) selectedPrefix
             <> pretty (branchLineIndex index)
             <> annotate (color White) (branchLineName branch)
+            <> selectedSuffix
+        where (selectedPrefix, selectedSuffix) = branchLineSelected branch
 
 branchByIndex
     :: [TemplateBranchInformation] -> Text -> Maybe TemplateBranchInformation
@@ -153,7 +173,8 @@ inputFeatureBranches availableBranches initialSelection = askUntil initial
                     <> "Add or remove a feature branch:"
         in  (doc, Nothing)
     process :: InputBranchState -> Text -> Either InputBranchState (Set Text)
-    process (selected, _) "" = Right selected
+    process (selected, _) "" =
+        Right $ branchSelection availableBranches selected
     process (selected, _) input =
         Left $ case branchByIndex availableBranches input of
             Just bi ->

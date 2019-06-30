@@ -115,7 +115,7 @@ runUIUnattended = interpret $ \case
             <$> maybe
                     (notPossible "selected branches")
                     return
-                    (fmap (branchesByNames templateInformation)
+                    (fmap (templateBranchesByNames templateInformation)
                           (preSelectedBranches providedConfiguration)
                     )
             <*> maybe (notPossible "variable values")
