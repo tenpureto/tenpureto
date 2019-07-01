@@ -57,7 +57,7 @@ data TemplateBranchInformation = TemplateBranchInformation
     , requiredBranches :: Set Text
     , branchVariables :: InsOrdHashMap Text Text
     , templateYaml :: TemplateYaml
-    , templateYamlFeature :: TemplateYamlFeature
+    , templateYamlFeature :: Maybe TemplateYamlFeature
     }
     deriving (Show, Eq)
 
@@ -74,8 +74,8 @@ loadTemplateInformation
 loadTemplateInformation repo = do
     allBranches <- listBranches repo
     let branches = filter (not . T.isPrefixOf internalBranchPrefix) allBranches
-    branchConfigurations <-
-        traverse (loadBranchConfiguration repo) $ sort $ branches
+    branchConfigurations <- traverse (loadBranchConfiguration repo)
+        $ sort branches
     let bi = catMaybes branchConfigurations
     return $ TemplateInformation { branchesInformation = bi }
 
@@ -89,8 +89,8 @@ loadBranchConfiguration repo branch = runMaybeT $ do
         $ findCommitByRef repo (BranchRef $ T.pack "remotes/origin/" <> branch)
     descriptor <- MaybeT $ getRepositoryFile repo branchHead templateYamlFile
     info       <- MaybeT . return . rightToMaybe $ parseTemplateYaml descriptor
-    let fb = features info
-    currentFeature <- MaybeT . return $ find ((==) branch . featureName) fb
+    let fb             = features info
+    let currentFeature = find ((==) branch . featureName) fb
     return $ TemplateBranchInformation
         { branchName          = branch
         , branchCommit        = branchHead
@@ -109,7 +109,7 @@ isFeatureBranch :: TemplateBranchInformation -> Bool
 isFeatureBranch b = branchName b `Set.member` requiredBranches b
 
 isHiddenBranch :: TemplateBranchInformation -> Bool
-isHiddenBranch = featureHidden . templateYamlFeature
+isHiddenBranch = maybe False featureHidden . templateYamlFeature
 
 isMergeOf :: TemplateBranchInformation -> [TemplateBranchInformation] -> Bool
 isMergeOf bi bis =

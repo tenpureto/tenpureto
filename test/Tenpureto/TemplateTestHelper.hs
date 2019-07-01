@@ -5,7 +5,6 @@ import qualified Data.Set                      as Set
 
 import           Tenpureto.Effects.Git          ( Committish(..) )
 import           Tenpureto.TemplateLoader       ( TemplateBranchInformation(..)
-                                                , TemplateYamlFeature(..)
                                                 )
 
 anonymousBranch :: Text -> [Text] -> TemplateBranchInformation
@@ -15,9 +14,7 @@ anonymousBranch name deps = TemplateBranchInformation
     , requiredBranches    = Set.fromList deps
     , branchVariables     = mempty
     , templateYaml        = mempty
-    , templateYamlFeature = TemplateYamlFeature { featureName   = name
-                                                , featureHidden = False
-                                                }
+    , templateYamlFeature = Nothing
     }
 
 branch :: Text -> [Text] -> TemplateBranchInformation
