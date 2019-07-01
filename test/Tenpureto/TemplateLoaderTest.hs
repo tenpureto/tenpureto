@@ -132,18 +132,21 @@ test_parseTemplateYaml =
         @?= Right TemplateYaml
                 { variables = InsOrdHashMap.empty
                 , features  = Set.singleton TemplateYamlFeature
-                                  { featureName   = "a"
-                                  , featureHidden = False
+                                  { featureName        = "a"
+                                  , featureDescription = Nothing
+                                  , featureHidden      = False
                                   }
                 , excludes  = Set.empty
                 }
     , testCase "parse extended features"
-        $   parseTemplateYaml "features: [ a: { hidden: true } ]"
+        $   parseTemplateYaml
+                "features: [ a: { description: foo, hidden: true } ]"
         @?= Right TemplateYaml
                 { variables = InsOrdHashMap.empty
                 , features  = Set.singleton TemplateYamlFeature
-                                  { featureName   = "a"
-                                  , featureHidden = True
+                                  { featureName        = "a"
+                                  , featureDescription = Just "foo"
+                                  , featureHidden      = True
                                   }
                 , excludes  = Set.empty
                 }

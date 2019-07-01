@@ -5,6 +5,7 @@ module Tenpureto.Effects.UI.Internal where
 import           Polysemy
 
 import           Data.Maybe
+import           Data.List
 import qualified Data.Text                     as T
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
@@ -13,8 +14,7 @@ import qualified Data.Map                      as Map
 import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Functor
-import           Data.Foldable
-import           Text.Printf
+import           Control.Monad
 import           Data.Text.Prettyprint.Doc.Render.Terminal
 
 import           Tenpureto.Data
@@ -77,32 +77,52 @@ branchSelection availableBranches selectedBranches =
         <$> filterBranchesByNames availableBranches selectedBranches
 
 inputBranchList :: [TemplateBranchInformation] -> Set Text -> Doc AnsiStyle
-inputBranchList availableBranches selectedBranches = vsep
-    $ fmap branchLine ([1 ..] `zip` availableBranches)
+inputBranchList availableBranches selectedBranches = vsep $ zipWith5
+    renderLine
+    selectedPrefixes
+    branchIndexes
+    branchNames
+    descriptions
+    notes
   where
-    branchLineIndex :: Int -> String
-    branchLineIndex = printf "%2d) "
-    transitivelySelected :: Set Text
+    renderLine :: Text -> Text -> Text -> Text -> Text -> Doc AnsiStyle
+    renderLine selectedPrefix index branch description note =
+        annotate (color Green) (pretty selectedPrefix)
+            <+> pretty index
+            <>  ")"
+            <+> hang
+                    4
+                    (  annotate (color White) (pretty branch)
+                    <> softline
+                    <> softline
+                    <> annotate (color Green) (pretty description)
+                    <> softline
+                    <> annotate (color Black) (pretty note)
+                    )
+    equalize texts =
+        let w = maximum (fmap T.length texts)
+        in  fmap (T.justifyLeft w ' ') texts
+    branchIndexes =
+        equalize
+            $     (T.pack . show . (fst @Int))
+            <$>   [1 ..]
+            `zip` availableBranches
     transitivelySelected = branchSelection availableBranches selectedBranches
-    branchLineSelected
-        :: TemplateBranchInformation -> (Doc AnsiStyle, Doc AnsiStyle)
     branchLineSelected branch =
         let name       = branchName branch
             selected   = name `Set.member` selectedBranches
             transitive = name `Set.member` transitivelySelected
         in  case (selected, transitive) of
                 (True , _    ) -> (" *", "")
-                (False, True ) -> (" +", " [transitive dependency]")
+                (False, True ) -> (" +", "[transitive dependency]")
                 (False, False) -> ("  ", "")
-    branchLineName :: TemplateBranchInformation -> Doc AnsiStyle
-    branchLineName = pretty . branchName
-    branchLine :: (Int, TemplateBranchInformation) -> Doc AnsiStyle
-    branchLine (index, branch) =
-        annotate (color Green) selectedPrefix
-            <> pretty (branchLineIndex index)
-            <> annotate (color White) (branchLineName branch)
-            <> selectedSuffix
-        where (selectedPrefix, selectedSuffix) = branchLineSelected branch
+    (selectedPrefixes, notes) =
+        unzip $ fmap branchLineSelected availableBranches
+    branchNames  = equalize $ fmap branchName availableBranches
+    descriptions = fmap
+        (fromMaybe "" . (templateYamlFeature >=> featureDescription))
+        availableBranches
+
 
 branchByIndex
     :: [TemplateBranchInformation] -> Text -> Maybe TemplateBranchInformation

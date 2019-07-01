@@ -40,6 +40,7 @@ data BranchFilter = BranchFilterEqualTo Text
 
 data TemplateYamlFeature = TemplateYamlFeature
         { featureName :: Text
+        , featureDescription :: Maybe Text
         , featureHidden :: Bool
         }
         deriving (Show, Eq, Ord)
@@ -185,7 +186,10 @@ instance Pretty TemplateBranchInformation where
         [ "Branch name:      " <+> (align . pretty) (branchName cfg)
         , "Required branches:" <+> (align . pretty) (requiredBranches cfg)
         , "Branch variables: " <+> (align . pretty) (branchVariables cfg)
-        , "Hidden:           " <+> (align . pretty) (isHiddenBranch cfg)
+        , "Description:      " <+> (align . pretty)
+            (featureDescription =<< templateYamlFeature cfg)
+        , "Hidden:           "
+            <+> (align . pretty) (featureHidden <$> templateYamlFeature cfg)
         ]
 
 instance Pretty TemplateInformation where
@@ -203,11 +207,19 @@ instance Pretty TemplateYaml where
         ]
 
 instance FromJSON TemplateYamlFeature where
-    parseJSON (Y.String v) =
-        pure $ TemplateYamlFeature { featureName = v, featureHidden = False }
+    parseJSON (Y.String v) = pure $ TemplateYamlFeature
+        { featureName        = v
+        , featureDescription = Nothing
+        , featureHidden      = False
+        }
     parseJSON (Y.Object v) = case HashMap.toList v of
         [(k, Y.Object vv)] ->
-            TemplateYamlFeature k <$> vv .:? "hidden" .!= False
+            TemplateYamlFeature k
+                <$> vv
+                .:? "description"
+                <*> vv
+                .:? "hidden"
+                .!= False
         _ -> fail "Invalid template YAML feature definition"
     parseJSON _ = fail "Invalid template YAML feature definition"
 

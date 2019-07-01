@@ -277,8 +277,9 @@ renameBranchInYaml oldName newName descriptor = TemplateYaml
     }
   where
     renameBranch old new b = if featureName b == old
-        then TemplateYamlFeature { featureName   = new
-                                 , featureHidden = featureHidden b
+        then TemplateYamlFeature { featureName        = new
+                                 , featureDescription = featureDescription b
+                                 , featureHidden      = featureHidden b
                                  }
         else b
 
