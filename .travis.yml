@@ -13,7 +13,7 @@ stages:
   - test
   - package
   - name: publish
-    if: branch = master
+    if: branch = master OR tag =~ ^v
 
 env:
   global:
