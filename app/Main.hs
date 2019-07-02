@@ -42,11 +42,12 @@ data Command
             }
     | TemplateGraph
             { templateName :: Text
+            , branchFilter :: BranchFilter
             , enableDebugLogging :: Bool
             }
     | TemplateListBranches
             { templateName :: Text
-            , branchFilters :: [BranchFilter]
+            , branchFilter :: BranchFilter
             , enableDebugLogging :: Bool
             }
     | TemplateRenameBranch
@@ -58,7 +59,7 @@ data Command
             }
     | TemplatePropagateChanges
             { templateName :: Text
-            , branchFilters :: [BranchFilter]
+            , branchFilter :: BranchFilter
             , remoteChangeMode :: RemoteChangeMode
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
@@ -116,6 +117,9 @@ branchFilterNameOption = BranchFilterEqualTo <$> strOption
     (long "branch" <> metavar "<branch>" <> help "Branch name to filter against"
     )
 
+branchFilterNamesOption :: Parser BranchFilter
+branchFilterNamesOption = BranchFilterOr <$> many branchFilterNameOption
+
 branchFilterChildOfOption :: Parser BranchFilter
 branchFilterChildOfOption = BranchFilterChildOf <$> strOption
     (long "children-of" <> metavar "<branch>" <> help
@@ -128,9 +132,24 @@ branchFilterParentOfOption = BranchFilterParentOf <$> strOption
         "Parent branches of a given branch"
     )
 
-branchFilterOptions :: Parser [BranchFilter]
-branchFilterOptions = (fmap catMaybes . traverse optional)
+branchFilterOptions :: Parser BranchFilter
+branchFilterOptions = BranchFilterAnd <$> (fmap catMaybes . traverse optional)
     [branchFilterChildOfOption, branchFilterParentOfOption]
+
+branchTypeIncludeHiddenFlag :: Parser BranchFilter
+branchTypeIncludeHiddenFlag = flag BranchFilterNone BranchFilterIsHiddenBranch
+        (  long "include-hidden"
+        <> help "Include hidden branches"
+        )
+
+branchTypeIncludeMergesFlag :: Parser BranchFilter
+branchTypeIncludeMergesFlag = flag BranchFilterNone BranchFilterIsMergeBranch
+                (  long "include-merges"
+                <> help "Include merge branches"
+                )
+
+branchTypeFilterOption :: Parser BranchFilter
+branchTypeFilterOption = BranchFilterOr <$> sequenceA [pure BranchFilterIsFeatureBranch, branchTypeIncludeHiddenFlag, branchTypeIncludeMergesFlag]
 
 oldVariableValueOption :: Parser Text
 oldVariableValueOption = strOption
@@ -189,7 +208,7 @@ updateCommand =
         <*> debugSwitch
 
 templateGraphCommand :: Parser Command
-templateGraphCommand = TemplateGraph <$> templateNameOption <*> debugSwitch
+templateGraphCommand = TemplateGraph <$> templateNameOption <*> branchTypeFilterOption <*> debugSwitch
 
 templateListBranchesCommand :: Parser Command
 templateListBranchesCommand =
@@ -211,7 +230,7 @@ propagateChanges :: Parser Command
 propagateChanges =
     TemplatePropagateChanges
         <$> templateNameOption
-        <*> many branchFilterNameOption
+        <*> branchFilterNamesOption
         <*> remoteChangeModeOptionSet
         <*> unattendedSwitch
         <*> debugSwitch
@@ -319,14 +338,14 @@ runCommand Update { maybeTemplateName = t, maybeTargetDirectory = td, maybePrevi
                 , preVariableValues         = Nothing
                 }
         updateProject (inputConfig <> currentConfig)
-runCommand TemplateGraph { templateName = t, enableDebugLogging = d } =
-    runAppM d True $ generateTemplateGraph t
-runCommand TemplateListBranches { templateName = t, branchFilters = bfs, enableDebugLogging = d }
-    = runAppM d True $ listTemplateBranches t bfs
+runCommand TemplateGraph { templateName = t, branchFilter = bf, enableDebugLogging = d } =
+    runAppM d True $ generateTemplateGraph t bf
+runCommand TemplateListBranches { templateName = t, branchFilter = bf, enableDebugLogging = d }
+    = runAppM d True $ listTemplateBranches t bf
 runCommand TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d False $ renameTemplateBranch t on nn i
-runCommand TemplatePropagateChanges { templateName = t, branchFilters = bfs, remoteChangeMode = cm, runUnattended = u, enableDebugLogging = d }
-    = runAppM d u $ propagateTemplateBranchChanges t bfs cm
+runCommand TemplatePropagateChanges { templateName = t, branchFilter = bf, remoteChangeMode = cm, runUnattended = u, enableDebugLogging = d }
+    = runAppM d u $ propagateTemplateBranchChanges t bf cm
 runCommand TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d False $ changeTemplateVariableValue t ov nv i
 

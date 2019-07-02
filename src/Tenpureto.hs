@@ -307,26 +307,43 @@ generateTemplateGraph
                TenpuretoException]
            r
     => Text
+    -> BranchFilter
     -> Sem r ()
-generateTemplateGraph template =
+generateTemplateGraph template branchFilter =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
         templateInformation <- loadTemplateInformation repo
-        let nodeAttributes branch =
-                [("label", T.unpack (branchName branch)), ("shape", "box")]
-        let
-            relevantBranches = filter
-                (\b -> isBaseBranch templateInformation b || isFeatureBranch b)
-                (branchesInformation templateInformation)
-        let nodes = map branchName relevantBranches `zip` relevantBranches
-        let
-            graph =
-                netlistGraph
+        let nodeAttributes branch
+                | isMergeBranch templateInformation branch
+                = [("label", ""), circle, dotted]
+                | isHiddenBranch branch
+                = [("label", T.unpack (branchName branch)), box, dotted]
+                | otherwise
+                = [("label", T.unpack (branchName branch)), box]
+        let edgeAttributes _ dst
+                | isMergeBranch templateInformation dst
+                = [("style", "dotted")]
+                | otherwise
+                = []
+        let relevantBranches =
+                getTemplateBranches branchFilter templateInformation
+        let nodes   = fmap branchName relevantBranches `zip` relevantBranches
+        let nodeSet = Set.fromList (fmap fst nodes)
+        let graph =
+                netlistGraph'
                         nodeAttributes
-                        (Set.toList . getBranchParents templateInformation)
+                        edgeAttributes
+                        ( Set.toList
+                        . Set.intersection nodeSet
+                        . getBranchParents templateInformation
+                        )
                         nodes
                     *> attribute ("layout", "dot")
                     *> attribute ("rankdir", "LR")
         sayLn $ pretty (showDot graph)
+  where
+    dotted = ("style", "dotted")
+    box    = ("shape", "box")
+    circle = ("shape", "circle")
 
 listTemplateBranches
     :: Members
@@ -334,12 +351,12 @@ listTemplateBranches
                TenpuretoException]
            r
     => Text
-    -> [BranchFilter]
+    -> BranchFilter
     -> Sem r ()
-listTemplateBranches template branchFilters =
+listTemplateBranches template branchFilter =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
         templateInformation <- loadTemplateInformation repo
-        let branches = getTemplateBranches branchFilters templateInformation
+        let branches = getTemplateBranches branchFilter templateInformation
         traverse_ (sayLn . pretty . branchName) branches
 
 renameTemplateBranch
@@ -394,25 +411,25 @@ propagateTemplateBranchChanges
                TenpuretoException]
            r
     => Text
-    -> [BranchFilter]
+    -> BranchFilter
     -> RemoteChangeMode
     -> Sem r ()
-propagateTemplateBranchChanges template branchFilters pushMode =
+propagateTemplateBranchChanges template branchFilter pushMode =
     runTemplateChange template False pushMode $ \repo -> do
         templateInformation <- loadTemplateInformation repo
-        let branches = getTemplateBranches branchFilters templateInformation
+        let branches = getTemplateBranches branchFilter templateInformation
         let toBranches =
                 [ (a, b)
                 | b <- branches
                 , a <- getTemplateBranches
-                    [BranchFilterParentOf (branchName b)]
+                    (BranchFilterParentOf (branchName b))
                     templateInformation
                 ]
         let fromBranches =
                 [ (a, b)
                 | a <- branches
                 , b <- getTemplateBranches
-                    [BranchFilterChildOf (branchName a)]
+                    (BranchFilterChildOf (branchName a))
                     templateInformation
                 ]
         let pairs = nub (toBranches ++ fromBranches)

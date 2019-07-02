@@ -92,16 +92,18 @@ test_getBranchChildren =
 test_getTemplateBranches :: [TestTree]
 test_getTemplateBranches =
     [ testCase "list child branches"
-        $   getTemplateBranches [BranchFilterChildOf "a"]
+        $   getTemplateBranches (BranchFilterChildOf "a")
                                 (TemplateInformation [a, b, c])
         @?= [b]
     , testCase "list parent branches"
-        $   getTemplateBranches [BranchFilterParentOf "c"]
+        $   getTemplateBranches (BranchFilterParentOf "c")
                                 (TemplateInformation [a, b, c])
         @?= [b]
     , testCase "apply multiple filters"
         $   getTemplateBranches
-                [BranchFilterChildOf "a", BranchFilterParentOf "c"]
+                (BranchFilterAnd
+                    [BranchFilterChildOf "a", BranchFilterParentOf "c"]
+                )
                 (TemplateInformation [a, b, c, d])
         @?= [b]
     ]
@@ -139,8 +141,7 @@ test_parseTemplateYaml =
                 , excludes  = Set.empty
                 }
     , testCase "parse extended features"
-        $   parseTemplateYaml
-                "features: [ a: { description: foo, hidden: true } ]"
+        $ parseTemplateYaml "features: [ a: { description: foo, hidden: true } ]"
         @?= Right TemplateYaml
                 { variables = InsOrdHashMap.empty
                 , features  = Set.singleton TemplateYamlFeature

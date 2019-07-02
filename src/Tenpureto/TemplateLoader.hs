@@ -34,9 +34,17 @@ import           Tenpureto.Effects.Git
 
 import           Tenpureto.Orphanage            ( )
 
-data BranchFilter = BranchFilterEqualTo Text
+data BranchFilter = BranchFilterAny
+                  | BranchFilterNone
+                  | BranchFilterEqualTo Text
                   | BranchFilterChildOf Text
                   | BranchFilterParentOf Text
+                  | BranchFilterOr [BranchFilter]
+                  | BranchFilterAnd [BranchFilter]
+                  | BranchFilterIsBaseBranch
+                  | BranchFilterIsFeatureBranch
+                  | BranchFilterIsHiddenBranch
+                  | BranchFilterIsMergeBranch
 
 data TemplateYamlFeature = TemplateYamlFeature
         { featureName :: Text
@@ -162,13 +170,14 @@ getBranchChildren template branch = Set.fromList $ branchName <$> filter
     (managedBranches template)
 
 getTemplateBranches
-    :: [BranchFilter] -> TemplateInformation -> [TemplateBranchInformation]
-getTemplateBranches [] ti = branchesInformation ti
-getTemplateBranches (h : t) ti =
-    filter (applyBranchFilter h ti) $ getTemplateBranches t ti
+    :: BranchFilter -> TemplateInformation -> [TemplateBranchInformation]
+getTemplateBranches f ti =
+    filter (applyBranchFilter f ti) (branchesInformation ti)
 
 applyBranchFilter
     :: BranchFilter -> TemplateInformation -> TemplateBranchInformation -> Bool
+applyBranchFilter BranchFilterAny            _ = const True
+applyBranchFilter BranchFilterNone            _ = const False
 applyBranchFilter (BranchFilterEqualTo name) _ = (==) name . branchName
 applyBranchFilter (BranchFilterChildOf parentBranch) ti =
     let parentNames = maybe Set.empty
@@ -180,6 +189,14 @@ applyBranchFilter (BranchFilterParentOf childBranch) ti =
                             (getBranchParents ti)
                             (findTemplateBranch ti childBranch)
     in  \b -> Set.member (branchName b) parentNames
+applyBranchFilter (BranchFilterOr filters) ti =
+    \bi -> any (\f -> applyBranchFilter f ti bi) filters
+applyBranchFilter (BranchFilterAnd filters) ti =
+    \bi -> all (\f -> applyBranchFilter f ti bi) filters
+applyBranchFilter BranchFilterIsBaseBranch    ti = isBaseBranch ti
+applyBranchFilter BranchFilterIsFeatureBranch _  = isFeatureBranch
+applyBranchFilter BranchFilterIsHiddenBranch  _  = isHiddenBranch
+applyBranchFilter BranchFilterIsMergeBranch   ti = isMergeBranch ti
 
 instance Pretty TemplateBranchInformation where
     pretty cfg = (align . vsep)
