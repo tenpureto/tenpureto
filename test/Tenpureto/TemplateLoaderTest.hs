@@ -137,17 +137,20 @@ test_parseTemplateYaml =
                                   { featureName        = "a"
                                   , featureDescription = Nothing
                                   , featureHidden      = False
+                                  , featureStability   = Stable
                                   }
                 , excludes  = Set.empty
                 }
     , testCase "parse extended features"
-        $ parseTemplateYaml "features: [ a: { description: foo, hidden: true } ]"
+        $   parseTemplateYaml
+                "features: [ a: { description: foo, hidden: true, stability: experimental } ]"
         @?= Right TemplateYaml
                 { variables = InsOrdHashMap.empty
                 , features  = Set.singleton TemplateYamlFeature
                                   { featureName        = "a"
                                   , featureDescription = Just "foo"
                                   , featureHidden      = True
+                                  , featureStability   = Experimental
                                   }
                 , excludes  = Set.empty
                 }

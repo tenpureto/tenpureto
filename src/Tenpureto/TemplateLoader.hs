@@ -46,10 +46,14 @@ data BranchFilter = BranchFilterAny
                   | BranchFilterIsHiddenBranch
                   | BranchFilterIsMergeBranch
 
+data FeatureStability = Deprecated | Experimental | Stable
+        deriving (Show, Eq, Ord)
+
 data TemplateYamlFeature = TemplateYamlFeature
         { featureName :: Text
         , featureDescription :: Maybe Text
         , featureHidden :: Bool
+        , featureStability :: FeatureStability
         }
         deriving (Show, Eq, Ord)
 
@@ -177,7 +181,7 @@ getTemplateBranches f ti =
 applyBranchFilter
     :: BranchFilter -> TemplateInformation -> TemplateBranchInformation -> Bool
 applyBranchFilter BranchFilterAny            _ = const True
-applyBranchFilter BranchFilterNone            _ = const False
+applyBranchFilter BranchFilterNone           _ = const False
 applyBranchFilter (BranchFilterEqualTo name) _ = (==) name . branchName
 applyBranchFilter (BranchFilterChildOf parentBranch) ti =
     let parentNames = maybe Set.empty
@@ -223,11 +227,18 @@ instance Pretty TemplateYaml where
         , "Features: " <+> (align . pretty) (features cfg)
         ]
 
+instance FromJSON FeatureStability where
+    parseJSON (Y.String "stable"      ) = pure Stable
+    parseJSON (Y.String "experimental") = pure Experimental
+    parseJSON (Y.String "deprecated"  ) = pure Deprecated
+    parseJSON _                         = fail "Invalid feature stability value"
+
 instance FromJSON TemplateYamlFeature where
     parseJSON (Y.String v) = pure $ TemplateYamlFeature
         { featureName        = v
         , featureDescription = Nothing
         , featureHidden      = False
+        , featureStability   = Stable
         }
     parseJSON (Y.Object v) = case HashMap.toList v of
         [(k, Y.Object vv)] ->
@@ -237,6 +248,9 @@ instance FromJSON TemplateYamlFeature where
                 <*> vv
                 .:? "hidden"
                 .!= False
+                <*> vv
+                .:? "stability"
+                .!= Stable
         _ -> fail "Invalid template YAML feature definition"
     parseJSON _ = fail "Invalid template YAML feature definition"
 

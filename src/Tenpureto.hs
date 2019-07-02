@@ -280,6 +280,7 @@ renameBranchInYaml oldName newName descriptor = TemplateYaml
         then TemplateYamlFeature { featureName        = new
                                  , featureDescription = featureDescription b
                                  , featureHidden      = featureHidden b
+                                 , featureStability   = featureStability b
                                  }
         else b
 

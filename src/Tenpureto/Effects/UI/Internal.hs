@@ -77,28 +77,39 @@ branchSelection availableBranches selectedBranches =
         <$> filterBranchesByNames availableBranches selectedBranches
 
 inputBranchList :: [TemplateBranchInformation] -> Set Text -> Doc AnsiStyle
-inputBranchList availableBranches selectedBranches = vsep $ zipWith5
+inputBranchList availableBranches selectedBranches = vsep $ zipWith6
     renderLine
     selectedPrefixes
     branchIndexes
     branchNames
     descriptions
+    stabilities
     notes
   where
-    renderLine :: Text -> Text -> Text -> Text -> Text -> Doc AnsiStyle
-    renderLine selectedPrefix index branch description note =
+    renderLine
+        :: Text
+        -> Text
+        -> Text
+        -> Text
+        -> FeatureStability
+        -> Text
+        -> Doc AnsiStyle
+    renderLine selectedPrefix index branch description stability note =
         annotate (color Green) (pretty selectedPrefix)
             <+> pretty index
             <>  ")"
             <+> hang
                     4
-                    (  annotate (color White) (pretty branch)
-                    <> softline
-                    <> softline
-                    <> annotate (color Green) (pretty description)
-                    <> softline
-                    <> annotate (color Black) (pretty note)
+                    (   annotate (color White) (pretty branch)
+                    <>  softline
+                    <>  softline
+                    <>  annotate (color Green) (pretty description)
+                    <+> stabilityNote stability
+                    <>  annotate (color Black) (pretty note)
                     )
+    stabilityNote Stable       = ""
+    stabilityNote Experimental = annotate (color Yellow) ("(experimental)")
+    stabilityNote Deprecated   = annotate (color Yellow) ("(deprecated)")
     equalize texts =
         let w = maximum (fmap T.length texts)
         in  fmap (T.justifyLeft w ' ') texts
@@ -121,6 +132,9 @@ inputBranchList availableBranches selectedBranches = vsep $ zipWith5
     branchNames  = equalize $ fmap branchName availableBranches
     descriptions = fmap
         (fromMaybe "" . (templateYamlFeature >=> featureDescription))
+        availableBranches
+    stabilities = fmap
+        (maybe Stable featureStability . templateYamlFeature)
         availableBranches
 
 
