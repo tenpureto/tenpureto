@@ -36,6 +36,9 @@ test_getBranchParents =
     [ testCase "include parents"
         $   getBranchParents (TemplateInformation [a, b]) b
         @?= Set.fromList ["a"]
+    , testCase "include parents with additional branches"
+        $   getBranchParents (TemplateInformation [a', b]) b
+        @?= Set.fromList ["a"]
     , testCase "not include grand parents"
         $   getBranchParents (TemplateInformation [a, b, c]) c
         @?= Set.fromList ["b"]
@@ -53,16 +56,21 @@ test_getBranchParents =
         @?= Set.fromList ["a"]
     ]
   where
-    a = baseBranch "a"
-    b = childBranch "b" [a]
-    c = childBranch "c" [b]
-    f = renamedBranch "f" b
-    g = anonymousBranch "g" []
+    a  = baseBranch "a"
+    p  = baseBranch "p"
+    a' = childBranch "a" [p]
+    b  = childBranch "b" [a]
+    c  = childBranch "c" [b]
+    f  = renamedBranch "f" b
+    g  = anonymousBranch "g" []
 
 test_getBranchChildren :: [TestTree]
 test_getBranchChildren =
     [ testCase "include children"
         $   getBranchChildren (TemplateInformation [a, b]) a
+        @?= Set.fromList ["b"]
+    , testCase "include children with smaller feature lists"
+        $   getBranchChildren (TemplateInformation [a', b]) a'
         @?= Set.fromList ["b"]
     , testCase "not include renamed children"
         $   getBranchChildren (TemplateInformation [a, b, g]) a
@@ -81,13 +89,15 @@ test_getBranchChildren =
         @?= Set.fromList ["b"]
     ]
   where
-    a = baseBranch "a"
-    b = childBranch "b" [a]
-    c = childBranch "c" [a, b]
-    d = renamedBranch "d" a
-    e = baseBranch "e"
-    f = mergeBranch "f" [a, e]
-    g = renamedBranch "g" b
+    a  = baseBranch "a"
+    p  = baseBranch "p"
+    a' = childBranch "a" [p]
+    b  = childBranch "b" [a]
+    c  = childBranch "c" [a, b]
+    d  = renamedBranch "d" a
+    e  = baseBranch "e"
+    f  = mergeBranch "f" [a, e]
+    g  = renamedBranch "g" b
 
 test_getTemplateBranches :: [TestTree]
 test_getTemplateBranches =

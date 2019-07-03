@@ -159,8 +159,12 @@ findTemplateBranch template branch =
 
 getBranchParents :: TemplateInformation -> TemplateBranchInformation -> Set Text
 getBranchParents template branch =
-    let isAncestor b =
-                flip Set.isProperSubsetOf (requiredBranches b) . requiredBranches
+    let isAncestor b a
+            | isFeatureBranch a
+            = Set.member (branchName a) (requiredBranches b)
+                && (requiredBranches a /= requiredBranches b)
+            | otherwise
+            = Set.isProperSubsetOf (requiredBranches a) (requiredBranches b)
         getAncestors b = filter (isAncestor b) (managedBranches template)
         ancestors         = getAncestors branch
         indirectAncestors = mconcat $ getAncestors <$> ancestors
