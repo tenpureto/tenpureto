@@ -317,7 +317,7 @@ generateTemplateGraph template branchFilter =
                 | isMergeBranch templateInformation branch
                 = [("label", ""), circle, dotted]
                 | isHiddenBranch branch
-                = [("label", T.unpack (branchName branch)), box, dotted]
+                = [("label", T.unpack (branchName branch)), box, dashed]
                 | otherwise
                 = [("label", T.unpack (branchName branch)), box]
         let edgeAttributes _ dst
@@ -343,6 +343,7 @@ generateTemplateGraph template branchFilter =
         sayLn $ pretty (showDot graph)
   where
     dotted = ("style", "dotted")
+    dashed = ("style", "dashed")
     box    = ("shape", "box")
     circle = ("shape", "circle")
 
