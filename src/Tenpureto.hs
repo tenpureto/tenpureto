@@ -575,7 +575,7 @@ runTemplateChange template interactive changeMode changesNature f =
                 sayLn $ createBranchManually dst
                 return $ Left $ TenpuretoBranchNotCreated dst
             pullRequest settings UpdateBranch { sourceCommit = c, sourceRef = BranchRef src, destinationRef = BranchRef dst, pullRequestRef = BranchRef pr, pullRequestTitle = title }
-                = runError $ createOrUpdatePullRequest
+                = try $ createOrUpdatePullRequest
                     repo
                     settings
                     c
@@ -606,6 +606,9 @@ runTemplateChange template interactive changeMode changesNature f =
                 if shouldPush
                     then pushRefsToServer changeMode changes
                     else throw CancelledException
+
+try :: Member (Error e) r => Sem r a -> Sem r (Either e a)
+try f = catch (Right <$> f) (return . Left)
 
 commitMessagePattern :: Text
 commitMessagePattern = "^Template: .*$"
