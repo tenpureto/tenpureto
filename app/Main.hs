@@ -166,6 +166,12 @@ pullRequestFlag = flag'
     <> help "Create a pull request instead of merging directly"
     )
 
+pullRequestMergeFlag :: Parser Bool
+pullRequestMergeFlag = switch
+        (  long "pull-request-merge"
+        <> help "Create a pull request from a merge commit"
+        )
+
 pullRequestLabelOption :: Parser Text
 pullRequestLabelOption = strOption
     (long "pull-request-label" <> metavar "<name>" <> help
@@ -183,6 +189,7 @@ pullRequestSettingsOptionSet =
     PullRequestSettings
         <$> many pullRequestLabelOption
         <*> many pullRequestAssignOption
+        <*> pullRequestMergeFlag
 
 remoteChangeModeOptionSet :: Parser RemoteChangeMode
 remoteChangeModeOptionSet = asum
