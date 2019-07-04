@@ -70,6 +70,7 @@ data Git m a where
     FindCommitByMessage ::GitRepository -> Text -> Git m (Maybe Committish)
     GetCommitMessage ::GitRepository -> Committish -> Git m Text
     GitDiffHasCommits ::GitRepository -> Committish -> Committish -> Git m Bool
+    GitLog ::GitRepository -> Committish -> Committish -> Git m Text
     GitLogDiff ::GitRepository -> Committish -> Committish -> Git m Text
     ListFiles ::GitRepository -> Git m [Path Rel File]
     GetCurrentBranch ::GitRepository -> Git m Text
@@ -226,6 +227,9 @@ runGit = interpret $ \case
             <&> T.strip
             <&> ("0" /=)
 
+    GitLog repo (Committish c) (Committish base) ->
+        gitRepoCmd repo ["log", "--color", c, "^" <> base] >>= asText
+
     GitLogDiff repo (Committish c) (Committish base) ->
         gitRepoCmd repo ["log", "--patch", "--color", c, "^" <> base] >>= asText
 
@@ -260,67 +264,70 @@ runGitHub
     -> Sem r a
 runGitHub = interpret $ \case
 
-    CreateOrUpdatePullRequest repo settings commitish title originalSource source target -> do
-        commitish' <- preparePullRequestHead (pullRequestPreMerge settings)
-                                             commitish
-        gitRepoCmd
-                repo
-                [ "push"
-                , "origin"
-                , unCommittish commitish' <> ":" <> "refs/heads/" <> source
-                ]
-            >>= asUnit
-        owner <- hubApiGraphQL repo hubOwnerQuery [] >>= asApiResponse
-        exitingPullRequests <-
-            hubApiGetCmd
+    CreateOrUpdatePullRequest repo settings commitish title originalSource source target
+        -> do
+            commitish' <- preparePullRequestHead
+                (pullRequestPreMerge settings)
+                commitish
+            gitRepoCmd
                     repo
-                    "/repos/{owner}/{repo}/pulls"
-                    [ ("head", (ownerLogin owner) <> ":" <> source)
-                    , ("base", target)
+                    [ "push"
+                    , "origin"
+                    , unCommittish commitish' <> ":" <> "refs/heads/" <> source
                     ]
-                >>= asApiResponse
-        pullRequest <- case exitingPullRequests of
-            pullRequest : _ -> return pullRequest
-            [] ->
-                hubApiCmd
+                >>= asUnit
+            owner <- hubApiGraphQL repo hubOwnerQuery [] >>= asApiResponse
+            exitingPullRequests <-
+                hubApiGetCmd
                         repo
-                        ApiPost
                         "/repos/{owner}/{repo}/pulls"
-                        PullRequestInputPayload
-                            { pullRequestHead     = source
-                            , pullRequestBase     = target
-                            , setPullRequestTitle = Just title
-                            }
+                        [ ("head", (ownerLogin owner) <> ":" <> source)
+                        , ("base", target)
+                        ]
                     >>= asApiResponse
-        hubApiCmd
-                repo
-                ApiPatch
-                (  "/repos/{owner}/{repo}/issues/"
-                <> (T.pack . show . pullRequestNumber) pullRequest
-                )
-                IssueInputPayload
-                    { setIssueAssignees = nub
-                                          $  fmap
-                                                 assigneeLogin
-                                                 (pullRequestAssignees
-                                                     pullRequest
-                                                 )
-                                          ++ pullRequestAssignTo settings
-                    , setIssueLabels    = nub
-                                          $  fmap
-                                                 labelName
-                                                 (pullRequestLabels pullRequest)
-                                          ++ pullRequestAddLabels settings
-                    }
-            >>= asUnit
+            pullRequest <- case exitingPullRequests of
+                pullRequest : _ -> return pullRequest
+                [] ->
+                    hubApiCmd
+                            repo
+                            ApiPost
+                            "/repos/{owner}/{repo}/pulls"
+                            PullRequestInputPayload
+                                { pullRequestHead     = source
+                                , pullRequestBase     = target
+                                , setPullRequestTitle = Just title
+                                }
+                        >>= asApiResponse
+            hubApiCmd
+                    repo
+                    ApiPatch
+                    (  "/repos/{owner}/{repo}/issues/"
+                    <> (T.pack . show . pullRequestNumber) pullRequest
+                    )
+                    IssueInputPayload
+                        { setIssueAssignees = nub
+                                              $  fmap
+                                                     assigneeLogin
+                                                     (pullRequestAssignees
+                                                         pullRequest
+                                                     )
+                                              ++ pullRequestAssignTo settings
+                        , setIssueLabels    = nub
+                                              $  fmap
+                                                     labelName
+                                                     (pullRequestLabels pullRequest)
+                                              ++ pullRequestAddLabels settings
+                        }
+                >>= asUnit
       where
         preparePullRequestHead False c              = return c
         preparePullRequestHead True  (Committish c) = do
             checkoutBranch repo c Nothing
             mergeResult <- mergeBranch repo ("origin/" <> target)
             case mergeResult of
-                MergeSuccess -> fromMaybe (Committish c)
-                    <$> commit repo (commitMergeMessage originalSource target)
+                MergeSuccess -> fromMaybe (Committish c) <$> commit
+                    repo
+                    (commitMergeMessage originalSource target)
                 MergeConflicts _ -> mergeAbort repo *> return (Committish c)
 
 instance Pretty BranchRef where

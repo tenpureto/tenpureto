@@ -38,6 +38,8 @@ import           Tenpureto.Internal
 data RemoteChangeMode = PushDirectly
                       | UpstreamPullRequest { pullRequestSettings :: PullRequestSettings }
 
+data ChangesNature = ExistingChanges | NewChanges
+
 makeFinalTemplateConfiguration
     :: Member UI r
     => PreliminaryProjectConfiguration
@@ -384,7 +386,7 @@ renameTemplateBranch
     -> Bool
     -> Sem r ()
 renameTemplateBranch template oldBranch newBranch interactive =
-    runTemplateChange template interactive PushDirectly $ \repo -> do
+    runTemplateChange template interactive PushDirectly NewChanges $ \repo -> do
         templateInformation <- loadTemplateInformation repo
         mainBranch          <- getTemplateBranch templateInformation oldBranch
         let bis = branchesInformation templateInformation
@@ -430,7 +432,7 @@ propagateTemplateBranchChanges
     -> RemoteChangeMode
     -> Sem r ()
 propagateTemplateBranchChanges template branchFilter pushMode =
-    runTemplateChange template False pushMode $ \repo -> do
+    runTemplateChange template False pushMode ExistingChanges $ \repo -> do
         templateInformation <- loadTemplateInformation repo
         let branches = getTemplateBranches branchFilter templateInformation
         logInfo $ "Propagating changes for" <+> pretty branches
@@ -491,7 +493,7 @@ changeTemplateVariableValue
     -> Bool
     -> Sem r ()
 changeTemplateVariableValue template oldValue newValue interactive =
-    runTemplateChange template interactive PushDirectly $ \repo -> do
+    runTemplateChange template interactive PushDirectly NewChanges $ \repo -> do
         bis <- branchesInformation <$> loadTemplateInformation repo
         templaterSettings <- compileSettings $ TemplaterSettings
             { templaterFromVariables = InsOrdHashMap.singleton "Variable"
@@ -532,15 +534,17 @@ runTemplateChange
     => Text
     -> Bool
     -> RemoteChangeMode
+    -> ChangesNature
     -> (GitRepository -> Sem r [PushSpec])
     -> Sem r ()
-runTemplateChange template interactive changeMode f =
+runTemplateChange template interactive changeMode changesNature f =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
+        let diff = case changesNature of
+                ExistingChanges -> gitLog
+                NewChanges      -> gitLogDiff
         let confirmUpdate src (BranchRef ref) = do
-                msg <- changesForBranchMessage ref <$> gitLogDiff
-                    repo
-                    src
-                    (Committish $ "remotes/origin/" <> ref)
+                msg <- changesForBranchMessage ref
+                    <$> diff repo src (Committish $ "remotes/origin/" <> ref)
                 sayLn msg
                 if not interactive
                     then return src
