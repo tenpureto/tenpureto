@@ -19,10 +19,10 @@ test_extractTemplateName =
                                          , targetDirectory  = [absdir|/tmp|]
                                          }
     in  [ testCase "should extract from create message"
-            $   extractTemplateName (commitCreateMessage cfg)
+            $   extractTemplateName (commitCreateMessage "foo/bar")
             @?= Just (selectedTemplate cfg)
         , testCase "should extract from update message"
-            $   extractTemplateName (commitUpdateMessage cfg)
+            $   extractTemplateName (commitUpdateMessage "foo/bar")
             @?= Just (selectedTemplate cfg)
         , testCase "should not extract from other messages"
             $   extractTemplateName "A\n\nTemplate foo/bar"

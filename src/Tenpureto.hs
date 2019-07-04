@@ -87,7 +87,9 @@ createProject projectConfiguration =
                       addFiles project files
                       _ <- commit
                           project
-                          (commitCreateMessage finalTemplateConfiguration)
+                          (commitCreateMessage
+                              (selectedTemplate finalTemplateConfiguration)
+                          )
                       sayLn $ projectCreated dst
 
 updateProject
@@ -122,7 +124,9 @@ updateProject projectConfiguration = do
                                   result <- commit
                                       staging
                                       (commitUpdateMessage
-                                          finalTemplateConfiguration
+                                          (selectedTemplate
+                                              finalTemplateConfiguration
+                                          )
                                       )
                                   case result of
                                       Just (Committish c) -> do
@@ -135,7 +139,9 @@ updateProject projectConfiguration = do
                                                   _ <- commit
                                                       project
                                                       (commitUpdateMergeMessage
-                                                          finalTemplateConfiguration
+                                                          (selectedTemplate
+                                                              finalTemplateConfiguration
+                                                          )
                                                       )
                                                   sayLn
                                                       $ projectUpdated
@@ -402,6 +408,7 @@ renameTemplateBranch template oldBranch newBranch interactive =
         pushChildren <- traverse
             (\bi -> renameOnBranch bi <&> \c -> UpdateBranch
                 { sourceCommit     = c
+                , sourceRef        = BranchRef $ branchName bi
                 , destinationRef   = BranchRef $ branchName bi
                 , pullRequestRef   = BranchRef $ branchName bi
                 , pullRequestTitle = pullRequestRenameBranchTitle
@@ -426,6 +433,7 @@ propagateTemplateBranchChanges template branchFilter pushMode =
     runTemplateChange template False pushMode $ \repo -> do
         templateInformation <- loadTemplateInformation repo
         let branches = getTemplateBranches branchFilter templateInformation
+        logInfo $ "Propagating changes for" <+> pretty branches
         let toBranches =
                 [ (a, b)
                 | b <- branches
@@ -444,17 +452,23 @@ propagateTemplateBranchChanges template branchFilter pushMode =
         catMaybes <$> traverse (propagateFromBranch repo) pairs
   where
     propagateFromBranch
-        :: Members '[Git] r
+        :: Members '[Logging, Git] r
         => GitRepository
         -> (TemplateBranchInformation, TemplateBranchInformation)
         -> Sem r (Maybe PushSpec)
     propagateFromBranch repo (fromBranch, toBranch) = do
+        logInfo
+            $   "Checking diff between"
+            <+> pretty fromBranch
+            <+> "and"
+            <+> pretty toBranch
         needsMerge <- gitDiffHasCommits repo
                                         (branchCommit fromBranch)
                                         (branchCommit toBranch)
         return $ if needsMerge
             then Just $ UpdateBranch
                 { sourceCommit     = branchCommit fromBranch
+                , sourceRef        = BranchRef $ branchName fromBranch
                 , destinationRef   = BranchRef $ branchName toBranch
                 , pullRequestRef   = BranchRef
                                      $  branchName fromBranch
@@ -500,6 +514,7 @@ changeTemplateVariableValue template oldValue newValue interactive =
                              (commitChangeVariableMessage oldValue newValue)
                 return UpdateBranch
                     { sourceCommit     = c
+                    , sourceRef        = BranchRef $ branchName bi
                     , destinationRef   = BranchRef $ branchName bi
                     , pullRequestRef   = BranchRef $ branchName bi
                     , pullRequestTitle = pullRequestChangeVariableTitle
@@ -541,9 +556,10 @@ runTemplateChange template interactive changeMode f =
                 = confirmUpdate src dst <&> \c ->
                     CreateBranch { sourceCommit = c, destinationRef = dst }
 
-            confirmCommit UpdateBranch { sourceCommit = src, destinationRef = dst, pullRequestRef = prRef, pullRequestTitle = title }
-                = confirmUpdate src dst <&> \c -> UpdateBranch
+            confirmCommit UpdateBranch { sourceCommit = srcCommit, sourceRef = src, destinationRef = dst, pullRequestRef = prRef, pullRequestTitle = title }
+                = confirmUpdate srcCommit dst <&> \c -> UpdateBranch
                     { sourceCommit     = c
+                    , sourceRef        = src
                     , destinationRef   = dst
                     , pullRequestRef   = prRef
                     , pullRequestTitle = title
@@ -554,13 +570,14 @@ runTemplateChange template interactive changeMode f =
             pullRequest _ (CreateBranch _ (BranchRef dst)) = do
                 sayLn $ createBranchManually dst
                 return $ Left $ TenpuretoBranchNotCreated dst
-            pullRequest settings UpdateBranch { sourceCommit = c, destinationRef = BranchRef dst, pullRequestRef = BranchRef src, pullRequestTitle = title }
+            pullRequest settings UpdateBranch { sourceCommit = c, sourceRef = BranchRef src, destinationRef = BranchRef dst, pullRequestRef = BranchRef pr, pullRequestTitle = title }
                 = runError $ createOrUpdatePullRequest
                     repo
                     settings
                     c
                     title
-                    (internalBranchPrefix <> src)
+                    src
+                    (internalBranchPrefix <> pr)
                     dst
         let pushRefsToServer PushDirectly changes = pushRefs repo changes
             pushRefsToServer UpstreamPullRequest { pullRequestSettings = settings } changes

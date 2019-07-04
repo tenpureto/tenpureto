@@ -28,7 +28,7 @@ import           Tenpureto.Effects.Process
 
 
 newtype GitRepository = GitRepository { repositoryPath :: Path Abs Dir }
-newtype Committish = Committish Text deriving (Eq, Show)
+newtype Committish = Committish { unCommittish :: Text } deriving (Eq, Show)
 
 data GitException = GitExecException { exitCode :: Int, stdOut :: Maybe ByteString, stdErr :: Maybe ByteString }
                   | HubExecException { exitCode :: Int, stdOut :: Maybe ByteString, stdErr :: Maybe ByteString }
@@ -135,7 +135,6 @@ newtype RepositoryOwner = RepositoryOwner { ownerLogin :: Text }
 newtype PullRequestAssignee = PullRequestAssignee { assigneeLogin :: Text }
 newtype PullRequestLabel = PullRequestLabel { labelName :: Text }
 data PullRequest = PullRequest { pullRequestNumber :: Int, pullRequestAssignees :: [PullRequestAssignee], pullRequestLabels :: [PullRequestLabel] }
-data ReferenceInputPayload = ReferenceInputPayload { referenceSha :: Text, referenceRef :: Maybe Text }
 
 data PullRequestInputPayload = PullRequestInputPayload { pullRequestHead :: Text, pullRequestBase :: Text, setPullRequestTitle :: Maybe Text }
 data IssueInputPayload = IssueInputPayload { setIssueAssignees :: [Text], setIssueLabels :: [Text] }
@@ -144,8 +143,14 @@ instance Pretty Committish where
     pretty (Committish c) = pretty c
 
 instance FromJSON RepositoryOwner where
-    parseJSON (Aeson.Object v) = RepositoryOwner <$> ((v .: "data") >>= (.: "repository") >>= (.: "owner") >>= (.: "login"))
-    parseJSON _                = fail "Invalid repository owner response"
+    parseJSON (Aeson.Object v) =
+        RepositoryOwner
+            <$> (   (v .: "data")
+                >>= (.: "repository")
+                >>= (.: "owner")
+                >>= (.: "login")
+                )
+    parseJSON _ = fail "Invalid repository owner response"
 
 instance FromJSON PullRequestAssignee where
     parseJSON (Aeson.Object v) = PullRequestAssignee <$> v .: "login"
@@ -167,10 +172,6 @@ instance FromJSON PullRequest where
             .:? "labels"
             .!= []
     parseJSON _ = fail "Invalid template YAML definition"
-
-instance ToJSON ReferenceInputPayload where
-    toJSON ReferenceInputPayload { referenceSha = sha, referenceRef = ref } =
-        Aeson.object $ ("sha" .= sha) : catMaybes [fmap ("ref" .=) ref]
 
 instance ToJSON PullRequestInputPayload where
     toJSON PullRequestInputPayload { pullRequestHead = h, pullRequestBase = b, setPullRequestTitle = t }
@@ -233,37 +234,15 @@ hubApiGraphQL
     -> Sem r CmdResult
 hubApiGraphQL (GitRepository path) query fields = runCmd
     (  "hub"
-    :| ["-C", T.pack (toFilePath path), "api", "graphql", "--field", "query=" <> query]
+    :| [ "-C"
+       , T.pack (toFilePath path)
+       , "api"
+       , "graphql"
+       , "--field"
+       , "query=" <> query
+       ]
     ++ (fields >>= \(key, value) -> ["--raw-field", key <> "=" <> value])
     )
-
-createOrUpdateReference
-    :: Members '[Process, Error GitException] r
-    => GitRepository
-    -> Committish
-    -> Text
-    -> Sem r ()
-createOrUpdateReference repo (Committish c) reference = do
-    (code, out, err) <- hubApiCmd
-        repo
-        ApiPost
-        "/repos/{owner}/{repo}/git/refs"
-        ReferenceInputPayload { referenceSha = c
-                              , referenceRef = Just ("refs/heads/" <> reference)
-                              }
-    case code of
-        ExitSuccess -> return ()
-        ExitFailure 22 ->
-            hubApiCmd
-                    repo
-                    ApiPatch
-                    ("/repos/{owner}/{repo}/git/refs/heads/" <> reference)
-                    ReferenceInputPayload { referenceSha = c
-                                          , referenceRef = Nothing
-                                          }
-                >>= asUnit
-        ExitFailure other ->
-            throw $ HubExecException other (Just out) (Just err)
 
 hubOwnerQuery :: Text
 hubOwnerQuery = $(embedStringFile "src/Tenpureto/Effects/Git/owner.graphql")

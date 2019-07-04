@@ -10,6 +10,7 @@ import           Data.Foldable
 import           Data.Maybe
 import           Data.Text                      ( Text )
 import           Data.Version
+import           Data.Functor
 
 import           System.Exit
 
@@ -118,7 +119,9 @@ branchFilterNameOption = BranchFilterEqualTo <$> strOption
     )
 
 branchFilterNamesOption :: Parser BranchFilter
-branchFilterNamesOption = BranchFilterOr <$> many branchFilterNameOption
+branchFilterNamesOption = many branchFilterNameOption <&> \case
+    [] -> BranchFilterAny
+    bs  -> BranchFilterOr bs
 
 branchFilterChildOfOption :: Parser BranchFilter
 branchFilterChildOfOption = BranchFilterChildOf <$> strOption
@@ -168,7 +171,7 @@ pullRequestFlag = flag'
 
 pullRequestMergeFlag :: Parser Bool
 pullRequestMergeFlag = switch
-        (  long "pull-request-merge"
+        (  long "pull-request-merge-commit"
         <> help "Create a pull request from a merge commit"
         )
 

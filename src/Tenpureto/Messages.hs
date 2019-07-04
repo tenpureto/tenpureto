@@ -4,21 +4,20 @@ import           Data.Text                      ( Text )
 import           Data.Text.Prettyprint.Doc
 import           Path
 
-import           Tenpureto.Data
-import           Tenpureto.Effects.Git
+import           Tenpureto.Orphanage            ( )
 
 -- Commit messages
 
-commitCreateMessage :: FinalTemplateConfiguration -> Text
-commitCreateMessage cfg =
-    "Create from a template\n\nTemplate: " <> selectedTemplate cfg
+commitCreateMessage :: Text -> Text
+commitCreateMessage template =
+    "Create from a template\n\nTemplate: " <> template
 
-commitUpdateMessage :: FinalTemplateConfiguration -> Text
-commitUpdateMessage cfg =
-    "Update from a template\n\nTemplate: " <> selectedTemplate cfg
+commitUpdateMessage :: Text -> Text
+commitUpdateMessage template =
+    "Update from a template\n\nTemplate: " <> template
 
-commitUpdateMergeMessage :: FinalTemplateConfiguration -> Text
-commitUpdateMergeMessage cfg = "Merge " <> selectedTemplate cfg
+commitUpdateMergeMessage :: Text -> Text
+commitUpdateMergeMessage template = "Merge " <> template
 
 commitRenameBranchMessage :: Text -> Text -> Text
 commitRenameBranchMessage from to =
@@ -27,6 +26,9 @@ commitRenameBranchMessage from to =
 commitChangeVariableMessage :: Text -> Text -> Text
 commitChangeVariableMessage from to =
     "Change \"" <> from <> "\" variable to \"" <> to <> "\""
+
+commitMergeMessage :: Text -> Text -> Text
+commitMergeMessage from to = "Merge branch '" <> from <> "' into " <> to
 
 -- Pull request messages
 
@@ -71,15 +73,14 @@ noRelevantTemplateChanges = "There are no relevant changes in the template."
 mergeSuccess :: Doc a
 mergeSuccess = "Successfully merged."
 
-confirmPushMessage :: [BranchRef] -> [BranchRef] -> [BranchRef] -> Doc a
+confirmPushMessage :: Pretty r => [r] -> [r] -> [r] -> Doc a
 confirmPushMessage deletes creates updates = "Do you want to"
     <+> (fillSep . punctuate " and") (toDelete ++ toCreate ++ toUpdate)
   where
-    branchList =
-        fillSep . punctuate comma . fmap (dquotes . pretty . reference)
-    toDelete = if null deletes then [] else ["delete" <+> branchList deletes]
-    toCreate = if null deletes then [] else ["create" <+> branchList creates]
-    toUpdate = if null updates then [] else ["push to" <+> branchList updates]
+    branchList = fillSep . punctuate comma . fmap (dquotes . pretty)
+    toDelete   = if null deletes then [] else ["delete" <+> branchList deletes]
+    toCreate   = if null deletes then [] else ["create" <+> branchList creates]
+    toUpdate   = if null updates then [] else ["push to" <+> branchList updates]
 
 confirmShellToAmendMessage :: Doc a
 confirmShellToAmendMessage = "Do you want to enter a shell to amend the commit"

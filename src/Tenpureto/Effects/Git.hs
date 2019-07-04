@@ -24,9 +24,12 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Functor
 import           Data.List
+import           Data.Maybe
+import           Data.Text.Prettyprint.Doc
 
 import           Path
 
+import           Tenpureto.Messages
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Process
 import           Tenpureto.Effects.Git.Internal
@@ -36,7 +39,7 @@ newtype RepositoryUrl = RepositoryUrl Text deriving (Eq, Show)
 newtype BranchRef = BranchRef { reference :: Text } deriving (Eq, Show)
 
 data PushSpec = CreateBranch { sourceCommit :: Committish, destinationRef :: BranchRef }
-              | UpdateBranch { sourceCommit :: Committish, destinationRef :: BranchRef, pullRequestRef :: BranchRef, pullRequestTitle :: Text }
+              | UpdateBranch { sourceCommit :: Committish, sourceRef :: BranchRef, destinationRef :: BranchRef, pullRequestRef :: BranchRef, pullRequestTitle :: Text }
               | DeleteBranch { destinationRef :: BranchRef }
               deriving (Eq, Show)
 
@@ -77,7 +80,7 @@ data Git m a where
 makeSem ''Git
 
 data GitServer m a where
-    CreateOrUpdatePullRequest ::GitRepository -> PullRequestSettings -> Committish -> Text -> Text -> Text -> GitServer m ()
+    CreateOrUpdatePullRequest ::GitRepository -> PullRequestSettings -> Committish -> Text -> Text -> Text -> Text -> GitServer m ()
 
 makeSem ''GitServer
 
@@ -257,9 +260,16 @@ runGitHub
     -> Sem r a
 runGitHub = interpret $ \case
 
-    CreateOrUpdatePullRequest repo settings commitish title source target -> do
-        commitish' <- prepareBranchHead (pullRequestPreMerge settings) commitish
-        createOrUpdateReference repo commitish' source
+    CreateOrUpdatePullRequest repo settings commitish title originalSource source target -> do
+        commitish' <- preparePullRequestHead (pullRequestPreMerge settings)
+                                             commitish
+        gitRepoCmd
+                repo
+                [ "push"
+                , "origin"
+                , unCommittish commitish' <> ":" <> "refs/heads/" <> source
+                ]
+            >>= asUnit
         owner <- hubApiGraphQL repo hubOwnerQuery [] >>= asApiResponse
         exitingPullRequests <-
             hubApiGetCmd
@@ -304,10 +314,14 @@ runGitHub = interpret $ \case
                     }
             >>= asUnit
       where
-        prepareBranchHead False c              = return c
-        prepareBranchHead True  (Committish c) = do
+        preparePullRequestHead False c              = return c
+        preparePullRequestHead True  (Committish c) = do
             checkoutBranch repo c Nothing
-            mergeResult <- mergeBranch repo target
+            mergeResult <- mergeBranch repo ("origin/" <> target)
             case mergeResult of
-                MergeSuccess     -> getCurrentHead repo
+                MergeSuccess -> fromMaybe (Committish c)
+                    <$> commit repo (commitMergeMessage originalSource target)
                 MergeConflicts _ -> mergeAbort repo *> return (Committish c)
+
+instance Pretty BranchRef where
+    pretty ref = pretty $ reference ref
