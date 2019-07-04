@@ -86,9 +86,9 @@ runUIInTerminal = interpret $ \case
                                          , variableValues  = varVals
                                          }
 
-    InputResolutionStrategy repo conflicts -> do
+    InputResolutionStrategy repo mergeConflicts -> do
         sayLn "The following files have merge conflicts:"
-        traverse_ (\c -> sayLn ("  " <> pretty c)) conflicts
+        traverse_ (\c -> sayLn ("  " <> pretty c)) mergeConflicts
         sayLn $ "Repository path: " <> pretty repo
         result <- confirm "Run \"git mergetool\"" (Just True)
         return $ bool AlreadyResolved MergeTool result

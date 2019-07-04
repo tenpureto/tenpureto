@@ -86,8 +86,11 @@ inputBranchList availableBranches selectedBranches = vsep $ zipWith6
     stabilities
     notes
   where
+    green  = annotate (color Green)
+    red    = annotate (color Red)
+    yellow = annotate (color Yellow)
     renderLine
-        :: Text
+        :: Doc AnsiStyle
         -> Text
         -> Text
         -> Text
@@ -95,21 +98,18 @@ inputBranchList availableBranches selectedBranches = vsep $ zipWith6
         -> Text
         -> Doc AnsiStyle
     renderLine selectedPrefix index branch description stability note =
-        annotate (color Green) (pretty selectedPrefix)
-            <+> pretty index
-            <>  ")"
-            <+> hang
-                    4
-                    (   annotate (color White) (pretty branch)
-                    <>  softline
-                    <>  softline
-                    <>  annotate (color Green) (pretty description)
-                    <+> stabilityNote stability
-                    <>  annotate (color Black) (pretty note)
-                    )
+        " " <> selectedPrefix <+> pretty index <> ")" <+> hang
+            4
+            (   annotate (color White) (pretty branch)
+            <>  softline
+            <>  softline
+            <>  annotate (color Green) (pretty description)
+            <+> stabilityNote stability
+            <>  annotate (color Black) (pretty note)
+            )
     stabilityNote Stable       = ""
-    stabilityNote Experimental = annotate (color Yellow) ("(experimental)")
-    stabilityNote Deprecated   = annotate (color Yellow) ("(deprecated)")
+    stabilityNote Experimental = yellow "(experimental)"
+    stabilityNote Deprecated   = yellow "(deprecated)"
     equalize texts =
         let w = maximum (fmap T.length texts)
         in  fmap (T.justifyLeft w ' ') texts
@@ -119,14 +119,19 @@ inputBranchList availableBranches selectedBranches = vsep $ zipWith6
             <$>   [1 ..]
             `zip` availableBranches
     transitivelySelected = branchSelection availableBranches selectedBranches
+    conflictsWithSelected branch = any (branchesConflict branch) $ filter
+        ((flip Set.member) selectedBranches . branchName)
+        availableBranches
     branchLineSelected branch =
-        let name       = branchName branch
-            selected   = name `Set.member` selectedBranches
-            transitive = name `Set.member` transitivelySelected
-        in  case (selected, transitive) of
-                (True , _    ) -> (" *", "")
-                (False, True ) -> (" +", "[transitive dependency]")
-                (False, False) -> ("  ", "")
+        let name        = branchName branch
+            selected    = name `Set.member` selectedBranches
+            transitive  = name `Set.member` transitivelySelected
+            conflicting = conflictsWithSelected branch
+        in  case (selected, transitive, conflicting) of
+                (True , _    , _   ) -> (green "✓", "")
+                (_    , _    , True) -> (red "𐄂", "[conflict]")
+                (False, True , _   ) -> (green "·", "[transitive dependency]")
+                (False, False, _   ) -> (" ", "")
     (selectedPrefixes, notes) =
         unzip $ fmap branchLineSelected availableBranches
     branchNames  = equalize $ fmap branchName availableBranches

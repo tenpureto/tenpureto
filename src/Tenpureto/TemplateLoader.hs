@@ -61,6 +61,7 @@ data TemplateYaml = TemplateYaml
         { variables :: InsOrdHashMap Text Text
         , features :: Set TemplateYamlFeature
         , excludes :: Set Text
+        , conflicts :: Set Text
         }
         deriving (Show, Eq)
 
@@ -135,6 +136,12 @@ isMergeBranch t b = any (isMergeOf b) mergeOptions
   where
     fb           = filter isFeatureBranch (branchesInformation t)
     mergeOptions = filter ((<) 1 . length) (subsequences fb)
+
+branchesConflict
+    :: TemplateBranchInformation -> TemplateBranchInformation -> Bool
+branchesConflict a b =
+    Set.member (branchName b) (conflicts $ templateYaml a)
+        || Set.member (branchName a) (conflicts $ templateYaml b)
 
 managedBranches :: TemplateInformation -> [TemplateBranchInformation]
 managedBranches t = filter (\b -> isFeatureBranch b || isMergeBranch t b)
@@ -270,6 +277,9 @@ instance FromJSON TemplateYaml where
             <*> v
             .:? "excludes"
             .!= Set.empty
+            <*> v
+            .:? "conflicts"
+            .!= Set.empty
     parseJSON _ = fail "Invalid template YAML definition"
 
 instance ToJSON TemplateYamlFeature where
@@ -285,10 +295,12 @@ instance Semigroup TemplateYaml where
     (<>) a b = TemplateYaml { variables = variables a <> variables b
                             , features  = features a <> features b
                             , excludes  = excludes a <> excludes b
+                            , conflicts = conflicts a <> conflicts b
                             }
 
 instance Monoid TemplateYaml where
     mempty = TemplateYaml { variables = mempty
                           , features  = mempty
                           , excludes  = mempty
+                          , conflicts = mempty
                           }

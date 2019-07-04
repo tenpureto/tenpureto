@@ -234,19 +234,23 @@ prepareTemplate
     -> Sem r TemplateYaml
 prepareTemplate repository template configuration =
     let
-        resolve _          []        = return ()
-        resolve descriptor conflicts = if templateYamlFile `elem` conflicts
-            then
-                writeAddFile repository
-                             templateYamlFile
-                             (formatTemplateYaml descriptor)
-                    >> resolve descriptor (delete templateYamlFile conflicts)
-            else
-                inputResolutionStrategy (repositoryPath repository) conflicts
-                    >>= \case
-                            AlreadyResolved -> return ()
-                            MergeTool ->
-                                runMergeTool repository >> sayLn mergeSuccess
+        resolve _ [] = return ()
+        resolve descriptor mergeConflicts =
+            if templateYamlFile `elem` mergeConflicts
+                then
+                    writeAddFile repository
+                                 templateYamlFile
+                                 (formatTemplateYaml descriptor)
+                        >> resolve
+                               descriptor
+                               (delete templateYamlFile mergeConflicts)
+                else
+                    inputResolutionStrategy (repositoryPath repository)
+                                            mergeConflicts
+                        >>= \case
+                                AlreadyResolved -> return ()
+                                MergeTool       -> runMergeTool repository
+                                    >> sayLn mergeSuccess
         checkoutTemplateBranch a = do
             checkoutBranch repository (branchName a) Nothing
             return $ templateYaml a
@@ -254,8 +258,8 @@ prepareTemplate repository template configuration =
             let d = ((<>) a . templateYaml) b
             mergeResult <- mergeBranch repository ("origin/" <> branchName b)
             case mergeResult of
-                MergeSuccess             -> return ()
-                MergeConflicts conflicts -> resolve d conflicts
+                MergeSuccess                  -> return ()
+                MergeConflicts mergeConflicts -> resolve d mergeConflicts
             _ <- commit repository ("Merge " <> branchName b)
             return d
         branchesToMerge =
@@ -274,6 +278,7 @@ renameBranchInYaml oldName newName descriptor = TemplateYaml
     { variables = variables descriptor
     , features  = Set.map (renameBranch oldName newName) (features descriptor)
     , excludes  = excludes descriptor
+    , conflicts = conflicts descriptor
     }
   where
     renameBranch old new b = if featureName b == old
@@ -292,6 +297,7 @@ replaceVariableInYaml old new descriptor = TemplateYaml
     { variables = replaceInFunctor old new (variables descriptor)
     , features  = features descriptor
     , excludes  = excludes descriptor
+    , conflicts = conflicts descriptor
     }
 
 commit_

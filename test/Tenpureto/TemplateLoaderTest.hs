@@ -130,38 +130,42 @@ test_parseTemplateYaml =
         $   parseTemplateYaml "variables: { \"Key\": \"value\" }"
         @?= Right TemplateYaml
                 { variables = InsOrdHashMap.singleton "Key" "value"
-                , features  = Set.empty
-                , excludes  = Set.empty
+                , features  = mempty
+                , excludes  = mempty
+                , conflicts = mempty
                 }
     , testCase "parse excludes"
         $   parseTemplateYaml "excludes: [ \".*\" ]"
-        @?= Right TemplateYaml { variables = InsOrdHashMap.empty
-                               , features  = Set.empty
+        @?= Right TemplateYaml { variables = mempty
+                               , features  = mempty
                                , excludes  = Set.singleton ".*"
+                               , conflicts = mempty
                                }
     , testCase "parse simple features"
         $   parseTemplateYaml "features: [ \"a\" ]"
         @?= Right TemplateYaml
-                { variables = InsOrdHashMap.empty
+                { variables = mempty
                 , features  = Set.singleton TemplateYamlFeature
                                   { featureName        = "a"
                                   , featureDescription = Nothing
                                   , featureHidden      = False
                                   , featureStability   = Stable
                                   }
-                , excludes  = Set.empty
+                , excludes  = mempty
+                , conflicts = mempty
                 }
     , testCase "parse extended features"
         $   parseTemplateYaml
                 "features: [ a: { description: foo, hidden: true, stability: experimental } ]"
         @?= Right TemplateYaml
-                { variables = InsOrdHashMap.empty
+                { variables = mempty
                 , features  = Set.singleton TemplateYamlFeature
                                   { featureName        = "a"
                                   , featureDescription = Just "foo"
                                   , featureHidden      = True
                                   , featureStability   = Experimental
                                   }
-                , excludes  = Set.empty
+                , excludes  = mempty
+                , conflicts = mempty
                 }
     ]
