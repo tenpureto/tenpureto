@@ -113,7 +113,7 @@ withNewWorktree
     -> (GitRepository -> Sem r a)
     -> Sem r a
 withNewWorktree repo c f = withSystemTempDir "tenpureto" $ \dir ->
-    bracket (initWorktree repo c dir) (const $ deleteWorktree repo dir) f
+    initWorktree repo c dir >> f repo
 
 runGit
     :: Members '[FileSystem, Process, Error GitException] r
