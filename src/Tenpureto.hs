@@ -63,7 +63,8 @@ buildTemplaterSettings
     :: TemplateYaml -> FinalProjectConfiguration -> TemplaterSettings
 buildTemplaterSettings TemplateYaml { variables = templateValues, excludes = templateExcludes } FinalProjectConfiguration { variableValues = values }
     = TemplaterSettings
-        { templaterFromVariables = templateValues
+        { templaterFromVariables = (InsOrdHashMap.fromList . Map.toList)
+                                       templateValues
         , templaterToVariables   = (InsOrdHashMap.fromList . Map.toList) values
         , templaterExcludes      = templateExcludes
         }
@@ -226,12 +227,7 @@ loadExistingProjectConfiguration projectPath =
             , preTargetDirectory        = Just projectPath
             , prePreviousTemplateCommit = previousCommit
             , preSelectedBranches = fmap (Set.map featureName . features) yaml
-            , preVariableValues         = fmap
-                                              ( Map.fromList
-                                              . InsOrdHashMap.toList
-                                              . variables
-                                              )
-                                              yaml
+            , preVariableValues         = fmap variables yaml
             }
 
 prepareTemplate
@@ -635,7 +631,7 @@ isChildBranch branch bi =
 
 hasVariableValue :: Text -> TemplateBranchInformation -> Bool
 hasVariableValue value bi =
-    value `elem` InsOrdHashMap.elems (branchVariables bi)
+    value `elem` Map.elems (branchVariables bi)
 
 getTemplateBranch
     :: Member (Error TenpuretoException) r

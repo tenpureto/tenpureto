@@ -4,9 +4,10 @@ import           Test.Tasty
 import           Test.Tasty.HUnit
 
 import           Tenpureto.TemplateTestHelper
-import           Tenpureto.TemplateLoader       ( TemplateInformation(..)
-                                                , TemplateBranchInformation(..)
+import           Tenpureto.TemplateLoader       ( TemplateBranchInformation(..)
                                                 )
+import           Tenpureto.TemplateLoader.Internal
+                                                ( templateInformation )
 import           Tenpureto.MergeOptimizer
 
 test_reorderBranches :: [TestTree]
@@ -28,25 +29,25 @@ test_includeMergeBranches :: [TestTree]
 test_includeMergeBranches =
     [ testCase "should include merges of two base branches"
         $   (branchName <$> includeMergeBranches
-                (TemplateInformation [a, b, c, z])
+                (templateInformation [a, b, c, z])
                 [a, b, c]
             )
         @?= (branchName <$> [a, b, c, z])
     , testCase "should include merges of three base branches"
         $   (branchName <$> includeMergeBranches
-                (TemplateInformation [a, b, c, q])
+                (templateInformation [a, b, c, q])
                 [a, b, c]
             )
         @?= (branchName <$> [a, b, c, q])
     , testCase "should not include merges with additional data"
         $   (branchName <$> includeMergeBranches
-                (TemplateInformation [a, b, c, y])
+                (templateInformation [a, b, c, y])
                 [a, b, c]
             )
         @?= (branchName <$> [a, b, c])
     , testCase "should not include useless merges"
         $   (branchName <$> includeMergeBranches
-                (TemplateInformation [a, b, c, x])
+                (templateInformation [a, b, c, x])
                 [a, b, c]
             )
         @?= (branchName <$> [a, b, c])

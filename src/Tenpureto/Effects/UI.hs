@@ -9,6 +9,7 @@ import           Data.Bool
 import           Data.Maybe
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
+import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
 import           Control.Monad
 
@@ -77,7 +78,12 @@ runUIInTerminal = interpret $ \case
                 (fromMaybe Set.empty preSelectedFeatures)
         let allBranches = Set.insert base branches
             sbi         = filter (flip Set.member allBranches . branchName) bi
-            sbvars      = mconcat (map branchVariables sbi)
+            sbvars =
+                mconcat
+                    (map
+                        (InsOrdHashMap.fromList . Map.toList . branchVariables)
+                        sbi
+                    )
             cvars =
                 fromMaybe Map.empty (preVariableValues providedConfiguration)
             vars = withDefaults sbvars cvars

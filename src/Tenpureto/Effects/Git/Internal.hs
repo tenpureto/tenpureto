@@ -28,7 +28,7 @@ import           Tenpureto.Effects.Process
 
 
 newtype GitRepository = GitRepository { repositoryPath :: Path Abs Dir }
-newtype Committish = Committish { unCommittish :: Text } deriving (Eq, Show)
+newtype Committish = Committish { unCommittish :: Text } deriving (Show, Eq, Ord)
 
 data GitException = GitExecException { exitCode :: Int, stdOut :: Maybe ByteString, stdErr :: Maybe ByteString }
                   | HubExecException { exitCode :: Int, stdOut :: Maybe ByteString, stdErr :: Maybe ByteString }

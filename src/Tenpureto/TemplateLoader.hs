@@ -1,7 +1,15 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE QuasiQuotes #-}
 
-module Tenpureto.TemplateLoader where
+module Tenpureto.TemplateLoader
+    ( module Tenpureto.TemplateLoader
+    , FeatureStability(..)
+    , TemplateInformation(..)
+    , TemplateBranchInformation(..)
+    , TemplateYaml(..)
+    , TemplateYamlFeature(..)
+    )
+where
 
 import           Polysemy
 
@@ -14,23 +22,14 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
-import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
-import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
-import qualified Data.HashMap.Strict           as HashMap
-import qualified Data.Yaml                     as Y
-import           Data.Yaml                      ( FromJSON(..)
-                                                , ToJSON(..)
-                                                , (.:?)
-                                                , (.!=)
-                                                , (.=)
-                                                )
 import           Data.Bifunctor
 import           Control.Monad.Trans.Maybe
+import qualified Data.Yaml                     as Y
 
 import           Path
 
-import           Tenpureto.Effects.Logging
 import           Tenpureto.Effects.Git
+import           Tenpureto.TemplateLoader.Internal
 
 import           Tenpureto.Orphanage            ( )
 
@@ -46,40 +45,6 @@ data BranchFilter = BranchFilterAny
                   | BranchFilterIsHiddenBranch
                   | BranchFilterIsMergeBranch
 
-data FeatureStability = Deprecated | Experimental | Stable
-        deriving (Show, Eq, Ord)
-
-data TemplateYamlFeature = TemplateYamlFeature
-        { featureName :: Text
-        , featureDescription :: Maybe Text
-        , featureHidden :: Bool
-        , featureStability :: FeatureStability
-        }
-        deriving (Show, Eq, Ord)
-
-data TemplateYaml = TemplateYaml
-        { variables :: InsOrdHashMap Text Text
-        , features :: Set TemplateYamlFeature
-        , excludes :: Set Text
-        , conflicts :: Set Text
-        }
-        deriving (Show, Eq)
-
-data TemplateBranchInformation = TemplateBranchInformation
-    { branchName :: Text
-    , branchCommit :: Committish
-    , requiredBranches :: Set Text
-    , branchVariables :: InsOrdHashMap Text Text
-    , templateYaml :: TemplateYaml
-    , templateYamlFeature :: Maybe TemplateYamlFeature
-    }
-    deriving (Show, Eq)
-
-newtype TemplateInformation = TemplateInformation
-    { branchesInformation :: [TemplateBranchInformation]
-    }
-    deriving (Show, Eq)
-
 internalBranchPrefix :: Text
 internalBranchPrefix = "tenpureto/"
 
@@ -91,7 +56,7 @@ loadTemplateInformation repo = do
     branchConfigurations <- traverse (loadBranchConfiguration repo)
         $ sort branches
     let bi = catMaybes branchConfigurations
-    return $ TemplateInformation { branchesInformation = bi }
+    return $ templateInformation bi
 
 loadBranchConfiguration
     :: Members '[Git] r
@@ -212,95 +177,3 @@ applyBranchFilter BranchFilterIsBaseBranch    ti = isBaseBranch ti
 applyBranchFilter BranchFilterIsFeatureBranch _  = isFeatureBranch
 applyBranchFilter BranchFilterIsHiddenBranch  _  = isHiddenBranch
 applyBranchFilter BranchFilterIsMergeBranch   ti = isMergeBranch ti
-
-instance Pretty TemplateBranchInformation where
-    pretty cfg = (align . vsep)
-        [ "Branch name:      " <+> (align . pretty) (branchName cfg)
-        , "Required branches:" <+> (align . pretty) (requiredBranches cfg)
-        , "Branch variables: " <+> (align . pretty) (branchVariables cfg)
-        , "Description:      " <+> (align . pretty)
-            (featureDescription =<< templateYamlFeature cfg)
-        , "Hidden:           "
-            <+> (align . pretty) (featureHidden <$> templateYamlFeature cfg)
-        ]
-
-instance Pretty TemplateInformation where
-    pretty cfg = (align . vsep)
-        ["Branches:" <+> (align . pretty) (branchesInformation cfg)]
-
-instance Pretty TemplateYamlFeature where
-    pretty feature =
-        (align . vsep) ["Name:" <+> (align . pretty) (featureName feature)]
-
-instance Pretty TemplateYaml where
-    pretty cfg = (align . vsep)
-        [ "Variables:" <+> (align . pretty) (variables cfg)
-        , "Features: " <+> (align . pretty) (features cfg)
-        ]
-
-instance FromJSON FeatureStability where
-    parseJSON (Y.String "stable"      ) = pure Stable
-    parseJSON (Y.String "experimental") = pure Experimental
-    parseJSON (Y.String "deprecated"  ) = pure Deprecated
-    parseJSON _                         = fail "Invalid feature stability value"
-
-instance FromJSON TemplateYamlFeature where
-    parseJSON (Y.String v) = pure $ TemplateYamlFeature
-        { featureName        = v
-        , featureDescription = Nothing
-        , featureHidden      = False
-        , featureStability   = Stable
-        }
-    parseJSON (Y.Object v) = case HashMap.toList v of
-        [(k, Y.Object vv)] ->
-            TemplateYamlFeature k
-                <$> vv
-                .:? "description"
-                <*> vv
-                .:? "hidden"
-                .!= False
-                <*> vv
-                .:? "stability"
-                .!= Stable
-        _ -> fail "Invalid template YAML feature definition"
-    parseJSON _ = fail "Invalid template YAML feature definition"
-
-instance FromJSON TemplateYaml where
-    parseJSON (Y.Object v) =
-        TemplateYaml
-            <$> v
-            .:? "variables"
-            .!= InsOrdHashMap.empty
-            <*> v
-            .:? "features"
-            .!= Set.empty
-            <*> v
-            .:? "excludes"
-            .!= Set.empty
-            <*> v
-            .:? "conflicts"
-            .!= Set.empty
-    parseJSON _ = fail "Invalid template YAML definition"
-
-instance ToJSON TemplateYamlFeature where
-    toJSON TemplateYamlFeature { featureName = n } = toJSON n
-
-instance ToJSON TemplateYaml where
-    toJSON TemplateYaml { variables = v, features = f, excludes = e } =
-        Y.object $ catMaybes
-            ["variables" .?= v, "features" .?= f, "excludes" .?= e]
-        where a .?= b = if b == mempty then Nothing else Just (a .= b)
-
-instance Semigroup TemplateYaml where
-    (<>) a b = TemplateYaml { variables = variables a <> variables b
-                            , features  = features a <> features b
-                            , excludes  = excludes a <> excludes b
-                            , conflicts = conflicts a <> conflicts b
-                            }
-
-instance Monoid TemplateYaml where
-    mempty = TemplateYaml { variables = mempty
-                          , features  = mempty
-                          , excludes  = mempty
-                          , conflicts = mempty
-                          }
