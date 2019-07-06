@@ -31,7 +31,6 @@ dependencies:
 - optparse-applicative
 - yaml
 - aeson
-- dotgen
 - Glob
 - file-embed
 - polysemy >= 0.5.0.1

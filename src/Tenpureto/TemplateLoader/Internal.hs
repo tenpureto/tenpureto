@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving, UndecidableInstances #-}
+
 module Tenpureto.TemplateLoader.Internal where
 
 import           Data.Maybe
@@ -16,7 +18,12 @@ import           Data.Yaml                      ( FromJSON(..)
                                                 )
 import qualified Data.Yaml                     as Y
 import           Data.Foldable
+import           Control.Applicative            ( Applicative
+                                                , Alternative
+                                                )
+import           Control.Monad
 import           Algebra.Graph
+import           Algebra.Graph.ToGraph          ( ToGraph )
 
 import           Tenpureto.Effects.Git
 
@@ -54,6 +61,9 @@ data TemplateBranchInformation = TemplateBranchInformation
     , templateYamlFeature :: Maybe TemplateYamlFeature
     }
     deriving (Show, Eq, Ord)
+
+newtype BranchGraph a = BranchGraph (Graph a)
+    deriving (Show, ToGraph, Functor, Applicative, Monad, Alternative, MonadPlus)
 
 instance Pretty TemplateBranchInformation where
     pretty cfg = (align . vsep)

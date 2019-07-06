@@ -13,14 +13,14 @@ import           Data.Maybe
 import           Data.Either
 import           Data.Either.Combinators
 import           Data.Text                      ( Text )
-import qualified Data.Text                     as T
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
 import qualified Data.Text.ICU                 as ICU
 import           Data.Functor
-import           Text.Dot
+import           Control.Monad
+import qualified Algebra.Graph.Export.Dot      as Dot
 
 import           Tenpureto.Data
 import           Tenpureto.Messages
@@ -34,6 +34,7 @@ import           Tenpureto.TemplateLoader
 import           Tenpureto.MergeOptimizer
 import           Tenpureto.Templater
 import           Tenpureto.Internal
+
 
 data RemoteChangeMode = PushDirectly
                       | UpstreamPullRequest { pullRequestSettings :: PullRequestSettings }
@@ -298,39 +299,11 @@ generateTemplateGraph
 generateTemplateGraph template branchFilter =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
         templateInformation <- loadTemplateInformation repo
-        let nodeAttributes branch
-                | isMergeBranch templateInformation branch
-                = [("label", ""), circle, dotted]
-                | isHiddenBranch branch
-                = [("label", T.unpack (branchName branch)), box, dashed]
-                | otherwise
-                = [("label", T.unpack (branchName branch)), box]
-        let edgeAttributes _ dst
-                | isMergeBranch templateInformation dst
-                = [("style", "dotted")]
-                | otherwise
-                = []
-        let relevantBranches =
-                getTemplateBranches branchFilter templateInformation
-        let nodes   = fmap branchName relevantBranches `zip` relevantBranches
-        let nodeSet = Set.fromList (fmap fst nodes)
-        let graph =
-                netlistGraph'
-                        nodeAttributes
-                        edgeAttributes
-                        ( Set.toList
-                        . Set.intersection nodeSet
-                        . getBranchParents templateInformation
-                        )
-                        nodes
-                    *> attribute ("layout", "dot")
-                    *> attribute ("rankdir", "LR")
-        sayLn $ pretty (showDot graph)
-  where
-    dotted = ("style", "dotted")
-    dashed = ("style", "dashed")
-    box    = ("shape", "box")
-    circle = ("shape", "circle")
+        let graph = mfilter
+                (applyBranchFilter branchFilter templateInformation)
+                (templateBranchesGraph templateInformation)
+        let style = exportDotStyle templateInformation
+        sayLn $ pretty (Dot.export style graph)
 
 listTemplateBranches
     :: Members

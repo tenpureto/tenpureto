@@ -4,11 +4,13 @@
 module Tenpureto.TemplateLoader
     ( module Tenpureto.TemplateLoader
     , FeatureStability(..)
-    , TemplateInformation(..)
+    , TemplateInformation
+    , branchesInformation
     , TemplateBranchInformation(..)
     , TemplateYaml(..)
     , TemplateYamlFeature
     , yamlFeatureName
+    , BranchGraph
     )
 where
 
@@ -215,3 +217,7 @@ replaceVariableInYaml old new descriptor = TemplateYaml
     , yamlExcludes  = yamlExcludes descriptor
     , yamlConflicts = yamlConflicts descriptor
     }
+
+templateBranchesGraph
+    :: TemplateInformation -> BranchGraph TemplateBranchInformation
+templateBranchesGraph = BranchGraph . branchesGraph
