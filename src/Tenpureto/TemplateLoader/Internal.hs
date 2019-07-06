@@ -160,17 +160,21 @@ instance Monoid TemplateYaml where
 
 buildGraph :: [TemplateBranchInformation] -> Graph TemplateBranchInformation
 buildGraph bis =
-    let
-        singleBranchNameGraph bi = vertex (branchName bi)
-            `connect` vertices (Set.toList $ requiredBranches bi)
-        fullBranchNameGraph = msum (fmap singleBranchNameGraph bis)
+    let branchNames = fmap branchName bis
+        branchEdges =
+                [ (branchName a, branchName b)
+                | a <- bis
+                , b <- bis
+                , Set.member (branchName a) (requiredBranches b)
+                    || Set.isSubsetOf (requiredBranches a) (requiredBranches b)
+                ]
+        fullBranchNameGraph =
+                overlay (vertices branchNames) (edges branchEdges)
         findBranchInformation name = find ((==) name . branchName) bis
         branchInformationVertex = maybe empty vertex . findBranchInformation
         branchNameGraph =
-            (simplify . transpose . removeTransitiveEdges . removeLoops)
-                fullBranchNameGraph
-    in
-        branchNameGraph >>= branchInformationVertex
+                (simplify . removeTransitiveEdges . removeLoops) fullBranchNameGraph
+    in  branchNameGraph >>= branchInformationVertex
 
 subtractEdges :: Ord a => Graph a -> Graph a -> Graph a
 subtractEdges x y = edges $ Set.toList (edgeSet x `Set.difference` edgeSet y)
