@@ -23,8 +23,6 @@ import           Tenpureto.Effects.Terminal
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Git
 
-import           Debug.Trace
-
 inputTemplate :: Member TerminalInput r => Sem r Text
 inputTemplate = ask "Template URL" Nothing
 
@@ -129,8 +127,8 @@ branchByIndex availableBranches index =
 inputSingleBranch
     :: Members '[Terminal, TerminalInput] r
     => [TemplateBranchInformation]
-    -> Maybe Text
-    -> Sem r TemplateBranchInformation
+    -> Set Text
+    -> Sem r (Set TemplateBranchInformation)
 inputSingleBranch availableBranches initialSelection = askUntil initial
                                                                 request
                                                                 process
@@ -141,9 +139,7 @@ inputSingleBranch availableBranches initialSelection = askUntil initial
     request badInput =
         let
             doc =
-                inputBranchList
-                        availableBranches
-                        (Set.fromList (maybeToList initialSelection))
+                inputBranchList availableBranches initialSelection
                     <> "\n"
                     <> maybe
                            ""
@@ -155,13 +151,15 @@ inputSingleBranch availableBranches initialSelection = askUntil initial
                     <> "Select a feature:"
         in  (doc, Nothing)
     process
-        :: Maybe Text -> Text -> Either (Maybe Text) TemplateBranchInformation
+        :: Maybe Text
+        -> Text
+        -> Either (Maybe Text) (Set TemplateBranchInformation)
     process _ "" =
-        case initialSelection >>= findBranchByName availableBranches of
-            Just bi -> Right bi
-            Nothing -> Left $ Just ""
+        case filterBranchesByNames availableBranches initialSelection of
+            [] -> Left $ Just ""
+            a  -> Right $ Set.fromList a
     process _ input = case branchByIndex availableBranches input of
-        Just bi -> Right bi
+        Just bi -> Right $ Set.singleton bi
         Nothing -> Left $ Just input
 
 inputMultipleBranches
@@ -217,9 +215,8 @@ inputBranches
 inputBranches branches previousSelection = case graphRoots branches of
     []                           -> return mempty
     roots | allConflicting roots -> do
-        selection <- Set.singleton
-            <$> inputSingleBranch roots (singlePrevious roots previousSelection)
-        children <- inputBranches
+        selection <- inputSingleBranch roots (previous roots previousSelection)
+        children  <- inputBranches
             (reachableExclusiveSubgraph selection branches)
             previousSelection
         return $ selection <> children
@@ -228,9 +225,6 @@ inputBranches branches previousSelection = case graphRoots branches of
         (previous (vertexList branches) previousSelection)
   where
     previous bs p = Set.intersection p (Set.fromList $ fmap branchName bs)
-    singlePrevious bs p = case Set.toList (previous bs p) of
-        [a] -> Just a
-        _   -> Nothing
     allConflicting bs =
         all id [ branchesConflict a b | a <- bs, b <- bs, a /= b ]
 
