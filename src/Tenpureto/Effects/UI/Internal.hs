@@ -23,6 +23,8 @@ import           Tenpureto.Effects.Terminal
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Git
 
+import           Debug.Trace
+
 inputTemplate :: Member TerminalInput r => Sem r Text
 inputTemplate = ask "Template URL" Nothing
 
@@ -41,6 +43,11 @@ filterBranchesByNames
     :: [TemplateBranchInformation] -> Set Text -> [TemplateBranchInformation]
 filterBranchesByNames availableBranches branches =
     filter (flip Set.member branches . branchName) availableBranches
+
+findBranchByName
+    :: [TemplateBranchInformation] -> Text -> Maybe TemplateBranchInformation
+findBranchByName availableBranches branch =
+    find ((==) branch . branchName) availableBranches
 
 type InputBranchState = (Set Text, Maybe Text)
 
@@ -149,6 +156,10 @@ inputSingleBranch availableBranches initialSelection = askUntil initial
         in  (doc, Nothing)
     process
         :: Maybe Text -> Text -> Either (Maybe Text) TemplateBranchInformation
+    process _ "" =
+        case initialSelection >>= findBranchByName availableBranches of
+            Just bi -> Right bi
+            Nothing -> Left $ Just ""
     process _ input = case branchByIndex availableBranches input of
         Just bi -> Right bi
         Nothing -> Left $ Just input
