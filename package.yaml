@@ -79,4 +79,6 @@ tests:
     - tasty-discover
     - tasty-smallcheck
     - tasty-hunit
+    - tasty-hedgehog
     - smallcheck
+    - hedgehog

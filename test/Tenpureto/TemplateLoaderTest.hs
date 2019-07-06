@@ -182,4 +182,4 @@ test_buildGraph =
     a         = baseBranch "a"
     b         = childBranch "b" [a]
     c         = childBranch "c" [b]
-    nameGraph = fmap branchName . buildGraph
+    nameGraph = mapVertices branchName . buildGraph

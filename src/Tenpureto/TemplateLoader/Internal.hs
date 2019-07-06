@@ -150,20 +150,22 @@ instance Monoid TemplateYaml where
 
 buildGraph :: [TemplateBranchInformation] -> Graph TemplateBranchInformation
 buildGraph bis =
-    let branchNames = fmap branchName bis
+    let
+        branchNames = fmap branchName bis
         branchEdges =
-                [ (branchName a, branchName b)
-                | a <- bis
-                , b <- bis
-                , Set.member (branchName a) (requiredBranches b)
-                    || Set.isSubsetOf (requiredBranches a) (requiredBranches b)
-                ]
-        fullBranchNameGraph =
-                overlay (vertices branchNames) (edges branchEdges)
+            [ (branchName a, branchName b)
+            | a <- bis
+            , b <- bis
+            , Set.member (branchName a) (requiredBranches b)
+                || (  Set.isProperSubsetOf (requiredBranches a)
+                                           (requiredBranches b)
+                   && not (Set.member (branchName b) (requiredBranches b))
+                   )
+            ]
+        branchNameGraph = overlay (vertices branchNames) (edges branchEdges)
         findBranchInformation name = find ((==) name . branchName) bis
-        branchNameGraph =
-                (simplify . removeTransitiveEdges . removeLoops) fullBranchNameGraph
-    in  filterMapVertices findBranchInformation branchNameGraph
+    in
+        filterMapVertices findBranchInformation branchNameGraph
 
 templateInformation :: [TemplateBranchInformation] -> TemplateInformation
 templateInformation branches =
