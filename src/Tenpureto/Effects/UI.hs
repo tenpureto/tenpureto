@@ -11,7 +11,6 @@ import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
-import           Control.Monad
 
 import           Tenpureto.Data
 import           Tenpureto.Messages
@@ -57,38 +56,18 @@ runUIInTerminal = interpret $ \case
         -> FinalUpdateConfiguration <$> maybe inputPreviousCommit return mbc
 
     InputProjectConfiguration templateInformation providedConfiguration -> do
-        let bi = filter (not . isHiddenBranch)
-                        (branchesInformation templateInformation)
-            bases     = filter (isBaseBranch templateInformation) bi
-            features' = filter isFeatureBranch bi
-            child base branch = Set.member base (requiredBranches branch)
-                && not (isBaseBranch templateInformation branch)
-        when (null bases) $ throw NoBaseBranchesException
-        base <- inputBaseBranch
-            bases
-            (preSelectedBaseBranch templateInformation providedConfiguration)
-        let featuresForBase     = filter (child base) features'
-            preSelectedFeatures = preSelectedFeatureBranches
-                templateInformation
-                providedConfiguration
-        branches <- if null featuresForBase
-            then return Set.empty
-            else inputFeatureBranches
-                featuresForBase
-                (fromMaybe Set.empty preSelectedFeatures)
-        let allBranches = Set.insert base branches
-            sbi         = filter (flip Set.member allBranches . branchName) bi
-            sbvars =
-                mconcat
-                    (map
-                        (InsOrdHashMap.fromList . Map.toList . branchVariables)
-                        sbi
-                    )
-            cvars =
+        let psb = fromMaybe mempty (preSelectedBranches providedConfiguration)
+        let branches = filterTemplateBranches BranchFilterIsFeatureBranch
+                                              templateInformation
+        sbi <- inputBranches branches psb
+        let sbvars = mconcat $ fmap
+                (InsOrdHashMap.fromList . Map.toList . branchVariables)
+                (Set.toList sbi)
+        let cvars =
                 fromMaybe Map.empty (preVariableValues providedConfiguration)
-            vars = withDefaults sbvars cvars
+        let vars = withDefaults sbvars cvars
         varVals <- inputVariables vars
-        return FinalProjectConfiguration { projectBranches = sbi
+        return FinalProjectConfiguration { projectBranches = Set.toList sbi
                                          , variableValues  = varVals
                                          }
 

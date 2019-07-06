@@ -15,8 +15,9 @@ import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Functor
 import           Data.Text.Prettyprint.Doc.Render.Terminal
+import           Algebra.Graph.ToGraph
 
-import           Tenpureto.Data
+import           Tenpureto.Graph
 import           Tenpureto.TemplateLoader
 import           Tenpureto.Effects.Terminal
 import           Tenpureto.Effects.FileSystem
@@ -30,32 +31,6 @@ inputTarget = ask "Target directory" Nothing <&> T.unpack >>= resolveDir
 
 inputPreviousCommit :: Member TerminalInput r => Sem r Committish
 inputPreviousCommit = ask "Previous template commit" Nothing <&> Committish
-
-preSelectedBaseBranch
-    :: TemplateInformation -> PreliminaryProjectConfiguration -> Maybe Text
-preSelectedBaseBranch templateInformation providedConfiguration =
-    let baseBranches = Set.fromList $ map branchName $ filter
-            (isBaseBranch templateInformation)
-            (branchesInformation templateInformation)
-        selected =
-                fromMaybe Set.empty (preSelectedBranches providedConfiguration)
-        selectedBaseBranches  = Set.intersection baseBranches selected
-        minSelectedBaseBranch = Set.lookupMin selectedBaseBranches
-        maxSelectedBaseBranch = Set.lookupMax selectedBaseBranches
-    in  if minSelectedBaseBranch == maxSelectedBaseBranch
-            then minSelectedBaseBranch
-            else Nothing
-
-preSelectedFeatureBranches
-    :: TemplateInformation
-    -> PreliminaryProjectConfiguration
-    -> Maybe (Set Text)
-preSelectedFeatureBranches templateInformation providedConfiguration =
-    let featureBranches = Set.fromList $ map branchName $ filter
-            (not . isBaseBranch templateInformation)
-            (branchesInformation templateInformation)
-    in  fmap (Set.intersection featureBranches)
-             (preSelectedBranches providedConfiguration)
 
 templateBranchesByNames
     :: TemplateInformation -> Set Text -> [TemplateBranchInformation]
@@ -144,14 +119,14 @@ branchByIndex availableBranches index =
         isIndex = (==) index . T.pack . show . fst
     in  find isIndex ([1 ..] `zip` availableBranches) <&> snd
 
-inputBaseBranch
+inputSingleBranch
     :: Members '[Terminal, TerminalInput] r
     => [TemplateBranchInformation]
     -> Maybe Text
-    -> Sem r Text
-inputBaseBranch availableBranches initialSelection = askUntil initial
-                                                              request
-                                                              process
+    -> Sem r TemplateBranchInformation
+inputSingleBranch availableBranches initialSelection = askUntil initial
+                                                                request
+                                                                process
   where
     initial :: Maybe Text
     initial = Nothing
@@ -159,33 +134,33 @@ inputBaseBranch availableBranches initialSelection = askUntil initial
     request badInput =
         let
             doc =
-                "Base branches:\n"
-                    <> inputBranchList
-                           availableBranches
-                           (Set.fromList (maybeToList initialSelection))
+                inputBranchList
+                        availableBranches
+                        (Set.fromList (maybeToList initialSelection))
                     <> "\n"
                     <> maybe
                            ""
                            (\x ->
                                dquotes (pretty x)
-                                   <+> "is not a valid branch index. "
+                                   <+> "is not a valid feature index. "
                            )
                            badInput
-                    <> "Select a base branch:"
+                    <> "Select a feature:"
         in  (doc, Nothing)
-    process :: Maybe Text -> Text -> Either (Maybe Text) Text
+    process
+        :: Maybe Text -> Text -> Either (Maybe Text) TemplateBranchInformation
     process _ input = case branchByIndex availableBranches input of
-        Just bi -> Right $ branchName bi
+        Just bi -> Right bi
         Nothing -> Left $ Just input
 
-inputFeatureBranches
+inputMultipleBranches
     :: Members '[Terminal, TerminalInput] r
     => [TemplateBranchInformation]
     -> Set Text
-    -> Sem r (Set Text)
-inputFeatureBranches availableBranches initialSelection = askUntil initial
-                                                                   request
-                                                                   process
+    -> Sem r (Set TemplateBranchInformation)
+inputMultipleBranches availableBranches initialSelection = askUntil initial
+                                                                    request
+                                                                    process
   where
     initial :: InputBranchState
     initial = (initialSelection, Nothing)
@@ -193,21 +168,26 @@ inputFeatureBranches availableBranches initialSelection = askUntil initial
     request (selected, badInput) =
         let
             doc =
-                "Feature branches:\n"
-                    <> inputBranchList availableBranches selected
+                inputBranchList availableBranches selected
                     <> "\n"
                     <> maybe
                            ""
                            (\x ->
                                dquotes (pretty x)
-                                   <+> "is not a valid branch index. "
+                                   <+> "is not a valid feature index. "
                            )
                            badInput
-                    <> "Add or remove a feature branch:"
+                    <> "Add or remove a feature:"
         in  (doc, Nothing)
-    process :: InputBranchState -> Text -> Either InputBranchState (Set Text)
+    process
+        :: InputBranchState
+        -> Text
+        -> Either InputBranchState (Set TemplateBranchInformation)
     process (selected, _) "" =
-        Right $ branchSelection availableBranches selected
+        Right
+            $ Set.fromList
+            $ filterBranchesByNames availableBranches
+            $ branchSelection availableBranches selected
     process (selected, _) input =
         Left $ case branchByIndex availableBranches input of
             Just bi ->
@@ -217,6 +197,31 @@ inputFeatureBranches availableBranches initialSelection = askUntil initial
                         else branch `Set.insert` selected
                 in  (newSelected, Nothing)
             Nothing -> (selected, Just input)
+
+inputBranches
+    :: Members '[Terminal, TerminalInput] r
+    => Graph TemplateBranchInformation
+    -> Set Text
+    -> Sem r (Set TemplateBranchInformation)
+inputBranches branches previousSelection = case graphRoots branches of
+    []                           -> return mempty
+    roots | allConflicting roots -> do
+        selection <- Set.singleton
+            <$> inputSingleBranch roots (singlePrevious roots previousSelection)
+        children <- inputBranches
+            (reachableExclusiveSubgraph selection branches)
+            previousSelection
+        return $ selection <> children
+    _ -> inputMultipleBranches
+        (vertexList branches)
+        (previous (vertexList branches) previousSelection)
+  where
+    previous bs p = Set.intersection p (Set.fromList $ fmap branchName bs)
+    singlePrevious bs p = case Set.toList (previous bs p) of
+        [a] -> Just a
+        _   -> Nothing
+    allConflicting bs =
+        all id [ branchesConflict a b | a <- bs, b <- bs, a /= b ]
 
 withDefaults :: Ord a => InsOrdHashMap a b -> Map a b -> InsOrdHashMap a b
 withDefaults vars defaults =

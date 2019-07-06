@@ -10,6 +10,7 @@ module Tenpureto.TemplateLoader
     , TemplateYaml(..)
     , TemplateYamlFeature
     , yamlFeatureName
+    , Graph
     )
 where
 
@@ -88,11 +89,6 @@ featureDescription = yamlFeatureDescription <=< templateYamlFeature
 featureStability :: TemplateBranchInformation -> FeatureStability
 featureStability = maybe Stable yamlFeatureStability . templateYamlFeature
 
-isBaseBranch :: TemplateInformation -> TemplateBranchInformation -> Bool
-isBaseBranch ti b = (Set.filter visible . requiredBranches) b
-    == Set.singleton (branchName b)
-    where visible = maybe False (not . isHiddenBranch) . findTemplateBranch ti
-
 isFeatureBranch :: TemplateBranchInformation -> Bool
 isFeatureBranch b = branchName b `Set.member` requiredBranches b
 
@@ -162,6 +158,11 @@ getTemplateBranches
     :: BranchFilter -> TemplateInformation -> [TemplateBranchInformation]
 getTemplateBranches f ti =
     filter (applyBranchFilter f ti) (branchesInformation ti)
+
+filterTemplateBranches
+    :: BranchFilter -> TemplateInformation -> Graph TemplateBranchInformation
+filterTemplateBranches f ti =
+    filterVertices (applyBranchFilter f ti) (templateBranchesGraph ti)
 
 applyBranchFilter
     :: BranchFilter -> TemplateInformation -> TemplateBranchInformation -> Bool

@@ -2,6 +2,7 @@ module Tenpureto.Graph
     ( Graph
     , overlay
     , compose
+    , vertex
     , vertices
     , edge
     , edges
@@ -9,14 +10,21 @@ module Tenpureto.Graph
     , mapVertices
     , filterVertices
     , filterMapVertices
+    , graphRoots
+    , reachableExclusiveSubgraph
     )
 where
 
+import  Data.Set                      ( Set )
 import qualified Data.Set                      as Set
+import           Data.Tree                      ( rootLabel )
 import qualified Algebra.Graph                 as G
 import           Algebra.Graph.ToGraph          ( ToVertex
                                                 , ToGraph
-                                                , toGraph )
+                                                , toGraph
+                                                , dfsForest
+                                                , reachable
+                                                )
 
 data Ord a => Graph a = NormalizedGraph   (G.Graph a)
                       | DenormalizedGraph (G.Graph a) (G.Graph a)
@@ -42,6 +50,9 @@ overlay x y = denormalizedGraph $ G.overlay (unGraph x) (unGraph y)
 
 compose :: Ord a => Graph a -> Graph a -> Graph a
 compose x y = denormalizedGraph $ G.compose (unGraph x) (unGraph y)
+
+vertex :: Ord a => a -> Graph a
+vertex = denormalizedGraph . G.vertex
 
 vertices :: Ord a => [a] -> Graph a
 vertices = denormalizedGraph . G.vertices
@@ -80,6 +91,20 @@ filterMapVertices f x =
                                (G.vertices (G.outputs c))
             g' = G.removeVertex v g
         in  maybe g' (G.overlay g' . join) ctx
+
+graphRoots :: Ord a => Graph a -> [a]
+graphRoots g =
+    let potentialRoots = fmap rootLabel (dfsForest g)
+        transposedGraph = G.transpose (toGraph g)
+        isRoot x = [x] == reachable x transposedGraph
+    in filter isRoot potentialRoots
+
+reachableExclusiveSubgraph :: Ord a => Set a -> Graph a -> Graph a
+reachableExclusiveSubgraph vs g =
+    let g' = unGraph g
+        rvs = Set.fromList $ concatMap (flip reachable g') vs
+        rvsExclusive = Set.difference rvs vs
+    in filterVertices (flip Set.member rvsExclusive) g
 
 -- Internal
 
