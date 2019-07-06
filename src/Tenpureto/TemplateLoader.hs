@@ -10,7 +10,6 @@ module Tenpureto.TemplateLoader
     , TemplateYaml(..)
     , TemplateYamlFeature
     , yamlFeatureName
-    , BranchGraph
     )
 where
 
@@ -32,6 +31,7 @@ import qualified Data.Yaml                     as Y
 
 import           Path
 
+import           Tenpureto.Graph
 import           Tenpureto.Effects.Git
 import           Tenpureto.TemplateLoader.Internal
 
@@ -182,9 +182,10 @@ applyBranchFilter (BranchFilterOr filters) ti =
     \bi -> any (\f -> applyBranchFilter f ti bi) filters
 applyBranchFilter (BranchFilterAnd filters) ti =
     \bi -> all (\f -> applyBranchFilter f ti bi) filters
-applyBranchFilter BranchFilterIsFeatureBranch _  = \bi -> isFeatureBranch bi && not (isHiddenBranch bi)
-applyBranchFilter BranchFilterIsHiddenBranch  _  = isHiddenBranch
-applyBranchFilter BranchFilterIsMergeBranch   ti = isMergeBranch ti
+applyBranchFilter BranchFilterIsFeatureBranch _ =
+    \bi -> isFeatureBranch bi && not (isHiddenBranch bi)
+applyBranchFilter BranchFilterIsHiddenBranch _  = isHiddenBranch
+applyBranchFilter BranchFilterIsMergeBranch  ti = isMergeBranch ti
 
 
 renameBranchInYaml :: Text -> Text -> TemplateYaml -> TemplateYaml
@@ -216,6 +217,5 @@ replaceVariableInYaml old new descriptor = TemplateYaml
     , yamlConflicts = yamlConflicts descriptor
     }
 
-templateBranchesGraph
-    :: TemplateInformation -> BranchGraph TemplateBranchInformation
-templateBranchesGraph = BranchGraph . branchesGraph
+templateBranchesGraph :: TemplateInformation -> Graph TemplateBranchInformation
+templateBranchesGraph = branchesGraph

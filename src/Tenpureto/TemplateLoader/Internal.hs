@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, UndecidableInstances #-}
-
 module Tenpureto.TemplateLoader.Internal where
 
 import           Data.Maybe
@@ -18,13 +16,8 @@ import           Data.Yaml                      ( FromJSON(..)
                                                 )
 import qualified Data.Yaml                     as Y
 import           Data.Foldable
-import           Control.Applicative            ( Applicative
-                                                , Alternative
-                                                )
-import           Control.Monad
-import           Algebra.Graph
-import           Algebra.Graph.ToGraph          ( ToGraph )
 
+import           Tenpureto.Graph
 import           Tenpureto.Effects.Git
 
 data FeatureStability = Deprecated | Experimental | Stable
@@ -61,9 +54,6 @@ data TemplateBranchInformation = TemplateBranchInformation
     , templateYamlFeature :: Maybe TemplateYamlFeature
     }
     deriving (Show, Eq, Ord)
-
-newtype BranchGraph a = BranchGraph (Graph a)
-    deriving (Show, ToGraph, Functor, Applicative, Monad, Alternative, MonadPlus)
 
 instance Pretty TemplateBranchInformation where
     pretty cfg = (align . vsep)
@@ -171,22 +161,9 @@ buildGraph bis =
         fullBranchNameGraph =
                 overlay (vertices branchNames) (edges branchEdges)
         findBranchInformation name = find ((==) name . branchName) bis
-        branchInformationVertex = maybe empty vertex . findBranchInformation
         branchNameGraph =
                 (simplify . removeTransitiveEdges . removeLoops) fullBranchNameGraph
-    in  branchNameGraph >>= branchInformationVertex
-
-subtractEdges :: Ord a => Graph a -> Graph a -> Graph a
-subtractEdges x y = edges $ Set.toList (edgeSet x `Set.difference` edgeSet y)
-
-removeLoops :: Ord a => Graph a -> Graph a
-removeLoops = edges . filter (uncurry (/=)) . edgeList
-
-removeTransitiveEdges :: Ord a => Graph a -> Graph a
-removeTransitiveEdges g = g `subtractEdges` (recCompose (g `compose` g))
-  where
-    recCompose x =
-        let y = overlay x (x `compose` g) in if y == x then y else recCompose y
+    in  filterMapVertices findBranchInformation branchNameGraph
 
 templateInformation :: [TemplateBranchInformation] -> TemplateInformation
 templateInformation branches =

@@ -5,8 +5,8 @@ import           Test.Tasty.HUnit
 
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
-import           Algebra.Graph
 
+import           Tenpureto.Graph
 import           Tenpureto.TemplateTestHelper
 import           Tenpureto.TemplateLoader
 import           Tenpureto.TemplateLoader.Internal

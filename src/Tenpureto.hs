@@ -19,11 +19,11 @@ import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
 import qualified Data.Text.ICU                 as ICU
 import           Data.Functor
-import           Control.Monad
 import qualified Algebra.Graph.Export.Dot      as Dot
 
 import           Tenpureto.Data
 import           Tenpureto.Messages
+import           Tenpureto.Graph
 import           Tenpureto.Effects.Logging
 import           Tenpureto.Effects.Terminal
 import           Tenpureto.Effects.FileSystem
@@ -299,7 +299,7 @@ generateTemplateGraph
 generateTemplateGraph template branchFilter =
     withClonedRepository (buildRepositoryUrl template) $ \repo -> do
         templateInformation <- loadTemplateInformation repo
-        let graph = mfilter
+        let graph = filterVertices
                 (applyBranchFilter branchFilter templateInformation)
                 (templateBranchesGraph templateInformation)
         let style = exportDotStyle templateInformation
