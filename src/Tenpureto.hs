@@ -61,13 +61,13 @@ makeFinalUpdateConfiguration = inputUpdateConfiguration
 
 buildTemplaterSettings
     :: TemplateYaml -> FinalProjectConfiguration -> TemplaterSettings
-buildTemplaterSettings TemplateYaml { variables = templateValues, excludes = templateExcludes } FinalProjectConfiguration { variableValues = values }
-    = TemplaterSettings
-        { templaterFromVariables = (InsOrdHashMap.fromList . Map.toList)
-                                       templateValues
-        , templaterToVariables   = (InsOrdHashMap.fromList . Map.toList) values
-        , templaterExcludes      = templateExcludes
-        }
+buildTemplaterSettings yaml cfg = TemplaterSettings
+    { templaterFromVariables = (InsOrdHashMap.fromList . Map.toList)
+                                   (yamlVariables yaml)
+    , templaterToVariables   = (InsOrdHashMap.fromList . Map.toList)
+                                   (variableValues cfg)
+    , templaterExcludes      = yamlExcludes yaml
+    }
 
 createProject
     :: Members
@@ -226,8 +226,10 @@ loadExistingProjectConfiguration projectPath =
                                               =<< previousCommitMessage
             , preTargetDirectory        = Just projectPath
             , prePreviousTemplateCommit = previousCommit
-            , preSelectedBranches = fmap (Set.map featureName . features) yaml
-            , preVariableValues         = fmap variables yaml
+            , preSelectedBranches       = fmap
+                                              (Set.map yamlFeatureName . yamlFeatures)
+                                              yaml
+            , preVariableValues         = fmap yamlVariables yaml
             }
 
 prepareTemplate
@@ -276,33 +278,6 @@ prepareTemplate repository template configuration =
                 logInfo $ "Merging branches:" <> line <> (indent 4 . pretty)
                     (fmap branchName branchesToMerge)
                 checkoutTemplateBranch h >>= flip (foldlM mergeTemplateBranch) t
-
-renameBranchInYaml :: Text -> Text -> TemplateYaml -> TemplateYaml
-renameBranchInYaml oldName newName descriptor = TemplateYaml
-    { variables = variables descriptor
-    , features  = Set.map (renameBranch oldName newName) (features descriptor)
-    , excludes  = excludes descriptor
-    , conflicts = conflicts descriptor
-    }
-  where
-    renameBranch old new b = if featureName b == old
-        then TemplateYamlFeature { featureName        = new
-                                 , featureDescription = featureDescription b
-                                 , featureHidden      = featureHidden b
-                                 , featureStability   = featureStability b
-                                 }
-        else b
-
-replaceInFunctor :: (Functor f, Eq a) => a -> a -> f a -> f a
-replaceInFunctor from to = fmap (\v -> if from == v then to else v)
-
-replaceVariableInYaml :: Text -> Text -> TemplateYaml -> TemplateYaml
-replaceVariableInYaml old new descriptor = TemplateYaml
-    { variables = replaceInFunctor old new (variables descriptor)
-    , features  = features descriptor
-    , excludes  = excludes descriptor
-    , conflicts = conflicts descriptor
-    }
 
 commit_
     :: Members '[Git, Error TenpuretoException] r
@@ -630,8 +605,7 @@ isChildBranch branch bi =
     branch /= branchName bi && Set.member branch (requiredBranches bi)
 
 hasVariableValue :: Text -> TemplateBranchInformation -> Bool
-hasVariableValue value bi =
-    value `elem` Map.elems (branchVariables bi)
+hasVariableValue value bi = value `elem` Map.elems (branchVariables bi)
 
 getTemplateBranch
     :: Member (Error TenpuretoException) r

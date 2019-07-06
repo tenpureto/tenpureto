@@ -7,7 +7,8 @@ module Tenpureto.TemplateLoader
     , TemplateInformation(..)
     , TemplateBranchInformation(..)
     , TemplateYaml(..)
-    , TemplateYamlFeature(..)
+    , TemplateYamlFeature
+    , yamlFeatureName
     )
 where
 
@@ -23,6 +24,7 @@ import qualified Data.Text                     as T
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           Data.Bifunctor
+import           Control.Monad
 import           Control.Monad.Trans.Maybe
 import qualified Data.Yaml                     as Y
 
@@ -68,16 +70,22 @@ loadBranchConfiguration repo branch = runMaybeT $ do
         $ findCommitByRef repo (BranchRef $ T.pack "remotes/origin/" <> branch)
     descriptor <- MaybeT $ getRepositoryFile repo branchHead templateYamlFile
     info       <- MaybeT . return . rightToMaybe $ parseTemplateYaml descriptor
-    let fb             = features info
-    let currentFeature = find ((==) branch . featureName) fb
+    let fb             = yamlFeatures info
+    let currentFeature = find ((==) branch . yamlFeatureName) fb
     return $ TemplateBranchInformation
         { branchName          = branch
         , branchCommit        = branchHead
-        , requiredBranches    = Set.map featureName fb
-        , branchVariables     = variables info
+        , requiredBranches    = Set.map yamlFeatureName fb
+        , branchVariables     = yamlVariables info
         , templateYaml        = info
         , templateYamlFeature = currentFeature
         }
+
+featureDescription :: TemplateBranchInformation -> Maybe Text
+featureDescription = yamlFeatureDescription <=< templateYamlFeature
+
+featureStability :: TemplateBranchInformation -> FeatureStability
+featureStability = maybe Stable yamlFeatureStability . templateYamlFeature
 
 isBaseBranch :: TemplateInformation -> TemplateBranchInformation -> Bool
 isBaseBranch ti b = (Set.filter visible . requiredBranches) b
@@ -88,7 +96,7 @@ isFeatureBranch :: TemplateBranchInformation -> Bool
 isFeatureBranch b = branchName b `Set.member` requiredBranches b
 
 isHiddenBranch :: TemplateBranchInformation -> Bool
-isHiddenBranch = maybe False featureHidden . templateYamlFeature
+isHiddenBranch = maybe False yamlFeatureHidden . templateYamlFeature
 
 isMergeOf :: TemplateBranchInformation -> [TemplateBranchInformation] -> Bool
 isMergeOf bi bis =
@@ -105,8 +113,8 @@ isMergeBranch t b = any (isMergeOf b) mergeOptions
 branchesConflict
     :: TemplateBranchInformation -> TemplateBranchInformation -> Bool
 branchesConflict a b =
-    Set.member (branchName b) (conflicts $ templateYaml a)
-        || Set.member (branchName a) (conflicts $ templateYaml b)
+    Set.member (branchName b) (yamlConflicts $ templateYaml a)
+        || Set.member (branchName a) (yamlConflicts $ templateYaml b)
 
 managedBranches :: TemplateInformation -> [TemplateBranchInformation]
 managedBranches t = filter (\b -> isFeatureBranch b || isMergeBranch t b)
@@ -177,3 +185,33 @@ applyBranchFilter BranchFilterIsBaseBranch    ti = isBaseBranch ti
 applyBranchFilter BranchFilterIsFeatureBranch _  = isFeatureBranch
 applyBranchFilter BranchFilterIsHiddenBranch  _  = isHiddenBranch
 applyBranchFilter BranchFilterIsMergeBranch   ti = isMergeBranch ti
+
+
+renameBranchInYaml :: Text -> Text -> TemplateYaml -> TemplateYaml
+renameBranchInYaml oldName newName descriptor = TemplateYaml
+    { yamlVariables = yamlVariables descriptor
+    , yamlFeatures  = Set.map (renameBranch oldName newName)
+                              (yamlFeatures descriptor)
+    , yamlExcludes  = yamlExcludes descriptor
+    , yamlConflicts = yamlConflicts descriptor
+    }
+  where
+    renameBranch old new b = if yamlFeatureName b == old
+        then TemplateYamlFeature
+            { yamlFeatureName        = new
+            , yamlFeatureDescription = yamlFeatureDescription b
+            , yamlFeatureHidden      = yamlFeatureHidden b
+            , yamlFeatureStability   = yamlFeatureStability b
+            }
+        else b
+
+replaceInFunctor :: (Functor f, Eq a) => a -> a -> f a -> f a
+replaceInFunctor from to = fmap (\v -> if from == v then to else v)
+
+replaceVariableInYaml :: Text -> Text -> TemplateYaml -> TemplateYaml
+replaceVariableInYaml old new descriptor = TemplateYaml
+    { yamlVariables = replaceInFunctor old new (yamlVariables descriptor)
+    , yamlFeatures  = yamlFeatures descriptor
+    , yamlExcludes  = yamlExcludes descriptor
+    , yamlConflicts = yamlConflicts descriptor
+    }

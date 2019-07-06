@@ -130,44 +130,44 @@ test_parseTemplateYaml :: [TestTree]
 test_parseTemplateYaml =
     [ testCase "parse variables"
         $   parseTemplateYaml "variables: { \"Key\": \"value\" }"
-        @?= Right TemplateYaml { variables = Map.singleton "Key" "value"
-                               , features  = mempty
-                               , excludes  = mempty
-                               , conflicts = mempty
+        @?= Right TemplateYaml { yamlVariables = Map.singleton "Key" "value"
+                               , yamlFeatures  = mempty
+                               , yamlExcludes  = mempty
+                               , yamlConflicts = mempty
                                }
     , testCase "parse excludes"
         $   parseTemplateYaml "excludes: [ \".*\" ]"
-        @?= Right TemplateYaml { variables = mempty
-                               , features  = mempty
-                               , excludes  = Set.singleton ".*"
-                               , conflicts = mempty
+        @?= Right TemplateYaml { yamlVariables = mempty
+                               , yamlFeatures  = mempty
+                               , yamlExcludes  = Set.singleton ".*"
+                               , yamlConflicts = mempty
                                }
     , testCase "parse simple features"
         $   parseTemplateYaml "features: [ \"a\" ]"
         @?= Right TemplateYaml
-                { variables = mempty
-                , features  = Set.singleton TemplateYamlFeature
-                                  { featureName        = "a"
-                                  , featureDescription = Nothing
-                                  , featureHidden      = False
-                                  , featureStability   = Stable
-                                  }
-                , excludes  = mempty
-                , conflicts = mempty
+                { yamlVariables = mempty
+                , yamlFeatures  = Set.singleton TemplateYamlFeature
+                                      { yamlFeatureName        = "a"
+                                      , yamlFeatureDescription = Nothing
+                                      , yamlFeatureHidden      = False
+                                      , yamlFeatureStability   = Stable
+                                      }
+                , yamlExcludes  = mempty
+                , yamlConflicts = mempty
                 }
     , testCase "parse extended features"
         $   parseTemplateYaml
                 "features: [ a: { description: foo, hidden: true, stability: experimental } ]"
         @?= Right TemplateYaml
-                { variables = mempty
-                , features  = Set.singleton TemplateYamlFeature
-                                  { featureName        = "a"
-                                  , featureDescription = Just "foo"
-                                  , featureHidden      = True
-                                  , featureStability   = Experimental
-                                  }
-                , excludes  = mempty
-                , conflicts = mempty
+                { yamlVariables = mempty
+                , yamlFeatures  = Set.singleton TemplateYamlFeature
+                                      { yamlFeatureName        = "a"
+                                      , yamlFeatureDescription = Just "foo"
+                                      , yamlFeatureHidden      = True
+                                      , yamlFeatureStability   = Experimental
+                                      }
+                , yamlExcludes  = mempty
+                , yamlConflicts = mempty
                 }
     ]
 

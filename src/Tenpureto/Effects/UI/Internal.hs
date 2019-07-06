@@ -14,7 +14,6 @@ import qualified Data.Map                      as Map
 import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Functor
-import           Control.Monad
 import           Data.Text.Prettyprint.Doc.Render.Terminal
 
 import           Tenpureto.Data
@@ -135,13 +134,8 @@ inputBranchList availableBranches selectedBranches = vsep $ zipWith6
     (selectedPrefixes, notes) =
         unzip $ fmap branchLineSelected availableBranches
     branchNames  = equalize $ fmap branchName availableBranches
-    descriptions = fmap
-        (fromMaybe "" . (templateYamlFeature >=> featureDescription))
-        availableBranches
-    stabilities = fmap
-        (maybe Stable featureStability . templateYamlFeature)
-        availableBranches
-
+    descriptions = fmap (fromMaybe "" . featureDescription) availableBranches
+    stabilities  = fmap featureStability availableBranches
 
 branchByIndex
     :: [TemplateBranchInformation] -> Text -> Maybe TemplateBranchInformation

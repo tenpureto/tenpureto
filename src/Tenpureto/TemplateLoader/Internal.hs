@@ -24,18 +24,18 @@ data FeatureStability = Deprecated | Experimental | Stable
         deriving (Show, Eq, Ord)
 
 data TemplateYamlFeature = TemplateYamlFeature
-        { featureName :: Text
-        , featureDescription :: Maybe Text
-        , featureHidden :: Bool
-        , featureStability :: FeatureStability
+        { yamlFeatureName :: Text
+        , yamlFeatureDescription :: Maybe Text
+        , yamlFeatureHidden :: Bool
+        , yamlFeatureStability :: FeatureStability
         }
         deriving (Show, Eq, Ord)
 
 data TemplateYaml = TemplateYaml
-        { variables :: Map Text Text
-        , features :: Set TemplateYamlFeature
-        , excludes :: Set Text
-        , conflicts :: Set Text
+        { yamlVariables :: Map Text Text
+        , yamlFeatures :: Set TemplateYamlFeature
+        , yamlExcludes :: Set Text
+        , yamlConflicts :: Set Text
         }
         deriving (Show, Eq, Ord)
 
@@ -61,9 +61,9 @@ instance Pretty TemplateBranchInformation where
         , "Required branches:" <+> (align . pretty) (requiredBranches cfg)
         , "Branch variables: " <+> (align . pretty) (branchVariables cfg)
         , "Description:      " <+> (align . pretty)
-            (featureDescription =<< templateYamlFeature cfg)
+            (yamlFeatureDescription =<< templateYamlFeature cfg)
         , "Hidden:           "
-            <+> (align . pretty) (featureHidden <$> templateYamlFeature cfg)
+            <+> (align . pretty) (yamlFeatureHidden <$> templateYamlFeature cfg)
         ]
 
 instance Pretty TemplateInformation where
@@ -72,12 +72,12 @@ instance Pretty TemplateInformation where
 
 instance Pretty TemplateYamlFeature where
     pretty feature =
-        (align . vsep) ["Name:" <+> (align . pretty) (featureName feature)]
+        (align . vsep) ["Name:" <+> (align . pretty) (yamlFeatureName feature)]
 
 instance Pretty TemplateYaml where
     pretty cfg = (align . vsep)
-        [ "Variables:" <+> (align . pretty) (variables cfg)
-        , "Features: " <+> (align . pretty) (features cfg)
+        [ "Variables:" <+> (align . pretty) (yamlVariables cfg)
+        , "Features: " <+> (align . pretty) (yamlFeatures cfg)
         ]
 
 instance FromJSON FeatureStability where
@@ -88,10 +88,10 @@ instance FromJSON FeatureStability where
 
 instance FromJSON TemplateYamlFeature where
     parseJSON (Y.String v) = pure $ TemplateYamlFeature
-        { featureName        = v
-        , featureDescription = Nothing
-        , featureHidden      = False
-        , featureStability   = Stable
+        { yamlFeatureName        = v
+        , yamlFeatureDescription = Nothing
+        , yamlFeatureHidden      = False
+        , yamlFeatureStability   = Stable
         }
     parseJSON (Y.Object v) = case HashMap.toList v of
         [(k, Y.Object vv)] ->
@@ -125,26 +125,27 @@ instance FromJSON TemplateYaml where
     parseJSON _ = fail "Invalid template YAML definition"
 
 instance ToJSON TemplateYamlFeature where
-    toJSON TemplateYamlFeature { featureName = n } = toJSON n
+    toJSON TemplateYamlFeature { yamlFeatureName = n } = toJSON n
 
 instance ToJSON TemplateYaml where
-    toJSON TemplateYaml { variables = v, features = f, excludes = e } =
-        Y.object $ catMaybes
+    toJSON TemplateYaml { yamlVariables = v, yamlFeatures = f, yamlExcludes = e }
+        = Y.object $ catMaybes
             ["variables" .?= v, "features" .?= f, "excludes" .?= e]
         where a .?= b = if b == mempty then Nothing else Just (a .= b)
 
 instance Semigroup TemplateYaml where
-    (<>) a b = TemplateYaml { variables = variables a <> variables b
-                            , features  = features a <> features b
-                            , excludes  = excludes a <> excludes b
-                            , conflicts = conflicts a <> conflicts b
-                            }
+    (<>) a b = TemplateYaml
+        { yamlVariables = yamlVariables a <> yamlVariables b
+        , yamlFeatures  = yamlFeatures a <> yamlFeatures b
+        , yamlExcludes  = yamlExcludes a <> yamlExcludes b
+        , yamlConflicts = yamlConflicts a <> yamlConflicts b
+        }
 
 instance Monoid TemplateYaml where
-    mempty = TemplateYaml { variables = mempty
-                          , features  = mempty
-                          , excludes  = mempty
-                          , conflicts = mempty
+    mempty = TemplateYaml { yamlVariables = mempty
+                          , yamlFeatures  = mempty
+                          , yamlExcludes  = mempty
+                          , yamlConflicts = mempty
                           }
 
 buildGraph :: [TemplateBranchInformation] -> Graph TemplateBranchInformation
