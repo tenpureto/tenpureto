@@ -44,7 +44,6 @@ data BranchFilter = BranchFilterAny
                   | BranchFilterParentOf Text
                   | BranchFilterOr [BranchFilter]
                   | BranchFilterAnd [BranchFilter]
-                  | BranchFilterIsBaseBranch
                   | BranchFilterIsFeatureBranch
                   | BranchFilterIsHiddenBranch
                   | BranchFilterIsMergeBranch
@@ -183,8 +182,7 @@ applyBranchFilter (BranchFilterOr filters) ti =
     \bi -> any (\f -> applyBranchFilter f ti bi) filters
 applyBranchFilter (BranchFilterAnd filters) ti =
     \bi -> all (\f -> applyBranchFilter f ti bi) filters
-applyBranchFilter BranchFilterIsBaseBranch    ti = isBaseBranch ti
-applyBranchFilter BranchFilterIsFeatureBranch _  = isFeatureBranch
+applyBranchFilter BranchFilterIsFeatureBranch _  = \bi -> isFeatureBranch bi && not (isHiddenBranch bi)
 applyBranchFilter BranchFilterIsHiddenBranch  _  = isHiddenBranch
 applyBranchFilter BranchFilterIsMergeBranch   ti = isMergeBranch ti
 
