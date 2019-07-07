@@ -202,7 +202,7 @@ test_semigroup = testGroup
 genTemplateYaml :: Range Int -> Gen TemplateYaml
 genTemplateYaml range =
     let smallRange   = Range.constant 0 2
-        genText      = Gen.text smallRange Gen.ascii
+        genText      = Gen.text (Range.singleton 1) Gen.alphaNum
         genTextTuple = liftA2 (\a -> \b -> (a, b)) genText genText
     in  do
             features  <- Gen.set range (genTemplateYamlFeature range)

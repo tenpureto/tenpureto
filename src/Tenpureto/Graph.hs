@@ -11,20 +11,23 @@ module Tenpureto.Graph
     , filterVertices
     , filterMapVertices
     , graphRoots
+    , foldTopologically
     )
 where
 
 import qualified Data.Set                      as Set
-import           Data.Tree                      ( rootLabel )
+import qualified Data.Map                      as Map
 import qualified Algebra.Graph                 as G
 import           Algebra.Graph.ToGraph          ( ToVertex
                                                 , ToGraph
                                                 , toGraph
-                                                , dfsForest
-                                                , reachable
+                                                , toAdjacencyMap
+                                                , toAdjacencyMapTranspose
+                                                , adjacencyMap
                                                 )
+import           Control.Monad
 
-data Ord a => Graph a = NormalizedGraph   (G.Graph a)
+data Graph a = NormalizedGraph   (G.Graph a)
                       | DenormalizedGraph (G.Graph a) (G.Graph a)
     deriving (Show)
 
@@ -33,11 +36,11 @@ instance Ord a => Eq (Graph a) where
 
 instance Ord a => ToGraph (Graph a) where
     type ToVertex (Graph a) = a
-    toGraph (NormalizedGraph   a) = a
+    toGraph (NormalizedGraph a    ) = a
     toGraph (DenormalizedGraph _ a) = a
 
 unGraph :: Ord a => Graph a -> G.Graph a
-unGraph (NormalizedGraph   a) = a
+unGraph (NormalizedGraph a    ) = a
 unGraph (DenormalizedGraph a _) = a
 
 denormalizedGraph :: Ord a => G.Graph a -> Graph a
@@ -85,17 +88,43 @@ filterMapVertices f x =
     filterEmptyVertices g = foldr removeIfEmpty g (G.vertexList g)
     removeVertexConnecting v g =
         let ctx = G.context ((==) v) g
-            join c = G.connect (G.vertices (G.inputs c))
-                               (G.vertices (G.outputs c))
+            cct c = G.connect (G.vertices (G.inputs c))
+                              (G.vertices (G.outputs c))
             g' = G.removeVertex v g
-        in  maybe g' (G.overlay g' . join) ctx
+        in  maybe g' (G.overlay g' . cct) ctx
+
+graphLeaves :: Ord a => Graph a -> [a]
+graphLeaves =
+    Set.toList
+        . Map.keysSet
+        . Map.filter Set.null
+        . adjacencyMap
+        . toAdjacencyMap
 
 graphRoots :: Ord a => Graph a -> [a]
-graphRoots g =
-    let potentialRoots = fmap rootLabel (dfsForest g)
-        transposedGraph = G.transpose (toGraph g)
-        isRoot x = [x] == reachable x transposedGraph
-    in filter isRoot potentialRoots
+graphRoots =
+    Set.toList
+        . Map.keysSet
+        . Map.filter Set.null
+        . adjacencyMap
+        . toAdjacencyMapTranspose
+
+foldTopologically
+    :: (Ord a, Monad m)
+    => (a -> m b)
+    -> (b -> b -> m b)
+    -> (b -> b -> m b)
+    -> Graph a
+    -> m (Maybe b)
+foldTopologically get vcombine hcombine graph =
+    let leaves  = graphLeaves graph
+        parents = adjacencyMap (toAdjacencyMapTranspose graph)
+        parent  = maybe mempty Set.toList . flip Map.lookup parents
+        foldVertex v = do
+            pbs <- traverse foldVertex (parent v)
+            bv  <- get v
+            foldM vcombine bv pbs
+    in  foldMaybeM hcombine =<< traverse foldVertex leaves
 
 -- Internal
 
@@ -122,3 +151,9 @@ removeTransitiveEdges g = g `subtractEdges` (recCompose (g `G.compose` g))
 
 normalize :: Ord a => G.Graph a -> G.Graph a
 normalize = removeTransitiveEdges . removeLoops
+
+foldMaybeM :: (Monad m, Traversable t) => (a -> a -> m a) -> t a -> m (Maybe a)
+foldMaybeM combine = foldM combine' Nothing
+  where
+    combine' Nothing  x = Just <$> return x
+    combine' (Just x) y = Just <$> combine x y

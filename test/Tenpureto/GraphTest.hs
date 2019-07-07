@@ -8,7 +8,10 @@ import qualified Hedgehog.Range                as Range
 
 import           Data.Ix
 import           Data.Text                      ( Text )
+import           Data.Set                       ( Set )
+import qualified Data.Set                      as Set
 import           Algebra.Graph.ToGraph
+import           Data.Functor.Identity
 
 import           Tenpureto.Graph
 
@@ -68,3 +71,25 @@ genGraph genVertices = do
 
 s :: Graph Text -> Graph Text
 s = id
+
+test_foldTopologically :: [TestTree]
+test_foldTopologically =
+    [ testCase "use last in the path" $ foldLast (path ["a", "b", "c"]) @?= Just
+        (Set.fromList ["c"])
+    , testCase "merge all vertices"
+        $   foldSet (overlay (path ["a", "b", "d"]) (path ["a", "c", "d"]))
+        @?= Just (Set.fromList ["a", "b", "c", "d"])
+    , testCase "merge disconnected graphs"
+        $   foldLast (overlay (path ["a", "b"]) (path ["c", "d"]))
+        @?= Just (Set.fromList ["b", "d"])
+    ]
+  where
+    foldSet :: Graph Text -> Maybe (Set Text)
+    foldSet = runIdentity . foldTopologically setGet setVCombine setHCombine
+    setGet  = pure . Set.singleton
+    setVCombine x y = pure $ Set.union x y
+    setHCombine = setVCombine
+
+    foldLast :: Graph Text -> Maybe (Set Text)
+    foldLast = runIdentity . foldTopologically setGet lastVCombine setHCombine
+    lastVCombine x _ = pure x
