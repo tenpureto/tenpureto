@@ -8,6 +8,7 @@ import           Tenpureto.TemplateLoader       ( TemplateInformation
                                                 , TemplateBranchInformation(..)
                                                 , managedBranches
                                                 , isMergeOf
+                                                , requiredBranches
                                                 )
 
 reorderBranches :: [TemplateBranchInformation] -> [TemplateBranchInformation]

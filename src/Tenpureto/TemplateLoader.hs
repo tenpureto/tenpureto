@@ -10,6 +10,8 @@ module Tenpureto.TemplateLoader
     , TemplateYaml(..)
     , TemplateYamlFeature
     , yamlFeatureName
+    , requiredBranches
+    , branchVariables
     , Graph
     )
 where
@@ -72,16 +74,10 @@ loadBranchConfiguration repo branch = runMaybeT $ do
         $ findCommitByRef repo (BranchRef $ T.pack "remotes/origin/" <> branch)
     descriptor <- MaybeT $ getRepositoryFile repo branchHead templateYamlFile
     info       <- MaybeT . return . rightToMaybe $ parseTemplateYaml descriptor
-    let fb             = yamlFeatures info
-    let currentFeature = find ((==) branch . yamlFeatureName) fb
-    return $ TemplateBranchInformation
-        { branchName          = branch
-        , branchCommit        = branchHead
-        , requiredBranches    = Set.map yamlFeatureName fb
-        , branchVariables     = yamlVariables info
-        , templateYaml        = info
-        , templateYamlFeature = currentFeature
-        }
+    return $ TemplateBranchInformation { branchName      = branch
+                                       , branchCommit    = branchHead
+                                       , templateYaml    = info
+                                       }
 
 featureDescription :: TemplateBranchInformation -> Maybe Text
 featureDescription = yamlFeatureDescription <=< templateYamlFeature

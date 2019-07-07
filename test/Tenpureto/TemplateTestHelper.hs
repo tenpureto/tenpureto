@@ -5,16 +5,28 @@ import qualified Data.Set                      as Set
 
 import           Tenpureto.Effects.Git          ( Committish(..) )
 import           Tenpureto.TemplateLoader       ( TemplateBranchInformation(..)
+                                                , FeatureStability(..)
+                                                , requiredBranches
                                                 )
+import           Tenpureto.TemplateLoader.Internal
+                                                ( TemplateYaml(..), TemplateYamlFeature(..) )
+
+yamlFeature :: Text -> TemplateYamlFeature
+yamlFeature name = TemplateYamlFeature { yamlFeatureName        = name
+                                       , yamlFeatureDescription = Nothing
+                                       , yamlFeatureHidden      = False
+                                       , yamlFeatureStability   = Stable
+                                       }
 
 anonymousBranch :: Text -> [Text] -> TemplateBranchInformation
 anonymousBranch name deps = TemplateBranchInformation
     { branchName          = name
     , branchCommit        = Committish "undefined"
-    , requiredBranches    = Set.fromList deps
-    , branchVariables     = mempty
-    , templateYaml        = mempty
-    , templateYamlFeature = Nothing
+    , templateYaml        = TemplateYaml    { yamlVariables = mempty
+                                            , yamlFeatures = Set.fromList $ fmap yamlFeature deps
+                                            , yamlExcludes = mempty
+                                            , yamlConflicts = mempty
+                                            }
     }
 
 branch :: Text -> [Text] -> TemplateBranchInformation

@@ -48,10 +48,7 @@ data TemplateInformation = TemplateInformation
 data TemplateBranchInformation = TemplateBranchInformation
     { branchName :: Text
     , branchCommit :: Committish
-    , requiredBranches :: Set Text
-    , branchVariables :: Map Text Text
     , templateYaml :: TemplateYaml
-    , templateYamlFeature :: Maybe TemplateYamlFeature
     }
     deriving (Show, Eq, Ord)
 
@@ -147,6 +144,16 @@ instance Monoid TemplateYaml where
                           , yamlExcludes  = mempty
                           , yamlConflicts = mempty
                           }
+
+requiredBranches :: TemplateBranchInformation -> Set Text
+requiredBranches = Set.map yamlFeatureName . yamlFeatures . templateYaml
+
+branchVariables :: TemplateBranchInformation -> Map Text Text
+branchVariables = yamlVariables . templateYaml
+
+templateYamlFeature :: TemplateBranchInformation -> Maybe TemplateYamlFeature
+templateYamlFeature bi =
+    find ((==) (branchName bi) . yamlFeatureName) $ yamlFeatures (templateYaml bi)
 
 buildGraph :: [TemplateBranchInformation] -> Graph TemplateBranchInformation
 buildGraph bis =
