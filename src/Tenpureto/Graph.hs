@@ -11,11 +11,9 @@ module Tenpureto.Graph
     , filterVertices
     , filterMapVertices
     , graphRoots
-    , reachableExclusiveSubgraph
     )
 where
 
-import  Data.Set                      ( Set )
 import qualified Data.Set                      as Set
 import           Data.Tree                      ( rootLabel )
 import qualified Algebra.Graph                 as G
@@ -98,14 +96,6 @@ graphRoots g =
         transposedGraph = G.transpose (toGraph g)
         isRoot x = [x] == reachable x transposedGraph
     in filter isRoot potentialRoots
-
-reachableExclusiveSubgraph :: Ord a => Set a -> Set a -> Graph a -> Graph a
-reachableExclusiveSubgraph includes excludes g =
-    let g' = unGraph g
-        includedVertices = Set.fromList $ concatMap (flip reachable g') includes
-        excludedVertices = Set.fromList $ concatMap (flip reachable g') excludes
-        resultingVertices = includedVertices `Set.difference` excludedVertices `Set.difference` includes
-    in filterVertices (flip Set.member resultingVertices) g
 
 -- Internal
 

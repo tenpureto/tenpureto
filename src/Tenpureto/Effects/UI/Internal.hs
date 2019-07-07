@@ -47,8 +47,6 @@ findBranchByName
 findBranchByName availableBranches branch =
     find ((==) branch . branchName) availableBranches
 
-type InputBranchState = (Set Text, Maybe Text)
-
 branchSelection :: [TemplateBranchInformation] -> Set Text -> Set Text
 branchSelection availableBranches selectedBranches =
     Set.unions
@@ -108,8 +106,8 @@ inputBranchList availableBranches selectedBranches = vsep $ zipWith6
             conflicting = conflictsWithSelected branch
         in  case (selected, transitive, conflicting) of
                 (True , _    , _   ) -> (green "✓", "")
-                (_    , _    , True) -> (red "𐄂", "[conflict]")
                 (False, True , _   ) -> (green "·", "[transitive dependency]")
+                (_    , _    , True) -> (red "𐄂", "[conflict]")
                 (False, False, _   ) -> (" ", "")
     (selectedPrefixes, notes) =
         unzip $ fmap branchLineSelected availableBranches
@@ -124,60 +122,35 @@ branchByIndex availableBranches index =
         isIndex = (==) index . T.pack . show . fst
     in  find isIndex ([1 ..] `zip` availableBranches) <&> snd
 
-inputSingleBranch
-    :: Members '[Terminal, TerminalInput] r
-    => [TemplateBranchInformation]
-    -> Set Text
-    -> Sem r (Set TemplateBranchInformation)
-inputSingleBranch availableBranches initialSelection = askUntil initial
-                                                                request
-                                                                process
-  where
-    initial :: Maybe Text
-    initial = Nothing
-    request :: Maybe Text -> (Doc AnsiStyle, Maybe Text)
-    request badInput =
-        let
-            doc =
-                inputBranchList availableBranches initialSelection
-                    <> "\n"
-                    <> maybe
-                           ""
-                           (\x ->
-                               dquotes (pretty x)
-                                   <+> "is not a valid feature index. "
-                           )
-                           badInput
-                    <> "Select a feature:"
-        in  (doc, Nothing)
-    process
-        :: Maybe Text
-        -> Text
-        -> Either (Maybe Text) (Set TemplateBranchInformation)
-    process _ "" =
-        case filterBranchesByNames availableBranches initialSelection of
-            [] -> Left $ Just ""
-            a  -> Right $ Set.fromList a
-    process _ input = case branchByIndex availableBranches input of
-        Just bi -> Right $ Set.singleton bi
-        Nothing -> Left $ Just input
+type InputBranchState
+    = ([TemplateBranchInformation], Set TemplateBranchInformation, Maybe Text)
 
-inputMultipleBranches
+inputBranches
     :: Members '[Terminal, TerminalInput] r
-    => [TemplateBranchInformation]
+    => Graph TemplateBranchInformation
     -> Set Text
     -> Sem r (Set TemplateBranchInformation)
-inputMultipleBranches availableBranches initialSelection = askUntil initial
-                                                                    request
-                                                                    process
+inputBranches graph initialNameSelection = askUntil initial request process
   where
+    initialSelection :: Set TemplateBranchInformation
+    initialSelection = Set.fromList
+        $ filterBranchesByNames (vertexList graph) initialNameSelection
+    roots :: Set TemplateBranchInformation
+    roots = Set.fromList (graphRoots graph)
+    available :: Set TemplateBranchInformation -> [TemplateBranchInformation]
+    available selected =
+        let fullSelection = filterBranchesByNames (vertexList graph)
+                $ Set.unions (Set.map requiredBranches selected)
+            reachableFromSelection = Set.unions
+                $ fmap (Set.fromList . flip reachable graph) fullSelection
+        in  Set.toList $ reachableFromSelection `Set.union` roots
     initial :: InputBranchState
-    initial = (initialSelection, Nothing)
+    initial = (available initialSelection, initialSelection, Nothing)
     request :: InputBranchState -> (Doc AnsiStyle, Maybe Text)
-    request (selected, badInput) =
+    request (availableBranches, selected, badInput) =
         let
             doc =
-                inputBranchList availableBranches selected
+                inputBranchList availableBranches (Set.map branchName selected)
                     <> "\n"
                     <> maybe
                            ""
@@ -192,47 +165,15 @@ inputMultipleBranches availableBranches initialSelection = askUntil initial
         :: InputBranchState
         -> Text
         -> Either InputBranchState (Set TemplateBranchInformation)
-    process (selected, _) "" =
-        Right
-            $ Set.fromList
-            $ filterBranchesByNames availableBranches
-            $ branchSelection availableBranches selected
-    process (selected, _) input =
+    process (_, selected, _) "" = Right selected
+    process (availableBranches, selected, _) input =
         Left $ case branchByIndex availableBranches input of
             Just bi ->
-                let branch      = branchName bi
-                    newSelected = if branch `Set.member` selected
-                        then branch `Set.delete` selected
-                        else branch `Set.insert` selected
-                in  (newSelected, Nothing)
-            Nothing -> (selected, Just input)
-
-inputBranches
-    :: Members '[Terminal, TerminalInput] r
-    => Graph TemplateBranchInformation
-    -> Set Text
-    -> Sem r (Set TemplateBranchInformation)
-inputBranches branches previousSelection = case graphRoots branches of
-    []                           -> return mempty
-    roots | allConflicting roots -> do
-        selection <- inputMultipleBranches
-            roots
-            (previous roots previousSelection)
-        children <- inputBranches
-            (reachableExclusiveSubgraph
-                selection
-                ((Set.fromList roots) `Set.difference` selection)
-                branches
-            )
-            previousSelection
-        return $ selection <> children
-    _ -> inputMultipleBranches
-        (vertexList branches)
-        (previous (vertexList branches) previousSelection)
-  where
-    previous bs p = Set.intersection p (Set.fromList $ fmap branchName bs)
-    allConflicting bs =
-        all id [ branchesConflict a b | a <- bs, b <- bs, a /= b ]
+                let newSelected = if bi `Set.member` selected
+                        then bi `Set.delete` selected
+                        else bi `Set.insert` selected
+                in  (available newSelected, newSelected, Nothing)
+            Nothing -> (availableBranches, selected, Just input)
 
 withDefaults :: Ord a => InsOrdHashMap a b -> Map a b -> InsOrdHashMap a b
 withDefaults vars defaults =
