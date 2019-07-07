@@ -215,9 +215,15 @@ inputBranches
 inputBranches branches previousSelection = case graphRoots branches of
     []                           -> return mempty
     roots | allConflicting roots -> do
-        selection <- inputSingleBranch roots (previous roots previousSelection)
-        children  <- inputBranches
-            (reachableExclusiveSubgraph selection branches)
+        selection <- inputMultipleBranches
+            roots
+            (previous roots previousSelection)
+        children <- inputBranches
+            (reachableExclusiveSubgraph
+                selection
+                ((Set.fromList roots) `Set.difference` selection)
+                branches
+            )
             previousSelection
         return $ selection <> children
     _ -> inputMultipleBranches

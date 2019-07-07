@@ -99,12 +99,13 @@ graphRoots g =
         isRoot x = [x] == reachable x transposedGraph
     in filter isRoot potentialRoots
 
-reachableExclusiveSubgraph :: Ord a => Set a -> Graph a -> Graph a
-reachableExclusiveSubgraph vs g =
+reachableExclusiveSubgraph :: Ord a => Set a -> Set a -> Graph a -> Graph a
+reachableExclusiveSubgraph includes excludes g =
     let g' = unGraph g
-        rvs = Set.fromList $ concatMap (flip reachable g') vs
-        rvsExclusive = Set.difference rvs vs
-    in filterVertices (flip Set.member rvsExclusive) g
+        includedVertices = Set.fromList $ concatMap (flip reachable g') includes
+        excludedVertices = Set.fromList $ concatMap (flip reachable g') excludes
+        resultingVertices = includedVertices `Set.difference` excludedVertices `Set.difference` includes
+    in filterVertices (flip Set.member resultingVertices) g
 
 -- Internal
 
