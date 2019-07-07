@@ -21,7 +21,7 @@ import           Tenpureto.Graph
 import           Tenpureto.Effects.Git
 
 data FeatureStability = Deprecated | Experimental | Stable
-        deriving (Show, Eq, Ord)
+        deriving (Show, Eq, Ord, Enum, Bounded)
 
 data TemplateYamlFeature = TemplateYamlFeature
         { yamlFeatureName :: Text

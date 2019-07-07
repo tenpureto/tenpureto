@@ -2,14 +2,22 @@ module Tenpureto.TemplateLoaderTest where
 
 import           Test.Tasty
 import           Test.Tasty.HUnit
+import           Hedgehog
+import qualified Hedgehog.Gen                  as Gen
+import qualified Hedgehog.Range                as Range
+import           Hedgehog.Classes
 
+import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
+import           Control.Applicative
 
 import           Tenpureto.Graph
 import           Tenpureto.TemplateTestHelper
 import           Tenpureto.TemplateLoader
 import           Tenpureto.TemplateLoader.Internal
+import           Tenpureto.PropertyTestHelpers
 
 test_managedBranches :: [TestTree]
 test_managedBranches =
@@ -183,3 +191,41 @@ test_buildGraph =
     b         = childBranch "b" [a]
     c         = childBranch "c" [b]
     nameGraph = mapVertices branchName . buildGraph
+
+test_semigroup :: TestTree
+test_semigroup = testGroup
+    "TemplateYaml"
+    [ lawTestTree $ semigroupLaws (genTemplateYaml (Range.exponential 0 10))
+    , lawTestTree $ monoidLaws (genTemplateYaml (Range.exponential 0 10))
+    ]
+
+genTemplateYaml :: Range Int -> Gen TemplateYaml
+genTemplateYaml range =
+    let smallRange   = Range.constant 0 2
+        genText      = Gen.text smallRange Gen.ascii
+        genTextTuple = liftA2 (\a -> \b -> (a, b)) genText genText
+    in  do
+            features  <- Gen.set range (genTemplateYamlFeature range)
+            variables <- Gen.map smallRange genTextTuple
+            excludes  <- Gen.set smallRange genText
+            conflicts <- Gen.set smallRange genText
+            return $ TemplateYaml { yamlVariables = variables
+                                  , yamlFeatures  = features
+                                  , yamlExcludes  = excludes
+                                  , yamlConflicts = conflicts
+                                  }
+
+genTemplateYamlFeature :: Range Int -> Gen TemplateYamlFeature
+genTemplateYamlFeature range = do
+    featureId   <- Gen.int range
+    description <- Gen.element [Nothing, Just (featureName featureId)]
+    hidden      <- Gen.bool
+    stability   <- Gen.enumBounded
+    return $ TemplateYamlFeature { yamlFeatureName = featureName featureId
+                                 , yamlFeatureDescription = description
+                                 , yamlFeatureHidden      = hidden
+                                 , yamlFeatureStability   = stability
+                                 }
+  where
+    featureName :: Int -> Text
+    featureName = (<>) "f" . T.pack . show
