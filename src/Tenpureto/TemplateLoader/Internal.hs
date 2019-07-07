@@ -152,8 +152,8 @@ branchVariables :: TemplateBranchInformation -> Map Text Text
 branchVariables = yamlVariables . templateYaml
 
 templateYamlFeature :: TemplateBranchInformation -> Maybe TemplateYamlFeature
-templateYamlFeature bi =
-    find ((==) (branchName bi) . yamlFeatureName) $ yamlFeatures (templateYaml bi)
+templateYamlFeature bi = find ((==) (branchName bi) . yamlFeatureName)
+    $ yamlFeatures (templateYaml bi)
 
 buildGraph :: [TemplateBranchInformation] -> Graph TemplateBranchInformation
 buildGraph bis =
