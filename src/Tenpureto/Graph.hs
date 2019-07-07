@@ -25,6 +25,11 @@ import           Algebra.Graph.ToGraph          ( ToVertex
                                                 , toAdjacencyMapTranspose
                                                 , adjacencyMap
                                                 )
+import qualified Algebra.Graph.NonEmpty.AdjacencyMap
+                                               as NAM
+import           Data.List.NonEmpty             ( NonEmpty(..) )
+import           Algebra.Graph.AdjacencyMap.Algorithm
+                                                ( scc )
 import           Control.Monad
 
 data Graph a = NormalizedGraph   (G.Graph a)
@@ -149,8 +154,15 @@ removeTransitiveEdges g = g `subtractEdges` (recCompose (g `G.compose` g))
         let y = G.overlay x (x `G.compose` g)
         in  if y == x then y else recCompose y
 
+dropCycles :: Ord a => G.Graph a -> G.Graph a
+dropCycles = (>>= vertexOrEmpty) . toGraph . scc . toAdjacencyMap
+  where
+    vertexOrEmpty cc = case NAM.vertexList1 cc of
+        v :| [] -> G.vertex v
+        _       -> G.empty
+
 normalize :: Ord a => G.Graph a -> G.Graph a
-normalize = removeTransitiveEdges . removeLoops
+normalize = removeTransitiveEdges . dropCycles . removeLoops
 
 foldMaybeM :: (Monad m, Traversable t) => (a -> a -> m a) -> t a -> m (Maybe a)
 foldMaybeM combine = foldM combine' Nothing
