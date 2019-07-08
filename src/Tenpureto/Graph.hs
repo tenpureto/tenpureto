@@ -36,8 +36,7 @@ import           Algebra.Graph.AdjacencyMap.Algorithm
 import           Data.Functor.Identity
 import           Control.Monad
 
-data Graph a = NormalizedGraph   (G.Graph a)
-                      | DenormalizedGraph (G.Graph a) (G.Graph a)
+data Graph a = Graph { unGraph :: G.Graph a, graphNormalized :: G.Graph a }
     deriving (Show)
 
 instance Ord a => Eq (Graph a) where
@@ -45,49 +44,43 @@ instance Ord a => Eq (Graph a) where
 
 instance Ord a => ToGraph (Graph a) where
     type ToVertex (Graph a) = a
-    toGraph (NormalizedGraph a    ) = a
-    toGraph (DenormalizedGraph _ a) = a
+    toGraph = graphNormalized
 
-unGraph :: Ord a => Graph a -> G.Graph a
-unGraph (NormalizedGraph a    ) = a
-unGraph (DenormalizedGraph a _) = a
-
-denormalizedGraph :: Ord a => G.Graph a -> Graph a
-denormalizedGraph a = DenormalizedGraph a (normalize a)
+graph :: Ord a => G.Graph a -> Graph a
+graph a = Graph a (normalize a)
 
 overlay :: Ord a => Graph a -> Graph a -> Graph a
-overlay x y = denormalizedGraph $ G.overlay (unGraph x) (unGraph y)
+overlay x y = graph $ G.overlay (unGraph x) (unGraph y)
 
 compose :: Ord a => Graph a -> Graph a -> Graph a
-compose x y = denormalizedGraph $ G.compose (unGraph x) (unGraph y)
+compose x y = graph $ G.compose (unGraph x) (unGraph y)
 
 vertex :: Ord a => a -> Graph a
-vertex = denormalizedGraph . G.vertex
+vertex = graph . G.vertex
 
 vertices :: Ord a => [a] -> Graph a
-vertices = denormalizedGraph . G.vertices
+vertices = graph . G.vertices
 
 edge :: Ord a => a -> a -> Graph a
-edge x y = denormalizedGraph $ G.edge x y
+edge x y = graph $ G.edge x y
 
 edges :: Ord a => [(a, a)] -> Graph a
-edges = denormalizedGraph . G.edges
+edges = graph . G.edges
 
 path :: Ord a => [a] -> Graph a
-path = denormalizedGraph . G.path
+path = graph . G.path
 
 mapVertices :: (Ord a, Ord b) => (a -> b) -> Graph a -> Graph b
-mapVertices f = denormalizedGraph . fmap f . unGraph
+mapVertices f = graph . fmap f . unGraph
 
 filterVertices :: Ord a => (a -> Bool) -> Graph a -> Graph a
 filterVertices f = filterMapVertices (\x -> if f x then Just x else Nothing)
 
 filterMapVertices :: (Ord a, Ord b) => (a -> Maybe b) -> Graph a -> Graph b
 filterMapVertices f x =
-    denormalizedGraph
-        $ (=<<) (maybe G.empty G.vertex . snd)
-        $ filterEmptyVertices
-        $ fmap zipf (unGraph x)
+    graph $ (=<<) (maybe G.empty G.vertex . snd) $ filterEmptyVertices $ fmap
+        zipf
+        (unGraph x)
   where
     zipf z = (z, f z)
     removeIfEmpty (  _, Just _ ) acc = acc
@@ -124,9 +117,9 @@ foldTopologically
     -> (b -> b -> m b)
     -> Graph a
     -> m (Maybe b)
-foldTopologically vcombine hcombine graph =
-    let leaves  = graphLeaves graph
-        parents = adjacencyMap (toAdjacencyMapTranspose graph)
+foldTopologically vcombine hcombine g =
+    let leaves  = graphLeaves g
+        parents = adjacencyMap (toAdjacencyMapTranspose g)
         parent  = maybe mempty Set.toList . flip Map.lookup parents
         foldVertex v = do
             pbs <- traverse foldVertex (parent v)
