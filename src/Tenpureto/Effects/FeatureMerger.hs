@@ -9,6 +9,7 @@ import           Data.Text                      ( Text )
 import           Data.List
 import           Data.Set                       ( Set )
 import           Data.Map                       ( Map )
+import           Control.Monad
 
 import           Tenpureto.Graph
 import           Tenpureto.Messages
@@ -108,7 +109,7 @@ mergeGraph
     :: Member FeatureMerger r
     => Graph MergedBranchInformation
     -> Sem r (Maybe MergedBranchInformation)
-mergeGraph = foldTopologically return vcombine hcombine
+mergeGraph = foldTopologically vcombine hcombine
   where
     vcombineD d1 d2 = MergedBranchDescriptor
         { mergedVariables = mergedVariables d1 <> mergedVariables d2
@@ -132,5 +133,5 @@ mergeGraph = foldTopologically return vcombine hcombine
                 return $ MergedBranchInformation { mergedBranchCommit     = c
                                                  , mergedBranchDescriptor = d
                                                  }
-    vcombine = combine vcombineD
+    vcombine = foldM (combine vcombineD)
     hcombine = combine hcombineD

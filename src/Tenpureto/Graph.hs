@@ -116,19 +116,17 @@ graphRoots =
 
 foldTopologically
     :: (Ord a, Monad m)
-    => (a -> m b)
-    -> (b -> b -> m b)
+    => (a -> [b] -> m b)
     -> (b -> b -> m b)
     -> Graph a
     -> m (Maybe b)
-foldTopologically get vcombine hcombine graph =
+foldTopologically vcombine hcombine graph =
     let leaves  = graphLeaves graph
         parents = adjacencyMap (toAdjacencyMapTranspose graph)
         parent  = maybe mempty Set.toList . flip Map.lookup parents
         foldVertex v = do
             pbs <- traverse foldVertex (parent v)
-            bv  <- get v
-            foldM vcombine bv pbs
+            vcombine v pbs
     in  foldMaybeM hcombine =<< traverse foldVertex leaves
 
 -- Internal

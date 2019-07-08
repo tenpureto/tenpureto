@@ -85,11 +85,10 @@ test_foldTopologically =
     ]
   where
     foldSet :: Graph Text -> Maybe (Set Text)
-    foldSet = runIdentity . foldTopologically setGet setVCombine setHCombine
-    setGet  = pure . Set.singleton
-    setVCombine x y = pure $ Set.union x y
-    setHCombine = setVCombine
+    foldSet = runIdentity . foldTopologically setVCombine setHCombine
+    setVCombine x ys = pure $ Set.insert x (mconcat ys)
+    setHCombine x y = pure $ Set.union x y
 
     foldLast :: Graph Text -> Maybe (Set Text)
-    foldLast = runIdentity . foldTopologically setGet lastVCombine setHCombine
-    lastVCombine x _ = pure x
+    foldLast = runIdentity . foldTopologically lastVCombine setHCombine
+    lastVCombine x _ = pure $ Set.singleton x
