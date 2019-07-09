@@ -18,6 +18,7 @@ import           Tenpureto.TemplateLoader       ( TemplateInformation
                                                 , managedBranches
                                                 , isMergeOf
                                                 , isFeatureBranch
+                                                , isHiddenBranch
                                                 , requiredBranches
                                                 , branchVariables
                                                 )
@@ -93,8 +94,9 @@ mergeBranchesGraph mergeCommits graph selectedBranches =
         $ graphSubset vertexDecision graph
   where
     vertexDecision v | v `Set.member` selectedBranches = MustKeep
+                     | isHiddenBranch v                = PreferDrop
                      | isFeatureBranch v               = MustDrop
-                     | otherwise                       = MayDrop
+                     | otherwise                       = PreferKeep
 
 mergeGraph
     :: Monad m

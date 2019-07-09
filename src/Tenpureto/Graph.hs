@@ -126,21 +126,20 @@ foldTopologically vcombine hcombine g =
             vcombine v pbs
     in  foldMaybeM hcombine =<< traverse foldVertex leaves
 
-data GraphSubsetDecision = MustDrop | MayDrop | MustKeep
+data GraphSubsetDecision = MustDrop | PreferDrop | PreferKeep | MustKeep
     deriving (Show, Eq, Ord, Enum, Bounded)
 
 graphSubset :: Ord a => (a -> GraphSubsetDecision) -> Graph a -> Graph a
 graphSubset f g = runIdentity $ do
-    (must, may) <-
+    (must, _) <-
         fromMaybe (mempty, Nothing) <$> foldTopologically vcombine hcombine g
-    let keep = must <> fromMaybe mempty may
-    return $ filterVertices (`Set.member` keep) g
+    return $ filterVertices (`Set.member` must) g
   where
-    vcombine c ps = case f c of
-        MustDrop -> return (must, Nothing)
-        MustKeep ->
-            return (c `Set.insert` must <> fromMaybe mempty may, Just mempty)
-        MayDrop -> return (must, fmap (c `Set.insert`) may)
+    vcombine c ps = return $ case f c of
+        MustDrop   -> (must, Nothing)
+        PreferDrop -> (must, fmap (c `Set.insert`) may)
+        PreferKeep -> (must <> maybe mempty (c `Set.insert`) may, Just mempty)
+        MustKeep   -> (c `Set.insert` must <> fromMaybe mempty may, Just mempty)
       where
         must = foldMap fst ps
         may  = fmap mconcat (traverse snd ps)

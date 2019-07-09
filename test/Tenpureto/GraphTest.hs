@@ -99,27 +99,46 @@ test_foldTopologically =
 
 test_graphSubset :: [TestTree]
 test_graphSubset =
-    [ testCase "keeps parents"
+    [ testCase "keeps parents even if dropping is prefered"
         $   graphSubset
                 (\case
                     "b" -> MustKeep
-                    _   -> MayDrop
+                    _   -> PreferDrop
                 )
                 (path ["a", "b"])
         @?= path @Text ["a", "b"]
-    , testCase "keeps children of kept vertices"
+    , testCase "keeps children of kept vertices if keeping is prefered"
+            $   graphSubset
+                    (\case
+                        "a" -> MustKeep
+                        _   -> PreferKeep
+                    )
+                    (path ["a", "b"])
+            @?= path @Text ["a", "b"]
+    , testCase "drops children of kept vertices if dropping is prefered"
+                $   graphSubset
+                        (\case
+                            "a" -> MustKeep
+                            _   -> PreferDrop
+                        )
+                        (path ["a", "b"])
+                @?= path @Text ["a"]
+    , testCase "keeps children of kept vertices if grandchildren dropped when keeping is prefered"
         $   graphSubset
                 (\case
                     "a" -> MustKeep
-                    _   -> MayDrop
+                    "b" -> PreferKeep
+                    "c" -> PreferDrop
+                    "d" -> MustDrop
+                    _   -> MustDrop
                 )
-                (path ["a", "b"])
+                (path ["a", "b", "c", "d"])
         @?= path @Text ["a", "b"]
     , testCase "drops children of dropped vertices"
         $   graphSubset
                 (\case
                     "a" -> MustDrop
-                    _   -> MayDrop
+                    _   -> PreferKeep
                 )
                 (path ["a", "b"])
         @?= path @Text []
@@ -128,7 +147,7 @@ test_graphSubset =
                 (\case
                     "a" -> MustDrop
                     "b" -> MustKeep
-                    _   -> MayDrop
+                    _   -> PreferKeep
                 )
                 (overlay (path ["a", "c"]) (path ["b", "c"]))
         @?= path @Text ["b"]
@@ -141,7 +160,7 @@ hprop_graphSubsetRespectsDecisions = property $ do
     decisions <- forAll
         $ traverse (\v -> (v, ) <$> Gen.enumBounded) graphVertices
     let subgraph = graphSubset
-            (flip (Map.findWithDefault MayDrop) (Map.fromList decisions))
+            (flip (Map.findWithDefault PreferKeep) (Map.fromList decisions))
             graph
     annotateShow subgraph
     let subgraphVertices = Set.fromList $ vertexList subgraph
