@@ -53,8 +53,12 @@ branchSelection availableBranches selectedBranches =
         $   requiredBranches
         <$> filterBranchesByNames availableBranches selectedBranches
 
-inputBranchList :: [TemplateBranchInformation] -> Set Text -> Doc AnsiStyle
-inputBranchList availableBranches selectedBranches = vsep $ zipWith6
+inputBranchList
+    :: Graph TemplateBranchInformation
+    -> [TemplateBranchInformation]
+    -> Set Text
+    -> Doc AnsiStyle
+inputBranchList _ availableBranches selectedBranches = vsep $ zipWith6
     renderLine
     selectedPrefixes
     branchIndexes
@@ -91,13 +95,10 @@ inputBranchList availableBranches selectedBranches = vsep $ zipWith6
         let w = maximum (fmap T.length texts)
         in  fmap (T.justifyLeft w ' ') texts
     branchIndexes =
-        equalize
-            $     (T.pack . show . (fst @Int))
-            <$>   [1 ..]
-            `zip` availableBranches
+        equalize $ T.pack . show . fst @Int <$> [1 ..] `zip` availableBranches
     transitivelySelected = branchSelection availableBranches selectedBranches
     conflictsWithSelected branch = any (branchesConflict branch) $ filter
-        ((flip Set.member) selectedBranches . branchName)
+        (flip Set.member selectedBranches . branchName)
         availableBranches
     branchLineSelected branch =
         let name        = branchName branch
@@ -150,7 +151,9 @@ inputBranches graph initialNameSelection = askUntil initial request process
     request (availableBranches, selected, badInput) =
         let
             doc =
-                inputBranchList availableBranches (Set.map branchName selected)
+                inputBranchList graph
+                                availableBranches
+                                (Set.map branchName selected)
                     <> "\n"
                     <> maybe
                            ""
