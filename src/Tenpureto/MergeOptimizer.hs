@@ -17,6 +17,7 @@ import           Tenpureto.TemplateLoader       ( TemplateInformation
                                                 , TemplateYamlFeature
                                                 , managedBranches
                                                 , isMergeOf
+                                                , isFeatureBranch
                                                 , requiredBranches
                                                 , branchVariables
                                                 )
@@ -83,11 +84,17 @@ mergeBranchesGraph
     :: Monad m
     => (Committish -> Committish -> MergedBranchDescriptor -> m Committish)
     -> Graph TemplateBranchInformation
+    -> Set TemplateBranchInformation
     -> m (Maybe TemplateYaml)
-mergeBranchesGraph mergeCommits =
+mergeBranchesGraph mergeCommits graph selectedBranches =
     fmap (fmap mergedBranchInformationToTemplateYaml)
-        . mergeGraph mergeCommits
-        . mapVertices templateBranchInformationData
+        $ mergeGraph mergeCommits
+        $ mapVertices templateBranchInformationData
+        $ graphSubset vertexDecision graph
+  where
+    vertexDecision v | v `Set.member` selectedBranches = MustKeep
+                     | isFeatureBranch v               = MustDrop
+                     | otherwise                       = MayDrop
 
 mergeGraph
     :: Monad m

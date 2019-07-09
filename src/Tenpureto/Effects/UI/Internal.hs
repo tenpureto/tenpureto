@@ -16,9 +16,12 @@ import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Functor
 import           Data.Text.Prettyprint.Doc.Render.Terminal
 import           Algebra.Graph.ToGraph
+import           Data.Functor.Identity
+import           Data.Foldable
 
 import           Tenpureto.Graph
 import           Tenpureto.TemplateLoader
+import           Tenpureto.MergeOptimizer
 import           Tenpureto.Effects.Terminal
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Git
@@ -53,12 +56,22 @@ branchSelection availableBranches selectedBranches =
         $   requiredBranches
         <$> filterBranchesByNames availableBranches selectedBranches
 
+preMergeBranches
+    :: Graph TemplateBranchInformation
+    -> Set TemplateBranchInformation
+    -> TemplateYaml
+preMergeBranches graph selectedBranches =
+    fold $ runIdentity $ mergeBranchesGraph
+        (\_ _ _ -> return (Committish ""))
+        graph
+        selectedBranches
+
 inputBranchList
     :: Graph TemplateBranchInformation
     -> [TemplateBranchInformation]
     -> Set Text
     -> Doc AnsiStyle
-inputBranchList _ availableBranches selectedBranches = vsep $ zipWith6
+inputBranchList graph availableBranches selectedBranches = vsep $ zipWith6
     renderLine
     selectedPrefixes
     branchIndexes
@@ -96,10 +109,11 @@ inputBranchList _ availableBranches selectedBranches = vsep $ zipWith6
         in  fmap (T.justifyLeft w ' ') texts
     branchIndexes =
         equalize $ T.pack . show . fst @Int <$> [1 ..] `zip` availableBranches
-    transitivelySelected = branchSelection availableBranches selectedBranches
-    conflictsWithSelected branch = any (branchesConflict branch) $ filter
-        (flip Set.member selectedBranches . branchName)
-        availableBranches
+    selectedBranchInformations = Set.fromList
+        $ filterBranchesByNames availableBranches selectedBranches
+    mergedYaml           = preMergeBranches graph selectedBranchInformations
+    transitivelySelected = (Set.map yamlFeatureName . yamlFeatures) mergedYaml
+    conflictsWithSelected = flip Set.member (yamlConflicts mergedYaml) . branchName
     branchLineSelected branch =
         let name        = branchName branch
             selected    = name `Set.member` selectedBranches
