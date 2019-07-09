@@ -12,9 +12,12 @@ module Tenpureto.Graph
     , filterMapVertices
     , graphRoots
     , foldTopologically
+    , GraphSubsetDecision(..)
+    , graphSubset
     )
 where
 
+import           Data.Maybe
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
 import qualified Algebra.Graph                 as G
@@ -30,6 +33,7 @@ import qualified Algebra.Graph.NonEmpty.AdjacencyMap
 import           Data.List.NonEmpty             ( NonEmpty(..) )
 import           Algebra.Graph.AdjacencyMap.Algorithm
                                                 ( scc )
+import           Data.Functor.Identity
 import           Control.Monad
 
 data Graph a = NormalizedGraph   (G.Graph a)
@@ -128,6 +132,27 @@ foldTopologically vcombine hcombine graph =
             pbs <- traverse foldVertex (parent v)
             vcombine v pbs
     in  foldMaybeM hcombine =<< traverse foldVertex leaves
+
+data GraphSubsetDecision = MustDrop | MayDrop | MustKeep
+    deriving (Show, Eq, Ord, Enum, Bounded)
+
+graphSubset :: Ord a => (a -> GraphSubsetDecision) -> Graph a -> Graph a
+graphSubset f g = runIdentity $ do
+    (must, may) <-
+        fromMaybe (mempty, Nothing) <$> foldTopologically vcombine hcombine g
+    let keep = must <> fromMaybe mempty may
+    return $ filterVertices (`Set.member` keep) g
+  where
+    vcombine c ps = case f c of
+        MustDrop -> return (must, Nothing)
+        MustKeep ->
+            return (c `Set.insert` must <> fromMaybe mempty may, Just mempty)
+        MayDrop -> return (must, fmap (c `Set.insert`) may)
+      where
+        must = foldMap fst ps
+        may  = fmap mconcat (traverse snd ps)
+    hcombine (xmust, xmay) (ymust, ymay) =
+        return (xmust <> ymust, xmay <> ymay)
 
 -- Internal
 

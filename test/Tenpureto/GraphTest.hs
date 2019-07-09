@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module Tenpureto.GraphTest where
 
 import           Test.Tasty
@@ -10,7 +12,9 @@ import           Data.Ix
 import           Data.Text                      ( Text )
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
+import qualified Data.Map                      as Map
 import           Algebra.Graph.ToGraph
+import           Data.Foldable
 import           Data.Functor.Identity
 
 import           Tenpureto.Graph
@@ -92,3 +96,56 @@ test_foldTopologically =
     foldLast :: Graph Text -> Maybe (Set Text)
     foldLast = runIdentity . foldTopologically lastVCombine setHCombine
     lastVCombine x _ = pure $ Set.singleton x
+
+test_graphSubset :: [TestTree]
+test_graphSubset =
+    [ testCase "keeps parents"
+        $   graphSubset
+                (\case
+                    "b" -> MustKeep
+                    _   -> MayDrop
+                )
+                (path ["a", "b"])
+        @?= path @Text ["a", "b"]
+    , testCase "keeps children of kept vertices"
+        $   graphSubset
+                (\case
+                    "a" -> MustKeep
+                    _   -> MayDrop
+                )
+                (path ["a", "b"])
+        @?= path @Text ["a", "b"]
+    , testCase "drops children of dropped vertices"
+        $   graphSubset
+                (\case
+                    "a" -> MustDrop
+                    _   -> MayDrop
+                )
+                (path ["a", "b"])
+        @?= path @Text []
+    , testCase "drops children of both dropped and kept vertices"
+        $   graphSubset
+                (\case
+                    "a" -> MustDrop
+                    "b" -> MustKeep
+                    _   -> MayDrop
+                )
+                (overlay (path ["a", "c"]) (path ["b", "c"]))
+        @?= path @Text ["b"]
+    ]
+
+hprop_graphSubsetRespectsDecisions :: Property
+hprop_graphSubsetRespectsDecisions = property $ do
+    graph <- forAll $ genIntGraph (Range.linear 0 100)
+    let graphVertices = vertexList graph
+    decisions <- forAll
+        $ traverse (\v -> (v, ) <$> Gen.enumBounded) graphVertices
+    let subgraph = graphSubset
+            (flip (Map.findWithDefault MayDrop) (Map.fromList decisions))
+            graph
+    annotateShow subgraph
+    let subgraphVertices = Set.fromList $ vertexList subgraph
+    for_ decisions $ \case
+        (v, MustDrop) -> Hedgehog.assert $ Set.notMember v subgraphVertices
+        (v, MustKeep) -> Hedgehog.assert $ Set.member v subgraphVertices
+        _             -> return ()
