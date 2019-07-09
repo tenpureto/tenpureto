@@ -30,6 +30,7 @@ import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Process
 import           Tenpureto.Effects.Git
 import           Tenpureto.Effects.UI
+import           Tenpureto.Effects.FeatureMerger
 import           Tenpureto.TemplateLoader
 import           Tenpureto.MergeOptimizer
 import           Tenpureto.Templater
@@ -240,39 +241,11 @@ prepareTemplate
     -> FinalProjectConfiguration
     -> Sem r TemplateYaml
 prepareTemplate repository template configuration =
-    let
-        resolve []             = return ()
-        resolve mergeConflicts = if templateYamlFile `elem` mergeConflicts
-            then resolve (delete templateYamlFile mergeConflicts)
-            else
-                inputResolutionStrategy (repositoryPath repository)
-                                        mergeConflicts
-                    >>= \case
-                            AlreadyResolved -> return ()
-                            MergeTool ->
-                                runMergeTool repository >> sayLn mergeSuccess
-        checkoutTemplateBranch a = do
-            checkoutBranch repository (branchName a) Nothing
-            return $ templateYaml a
-        mergeTemplateBranch a b = do
-            let d = ((<>) a . templateYaml) b
-            mergeResult <- mergeBranch repository ("origin/" <> branchName b)
-            writeAddFile repository templateYamlFile (formatTemplateYaml d)
-            case mergeResult of
-                MergeSuccess                  -> return ()
-                MergeConflicts mergeConflicts -> resolve mergeConflicts
-            _ <- commit repository ("Merge " <> branchName b)
-            return d
-        branchesToMerge =
-            reorderBranches $ includeMergeBranches template $ projectBranches
-                configuration
-    in
-        case branchesToMerge of
-            []    -> throw TenpuretoEmptySelection
-            h : t -> do
-                logInfo $ "Merging branches:" <> line <> (indent 4 . pretty)
-                    (fmap branchName branchesToMerge)
-                checkoutTemplateBranch h >>= flip (foldlM mergeTemplateBranch) t
+    runFeatureMergerGit repository
+        $   mergeBranchesGraph mergeCommits
+                               (branchesGraph template)
+                               (Set.fromList $ projectBranches configuration)
+        >>= maybe (throw TenpuretoEmptySelection) return
 
 commit_
     :: Members '[Git, Error TenpuretoException] r

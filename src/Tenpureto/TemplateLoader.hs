@@ -6,6 +6,7 @@ module Tenpureto.TemplateLoader
     , FeatureStability(..)
     , TemplateInformation
     , branchesInformation
+    , branchesGraph
     , TemplateBranchInformation(..)
     , TemplateYaml(..)
     , TemplateYamlFeature

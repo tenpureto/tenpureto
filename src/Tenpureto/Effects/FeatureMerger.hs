@@ -30,7 +30,10 @@ runFeatureMergerGit repo = interpret $ \case
     MergeCommits b1 b2 d -> do
         checkoutBranch repo (unCommittish b1) Nothing
         mergeResult <- mergeBranch repo (unCommittish b2)
-        _           <- case mergeResult of
+        writeAddFile repo
+                     templateYamlFile
+                     (formatTemplateYaml (descriptorToTemplateYaml d))
+        case mergeResult of
             MergeSuccess                  -> return ()
             MergeConflicts mergeConflicts -> resolve d mergeConflicts
         maybeC <- commit repo "Merge"
@@ -39,16 +42,7 @@ runFeatureMergerGit repo = interpret $ \case
         resolve _ [] = return ()
         resolve descriptor mergeConflicts =
             if templateYamlFile `elem` mergeConflicts
-                then
-                    writeAddFile
-                            repo
-                            templateYamlFile
-                            (formatTemplateYaml
-                                (descriptorToTemplateYaml descriptor)
-                            )
-                        >> resolve
-                               descriptor
-                               (delete templateYamlFile mergeConflicts)
+                then resolve descriptor (delete templateYamlFile mergeConflicts)
                 else
                     inputResolutionStrategy (repositoryPath repo) mergeConflicts
                         >>= \case
