@@ -26,6 +26,7 @@ import           Data.Functor
 import           Data.List
 import           Data.Maybe
 import           Data.Text.Prettyprint.Doc
+import           Control.Monad
 
 import           Path
 
@@ -112,8 +113,8 @@ withNewWorktree
     -> Committish
     -> (GitRepository -> Sem r a)
     -> Sem r a
-withNewWorktree repo c f = withSystemTempDir "tenpureto" $ \dir ->
-    initWorktree repo c dir >> f repo
+withNewWorktree repo c f =
+    withSystemTempDir "tenpureto" (initWorktree repo c >=> f)
 
 runGit
     :: Members '[FileSystem, Process, Error GitException] r
