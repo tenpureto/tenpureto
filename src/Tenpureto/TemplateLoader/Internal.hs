@@ -155,6 +155,9 @@ templateYamlFeature :: TemplateBranchInformation -> Maybe TemplateYamlFeature
 templateYamlFeature bi = find ((==) (branchName bi) . yamlFeatureName)
     $ yamlFeatures (templateYaml bi)
 
+branchConflicts :: TemplateBranchInformation -> Set Text
+branchConflicts = yamlConflicts . templateYaml
+
 buildGraph :: [TemplateBranchInformation] -> Graph TemplateBranchInformation
 buildGraph bis =
     let
@@ -174,6 +177,39 @@ buildGraph bis =
     in
         filterMapVertices findBranchInformation branchNameGraph
 
+transposeMapSet :: (Ord k, Ord v) => Map k (Set v) -> Map v (Set k)
+transposeMapSet = Map.foldrWithKey combine Map.empty
+  where
+    combine k v acc = Set.foldr (combine' k) acc v
+    combine' k v = Map.insertWith Set.union v (Set.singleton k)
+
+commutativeConflicts
+    :: [TemplateBranchInformation] -> [TemplateBranchInformation]
+commutativeConflicts bis =
+    let
+        conflictsMap =
+            Map.fromList [ (branchName b, branchConflicts b) | b <- bis ]
+        transposedMap = transposeMapSet conflictsMap
+    in
+        [ TemplateBranchInformation
+              { branchName   = branchName b
+              , branchCommit = branchCommit b
+              , templateYaml =
+                  TemplateYaml
+                      { yamlVariables = (yamlVariables . templateYaml) b
+                      , yamlFeatures  = (yamlFeatures . templateYaml) b
+                      , yamlExcludes  = (yamlExcludes . templateYaml) b
+                      , yamlConflicts = (yamlConflicts . templateYaml) b
+                                            <> Map.findWithDefault
+                                                   Set.empty
+                                                   (branchName b)
+                                                   transposedMap
+                      }
+              }
+        | b <- bis
+        ]
+
 templateInformation :: [TemplateBranchInformation] -> TemplateInformation
 templateInformation branches =
-    TemplateInformation branches (buildGraph branches)
+    let enrichedBranches = commutativeConflicts branches
+    in  TemplateInformation enrichedBranches (buildGraph enrichedBranches)
