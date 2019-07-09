@@ -241,32 +241,26 @@ prepareTemplate
     -> Sem r TemplateYaml
 prepareTemplate repository template configuration =
     let
-        resolve _ [] = return ()
-        resolve descriptor mergeConflicts =
-            if templateYamlFile `elem` mergeConflicts
-                then
-                    writeAddFile repository
-                                 templateYamlFile
-                                 (formatTemplateYaml descriptor)
-                        >> resolve
-                               descriptor
-                               (delete templateYamlFile mergeConflicts)
-                else
-                    inputResolutionStrategy (repositoryPath repository)
-                                            mergeConflicts
-                        >>= \case
-                                AlreadyResolved -> return ()
-                                MergeTool       -> runMergeTool repository
-                                    >> sayLn mergeSuccess
+        resolve []             = return ()
+        resolve mergeConflicts = if templateYamlFile `elem` mergeConflicts
+            then resolve (delete templateYamlFile mergeConflicts)
+            else
+                inputResolutionStrategy (repositoryPath repository)
+                                        mergeConflicts
+                    >>= \case
+                            AlreadyResolved -> return ()
+                            MergeTool ->
+                                runMergeTool repository >> sayLn mergeSuccess
         checkoutTemplateBranch a = do
             checkoutBranch repository (branchName a) Nothing
             return $ templateYaml a
         mergeTemplateBranch a b = do
             let d = ((<>) a . templateYaml) b
             mergeResult <- mergeBranch repository ("origin/" <> branchName b)
+            writeAddFile repository templateYamlFile (formatTemplateYaml d)
             case mergeResult of
                 MergeSuccess                  -> return ()
-                MergeConflicts mergeConflicts -> resolve d mergeConflicts
+                MergeConflicts mergeConflicts -> resolve mergeConflicts
             _ <- commit repository ("Merge " <> branchName b)
             return d
         branchesToMerge =

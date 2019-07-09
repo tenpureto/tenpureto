@@ -120,7 +120,12 @@ parseTemplateYaml yaml =
     in  first (T.pack . Y.prettyPrintParseException) info
 
 formatTemplateYaml :: TemplateYaml -> ByteString
-formatTemplateYaml = BS.fromStrict . Y.encode
+formatTemplateYaml y = (BS.fromStrict . Y.encode) TemplateYaml
+    { yamlVariables = yamlVariables y
+    , yamlFeatures  = Set.filter (not . yamlFeatureHidden) (yamlFeatures y)
+    , yamlExcludes  = mempty
+    , yamlConflicts = mempty
+    }
 
 templateYamlFile :: Path Rel File
 templateYamlFile = [relfile|.template.yaml|]

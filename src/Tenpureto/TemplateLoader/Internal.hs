@@ -15,6 +15,7 @@ import           Data.Yaml                      ( FromJSON(..)
                                                 , (.=)
                                                 )
 import qualified Data.Yaml                     as Y
+import           Data.Aeson.Types               ( KeyValue )
 import           Data.Foldable
 
 import           Tenpureto.Graph
@@ -83,6 +84,11 @@ instance FromJSON FeatureStability where
     parseJSON (Y.String "deprecated"  ) = pure Deprecated
     parseJSON _                         = fail "Invalid feature stability value"
 
+instance ToJSON FeatureStability where
+    toJSON Stable       = toJSON @Text "stable"
+    toJSON Experimental = toJSON @Text "experimental"
+    toJSON Deprecated   = toJSON @Text "deprecated"
+
 instance FromJSON TemplateYamlFeature where
     parseJSON (Y.String v) = pure $ TemplateYamlFeature
         { yamlFeatureName        = v
@@ -122,13 +128,25 @@ instance FromJSON TemplateYaml where
     parseJSON _ = fail "Invalid template YAML definition"
 
 instance ToJSON TemplateYamlFeature where
-    toJSON TemplateYamlFeature { yamlFeatureName = n } = toJSON n
+    toJSON TemplateYamlFeature { yamlFeatureName = n, yamlFeatureDescription = d, yamlFeatureHidden = h, yamlFeatureStability = s }
+        = case
+                catMaybes
+                    [ "description" .?= d
+                    , kvd "hidden"    False  h
+                    , kvd "stability" Stable s
+                    ]
+            of
+                []     -> toJSON n
+                fields -> Y.object [n .= (Y.object fields)]
 
 instance ToJSON TemplateYaml where
-    toJSON TemplateYaml { yamlVariables = v, yamlFeatures = f, yamlExcludes = e }
+    toJSON TemplateYaml { yamlVariables = v, yamlFeatures = f, yamlExcludes = e, yamlConflicts = c }
         = Y.object $ catMaybes
-            ["variables" .?= v, "features" .?= f, "excludes" .?= e]
-        where a .?= b = if b == mempty then Nothing else Just (a .= b)
+            [ "variables" .?= v
+            , "features" .?= f
+            , "excludes" .?= e
+            , "conflicts" .?= c
+            ]
 
 instance Semigroup TemplateYaml where
     (<>) a b = TemplateYaml
@@ -144,6 +162,12 @@ instance Monoid TemplateYaml where
                           , yamlExcludes  = mempty
                           , yamlConflicts = mempty
                           }
+
+(.?=) :: (KeyValue kv, ToJSON v, Eq v, Monoid v) => Text -> v -> Maybe kv
+(.?=) a b = if b == mempty then Nothing else Just (a .= b)
+
+kvd :: (KeyValue kv, ToJSON v, Eq v) => Text -> v -> v -> Maybe kv
+kvd a bd b = if b == bd then Nothing else Just (a .= b)
 
 requiredBranches :: TemplateBranchInformation -> Set Text
 requiredBranches = Set.map yamlFeatureName . yamlFeatures . templateYaml
