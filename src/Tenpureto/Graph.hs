@@ -14,6 +14,7 @@ module Tenpureto.Graph
     , foldTopologically
     , GraphSubsetDecision(..)
     , graphSubset
+    , graphAncestors
     )
 where
 
@@ -27,6 +28,7 @@ import           Algebra.Graph.ToGraph          ( ToVertex
                                                 , toAdjacencyMap
                                                 , toAdjacencyMapTranspose
                                                 , adjacencyMap
+                                                , reachable
                                                 )
 import qualified Algebra.Graph.NonEmpty.AdjacencyMap
                                                as NAM
@@ -110,6 +112,13 @@ graphRoots =
         . Map.filter Set.null
         . adjacencyMap
         . toAdjacencyMapTranspose
+
+graphAncestors :: Ord a => Graph a -> [a] -> [a]
+graphAncestors g vs =
+    let transposed = toAdjacencyMapTranspose g
+    in  Set.toList $ Set.unions $ fmap
+            (Set.fromList . flip reachable transposed)
+            vs
 
 foldTopologically
     :: (Ord a, Monad m)

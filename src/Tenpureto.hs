@@ -240,15 +240,19 @@ prepareTemplate
     -> FinalProjectConfiguration
     -> Sem r TemplateYaml
 prepareTemplate repository template configuration =
-    let graph            = branchesGraph template
-        selectedBranches = Set.fromList $ projectBranches configuration
-        (mergeLog, _)    = runMergeGraphPure graph selectedBranches
+    let
+        graph            = branchesGraph template
+        selectedBranches = projectBranches configuration
+        fullSelectedBranches =
+            Set.fromList $ graphAncestors graph selectedBranches
+        (mergeLog, _) = runMergeGraphPure graph fullSelectedBranches
         mergeRecord (MergeRecord a b c) =
-                "Merge" <+> pretty a <+> "and" <+> pretty b <+> "as" <+> pretty c
-    in  do
+            "Merge" <+> pretty a <+> "and" <+> pretty b <+> "as" <+> pretty c
+    in
+        do
             logInfo $ "Merge plan:" <> line <> (indent 4 . vsep)
                 (fmap mergeRecord mergeLog)
-            runMergeGraph repository graph selectedBranches
+            runMergeGraph repository graph fullSelectedBranches
                 >>= maybe (throw TenpuretoEmptySelection) return
 
 commit_
