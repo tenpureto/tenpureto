@@ -1,6 +1,7 @@
 module Tenpureto.TemplateLoader.Internal where
 
 import           Data.Maybe
+import           Data.List
 import           Data.Text                      ( Text )
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
@@ -16,7 +17,6 @@ import           Data.Yaml                      ( FromJSON(..)
                                                 )
 import qualified Data.Yaml                     as Y
 import           Data.Aeson.Types               ( KeyValue )
-import           Data.Foldable
 
 import           Tenpureto.Graph
 import           Tenpureto.Effects.Git
@@ -233,7 +233,28 @@ commutativeConflicts bis =
         | b <- bis
         ]
 
+isFeatureBranch :: TemplateBranchInformation -> Bool
+isFeatureBranch b = branchName b `Set.member` requiredBranches b
+
+isHiddenBranch :: TemplateBranchInformation -> Bool
+isHiddenBranch = maybe False yamlFeatureHidden . templateYamlFeature
+
+isMergeOf :: TemplateBranchInformation -> [TemplateBranchInformation] -> Bool
+isMergeOf bi bis =
+    foldMap requiredBranches bis
+        == requiredBranches bi
+        && all ((/=) (requiredBranches bi) . requiredBranches) bis
+
+isMergeBranch'
+    :: [TemplateBranchInformation] -> TemplateBranchInformation -> Bool
+isMergeBranch' bis b = any (isMergeOf b) mergeOptions
+  where
+    fb           = filter isFeatureBranch bis
+    mergeOptions = filter ((<) 1 . length) (subsequences fb)
+
 templateInformation :: [TemplateBranchInformation] -> TemplateInformation
 templateInformation branches =
-    let enrichedBranches = commutativeConflicts branches
+    let isManagedBranch b = isFeatureBranch b || isMergeBranch' branches b
+        enrichedBranches =
+                (commutativeConflicts . filter isManagedBranch) branches
     in  TemplateInformation enrichedBranches (buildGraph enrichedBranches)

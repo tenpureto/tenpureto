@@ -14,6 +14,9 @@ module Tenpureto.TemplateLoader
     , requiredBranches
     , branchVariables
     , Graph
+    , isFeatureBranch
+    , isHiddenBranch
+    , isMergeOf
     )
 where
 
@@ -86,23 +89,8 @@ featureDescription = yamlFeatureDescription <=< templateYamlFeature
 featureStability :: TemplateBranchInformation -> FeatureStability
 featureStability = maybe Stable yamlFeatureStability . templateYamlFeature
 
-isFeatureBranch :: TemplateBranchInformation -> Bool
-isFeatureBranch b = branchName b `Set.member` requiredBranches b
-
-isHiddenBranch :: TemplateBranchInformation -> Bool
-isHiddenBranch = maybe False yamlFeatureHidden . templateYamlFeature
-
-isMergeOf :: TemplateBranchInformation -> [TemplateBranchInformation] -> Bool
-isMergeOf bi bis =
-    foldMap requiredBranches bis
-        == requiredBranches bi
-        && all ((/=) (requiredBranches bi) . requiredBranches) bis
-
 isMergeBranch :: TemplateInformation -> TemplateBranchInformation -> Bool
-isMergeBranch t b = any (isMergeOf b) mergeOptions
-  where
-    fb           = filter isFeatureBranch (branchesInformation t)
-    mergeOptions = filter ((<) 1 . length) (subsequences fb)
+isMergeBranch t = isMergeBranch' (branchesInformation t)
 
 branchesConflict
     :: TemplateBranchInformation -> TemplateBranchInformation -> Bool
