@@ -108,22 +108,36 @@ test_graphSubset =
                 (path ["a", "b"])
         @?= path @Text ["a", "b"]
     , testCase "keeps children of kept vertices if keeping is prefered"
-            $   graphSubset
-                    (\case
-                        "a" -> MustKeep
-                        _   -> PreferKeep
-                    )
-                    (path ["a", "b"])
-            @?= path @Text ["a", "b"]
+        $   graphSubset
+                (\case
+                    "a" -> MustKeep
+                    _   -> PreferKeep
+                )
+                (path ["a", "b"])
+        @?= path @Text ["a", "b"]
     , testCase "drops children of kept vertices if dropping is prefered"
-                $   graphSubset
-                        (\case
-                            "a" -> MustKeep
-                            _   -> PreferDrop
-                        )
-                        (path ["a", "b"])
-                @?= path @Text ["a"]
-    , testCase "keeps children of kept vertices if grandchildren dropped when keeping is prefered"
+        $   graphSubset
+                (\case
+                    "a" -> MustKeep
+                    _   -> PreferDrop
+                )
+                (path ["a", "b"])
+        @?= path @Text ["a"]
+    , testCase
+            "handle interleaving PreferKeep and PreferDrop"
+            $graphSubset
+            (\case
+                "a" -> MustKeep
+                "b" -> MustDrop
+                "c" -> PreferKeep
+                "d" -> PreferKeep
+                "f" -> PreferKeep
+                _   -> PreferDrop
+            )
+            (path ["a", "b", "c", "d", "e", "f"])
+        @?= path @Text ["a"]
+    , testCase
+            "keeps children of kept vertices if grandchildren dropped when keeping is prefered"
         $   graphSubset
                 (\case
                     "a" -> MustKeep
@@ -159,12 +173,17 @@ hprop_graphSubsetRespectsDecisions = property $ do
     let graphVertices = vertexList graph
     decisions <- forAll
         $ traverse (\v -> (v, ) <$> Gen.enumBounded) graphVertices
+    let ancestors = graphAncestors
+            graph
+            (fst <$> filter ((==) MustKeep . snd) decisions)
+    let overrides      = Map.fromList $ zip ancestors (repeat MustKeep)
+    let finalDecisions = Map.union overrides (Map.fromList decisions)
     let subgraph = graphSubset
-            (flip (Map.findWithDefault PreferKeep) (Map.fromList decisions))
+            (flip (Map.findWithDefault PreferKeep) finalDecisions)
             graph
     annotateShow subgraph
     let subgraphVertices = Set.fromList $ vertexList subgraph
-    for_ decisions $ \case
+    for_ (Map.toList finalDecisions) $ \case
         (v, MustDrop) -> Hedgehog.assert $ Set.notMember v subgraphVertices
         (v, MustKeep) -> Hedgehog.assert $ Set.member v subgraphVertices
         _             -> return ()

@@ -250,6 +250,8 @@ prepareTemplate repository template configuration =
             "Merge" <+> pretty a <+> "and" <+> pretty b <+> "as" <+> pretty c
     in
         do
+            logInfo $ "Full branch selection:" <> line <> (indent 4 . pretty)
+                (branchName <$> Set.toList fullSelectedBranches)
             logInfo $ "Merge plan:" <> line <> (indent 4 . vsep)
                 (fmap mergeRecord mergeLog)
             runMergeGraph repository graph fullSelectedBranches

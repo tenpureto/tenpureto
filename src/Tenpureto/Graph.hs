@@ -28,13 +28,14 @@ import           Algebra.Graph.ToGraph          ( ToVertex
                                                 , toAdjacencyMap
                                                 , toAdjacencyMapTranspose
                                                 , adjacencyMap
-                                                , reachable
+                                                , dfs
                                                 )
 import qualified Algebra.Graph.NonEmpty.AdjacencyMap
                                                as NAM
 import           Data.List.NonEmpty             ( NonEmpty(..) )
 import           Algebra.Graph.AdjacencyMap.Algorithm
                                                 ( scc )
+import           Data.Functor
 import           Data.Functor.Identity
 import           Control.Monad
 
@@ -91,7 +92,7 @@ filterMapVertices f x =
         :: (Ord a, Ord b) => G.Graph (a, Maybe b) -> G.Graph (a, Maybe b)
     filterEmptyVertices g = foldr removeIfEmpty g (G.vertexList g)
     removeVertexConnecting v g =
-        let ctx = G.context ((==) v) g
+        let ctx = G.context (v ==) g
             cct c = G.connect (G.vertices (G.inputs c))
                               (G.vertices (G.outputs c))
             g' = G.removeVertex v g
@@ -115,10 +116,7 @@ graphRoots =
 
 graphAncestors :: Ord a => Graph a -> [a] -> [a]
 graphAncestors g vs =
-    let transposed = toAdjacencyMapTranspose g
-    in  Set.toList $ Set.unions $ fmap
-            (Set.fromList . flip reachable transposed)
-            vs
+    let transposed = toAdjacencyMapTranspose g in dfs vs transposed
 
 foldTopologically
     :: (Ord a, Monad m)
@@ -146,9 +144,9 @@ graphSubset f g = runIdentity $ do
   where
     vcombine c ps = return $ case f c of
         MustDrop   -> (must, Nothing)
-        PreferDrop -> (must, fmap (c `Set.insert`) may)
-        PreferKeep -> (must <> maybe mempty (c `Set.insert`) may, Just mempty)
-        MustKeep   -> (c `Set.insert` must <> fromMaybe mempty may, Just mempty)
+        PreferDrop -> (must, fmap (Set.insert c) may)
+        PreferKeep -> (must <> maybe mempty (Set.insert c) may, may $> mempty)
+        MustKeep   -> (Set.insert c must <> fromMaybe mempty may, Just mempty)
       where
         must = foldMap fst ps
         may  = fmap mconcat (traverse snd ps)
