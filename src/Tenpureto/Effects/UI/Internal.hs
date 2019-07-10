@@ -61,10 +61,10 @@ preMergeBranches
     -> Set TemplateBranchInformation
     -> TemplateYaml
 preMergeBranches graph selectedBranches =
-    fold $ runIdentity $ mergeBranchesGraph
-        (\_ _ _ -> return (Committish ""))
-        graph
-        selectedBranches
+    fold $ runIdentity $ mergeBranchesGraph (const ())
+                                            (\_ _ _ -> return ())
+                                            graph
+                                            selectedBranches
 
 inputBranchList
     :: Graph TemplateBranchInformation
@@ -113,7 +113,8 @@ inputBranchList graph availableBranches selectedBranches = vsep $ zipWith6
         $ filterBranchesByNames availableBranches selectedBranches
     mergedYaml           = preMergeBranches graph selectedBranchInformations
     transitivelySelected = (Set.map yamlFeatureName . yamlFeatures) mergedYaml
-    conflictsWithSelected = flip Set.member (yamlConflicts mergedYaml) . branchName
+    conflictsWithSelected =
+        flip Set.member (yamlConflicts mergedYaml) . branchName
     branchLineSelected branch =
         let name        = branchName branch
             selected    = name `Set.member` selectedBranches

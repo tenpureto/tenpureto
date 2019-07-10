@@ -30,9 +30,8 @@ import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Process
 import           Tenpureto.Effects.Git
 import           Tenpureto.Effects.UI
-import           Tenpureto.Effects.FeatureMerger
+import           Tenpureto.FeatureMerger
 import           Tenpureto.TemplateLoader
-import           Tenpureto.MergeOptimizer
 import           Tenpureto.Templater
 import           Tenpureto.Internal
 
@@ -241,11 +240,16 @@ prepareTemplate
     -> FinalProjectConfiguration
     -> Sem r TemplateYaml
 prepareTemplate repository template configuration =
-    runFeatureMergerGit repository
-        $   mergeBranchesGraph mergeCommits
-                               (branchesGraph template)
-                               (Set.fromList $ projectBranches configuration)
-        >>= maybe (throw TenpuretoEmptySelection) return
+    let graph            = branchesGraph template
+        selectedBranches = Set.fromList $ projectBranches configuration
+        (mergeLog, _)    = runMergeGraphPure graph selectedBranches
+        mergeRecord (MergeRecord a b c) =
+                "Merge" <+> pretty a <+> "and" <+> pretty b <+> "as" <+> pretty c
+    in  do
+            logInfo $ "Merge plan:" <> line <> (indent 4 . vsep)
+                (fmap mergeRecord mergeLog)
+            runMergeGraph repository graph selectedBranches
+                >>= maybe (throw TenpuretoEmptySelection) return
 
 commit_
     :: Members '[Git, Error TenpuretoException] r

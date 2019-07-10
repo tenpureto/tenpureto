@@ -22,11 +22,9 @@ import           Tenpureto.TemplateLoader       ( TemplateInformation
                                                 , requiredBranches
                                                 , branchVariables
                                                 )
-import           Tenpureto.Effects.Git          ( Committish )
 
-
-data MergedBranchInformation = MergedBranchInformation
-    { mergedBranchCommit :: Committish
+data MergedBranchInformation a = MergedBranchInformation
+    { mergedBranchMeta :: a
     , mergedBranchDescriptor :: MergedBranchDescriptor
     }
     deriving (Show, Eq, Ord)
@@ -46,14 +44,17 @@ descriptorToTemplateYaml d = TemplateYaml { yamlVariables = mergedVariables d
                                           , yamlConflicts = mergedConflicts d
                                           }
 
-mergedBranchInformationToTemplateYaml :: MergedBranchInformation -> TemplateYaml
+mergedBranchInformationToTemplateYaml
+    :: MergedBranchInformation a -> TemplateYaml
 mergedBranchInformationToTemplateYaml =
     descriptorToTemplateYaml . mergedBranchDescriptor
 
 templateBranchInformationData
-    :: TemplateBranchInformation -> MergedBranchInformation
-templateBranchInformationData bi = MergedBranchInformation
-    { mergedBranchCommit     = branchCommit bi
+    :: (TemplateBranchInformation -> a)
+    -> TemplateBranchInformation
+    -> MergedBranchInformation a
+templateBranchInformationData extract bi = MergedBranchInformation
+    { mergedBranchMeta       = extract bi
     , mergedBranchDescriptor =
         MergedBranchDescriptor
             { mergedVariables = branchVariables bi
@@ -82,27 +83,32 @@ includeMergeBranches template branches =
     in  nub $ branches ++ filter isMerge allBranches
 
 mergeBranchesGraph
-    :: Monad m
-    => (Committish -> Committish -> MergedBranchDescriptor -> m Committish)
+    :: (Ord a, Monad m)
+    => (TemplateBranchInformation -> a)
+    -> (a -> a -> MergedBranchDescriptor -> m a)
     -> Graph TemplateBranchInformation
     -> Set TemplateBranchInformation
     -> m (Maybe TemplateYaml)
-mergeBranchesGraph mergeCommits graph selectedBranches =
+mergeBranchesGraph extract mergeCommits graph selectedBranches =
     fmap (fmap mergedBranchInformationToTemplateYaml)
         $ mergeGraph mergeCommits
-        $ mapVertices templateBranchInformationData
-        $ graphSubset vertexDecision graph
-  where
-    vertexDecision v | v `Set.member` selectedBranches = MustKeep
-                     | isHiddenBranch v                = PreferDrop
-                     | isFeatureBranch v               = MustDrop
-                     | otherwise                       = PreferKeep
+        $ mapVertices (templateBranchInformationData extract)
+        $ graphSubset (vertexDecision selectedBranches) graph
+
+vertexDecision
+    :: Set TemplateBranchInformation
+    -> TemplateBranchInformation
+    -> GraphSubsetDecision
+vertexDecision selectedBranches v | v `Set.member` selectedBranches = MustKeep
+                                  | isHiddenBranch v                = PreferDrop
+                                  | isFeatureBranch v               = MustDrop
+                                  | otherwise                       = PreferKeep
 
 mergeGraph
-    :: Monad m
-    => (Committish -> Committish -> MergedBranchDescriptor -> m Committish)
-    -> Graph MergedBranchInformation
-    -> m (Maybe MergedBranchInformation)
+    :: (Ord a, Monad m)
+    => (a -> a -> MergedBranchDescriptor -> m a)
+    -> Graph (MergedBranchInformation a)
+    -> m (Maybe (MergedBranchInformation a))
 mergeGraph mergeCommits = foldTopologically vcombine hcombine
   where
     vcombineD d1 d2 = MergedBranchDescriptor
@@ -121,10 +127,8 @@ mergeGraph mergeCommits = foldTopologically vcombine hcombine
         let d = combineD (mergedBranchDescriptor b1)
                          (mergedBranchDescriptor b2)
         in  do
-                c <- mergeCommits (mergedBranchCommit b1)
-                                  (mergedBranchCommit b2)
-                                  d
-                return $ MergedBranchInformation { mergedBranchCommit     = c
+                c <- mergeCommits (mergedBranchMeta b1) (mergedBranchMeta b2) d
+                return $ MergedBranchInformation { mergedBranchMeta       = c
                                                  , mergedBranchDescriptor = d
                                                  }
     vcombine = foldM (combine vcombineD)
