@@ -4,6 +4,7 @@ module Tenpureto.FeatureMerger
     ( MergeRecord(..)
     , runMergeGraphPure
     , runMergeGraph
+    , listMergeCombinations
     )
 where
 
@@ -15,8 +16,11 @@ import qualified Data.Text                     as T
 import           Data.Maybe
 import           Data.List
 import           Data.Set                       ( Set )
+import qualified Data.Set                      as Set
+import           Algebra.Graph.ToGraph
 
 import           Tenpureto.Messages
+import           Tenpureto.Graph
 import           Tenpureto.TemplateLoader
 import           Tenpureto.MergeOptimizer
 import           Tenpureto.Effects.Git
@@ -77,3 +81,26 @@ runMergeGraphPure graph selectedBranches =
                   output $ MergeRecord b1 b2 mc
                   return mc
           in  mergeBranchesGraph branchName logMerges graph selectedBranches
+
+listMergeCombinations
+    :: Graph TemplateBranchInformation -> [Set TemplateBranchInformation]
+listMergeCombinations graph =
+    let selectable branch =
+                not (isHiddenBranch branch) && isFeatureBranch branch
+        nodes        = filter selectable $ vertexList graph
+        combinations = subsequences nodes
+        addAncestors = filter selectable . graphAncestors graph
+        noConflicts selected =
+                let conflicts :: Set Text
+                    conflicts =
+                            (maybe mempty yamlConflicts . snd . runMergeGraphPure graph)
+                                selected
+                    selectedNames = Set.map branchName selected
+                in  Set.null (Set.intersection conflicts selectedNames)
+    in  filter noConflicts
+            $   Set.toList
+            .   Set.fromList
+            $   fmap Set.fromList
+            $   filter (not . null)
+            $   addAncestors
+            <$> combinations

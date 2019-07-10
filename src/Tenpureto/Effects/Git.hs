@@ -62,6 +62,7 @@ data Git m a where
     MergeBranch ::GitRepository -> Text -> Git m MergeResult
     MergeAbort ::GitRepository -> Git m ()
     RunMergeTool ::GitRepository -> Git m ()
+    ResetWorktree ::GitRepository -> Git m ()
     GetRepositoryFile ::GitRepository -> Committish -> Path Rel File -> Git m (Maybe ByteString)
     GetWorkingCopyFile ::GitRepository -> Path Rel File -> Git m (Maybe ByteString)
     WriteRepoFile ::GitRepository -> Path Rel File -> ByteString -> Git m ()
@@ -170,9 +171,11 @@ runGit = interpret $ \case
                     >>= asFiles
                     <&> MergeConflicts
 
-    MergeAbort   repo -> gitRepoCmd repo ["merge", "--abort"] >>= asUnit
+    MergeAbort    repo -> gitRepoCmd repo ["merge", "--abort"] >>= asUnit
 
-    RunMergeTool repo -> gitInteractiveRepoCmd repo ["mergetool"]
+    RunMergeTool  repo -> gitInteractiveRepoCmd repo ["mergetool"]
+
+    ResetWorktree repo -> gitRepoCmd repo ["reset", "--hard"] >>= asUnit
 
     GetRepositoryFile repo (Committish c) file ->
         gitRepoCmd repo ["show", c <> ":" <> T.pack (toFilePath file)]

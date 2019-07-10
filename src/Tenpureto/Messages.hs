@@ -96,3 +96,10 @@ deleteBranchManually branch =
     "Cannot delete a branch with a pull request, please delete a \""
         <> pretty branch
         <> "\" branch manually."
+
+noConflictingCombinations :: Doc a
+noConflictingCombinations =
+    "All good, there are no feature combinations that have merge conflicts."
+
+conflictingCombinations :: Doc a
+conflictingCombinations = "The following feature combinations have merge conflicts:"

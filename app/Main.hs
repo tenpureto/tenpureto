@@ -65,6 +65,10 @@ data Command
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
             }
+    | TemplateListConflicts
+            { templateName :: Text
+            , enableDebugLogging :: Bool
+            }
     | TemplateChangeVariable
             { templateName :: Text
             , oldVariableValue :: Text
@@ -245,6 +249,11 @@ propagateChanges =
         <*> unattendedSwitch
         <*> debugSwitch
 
+listConflicts :: Parser Command
+listConflicts = TemplateListConflicts
+        <$> templateNameOption
+        <*> debugSwitch
+
 changeVariableCommand :: Parser Command
 changeVariableCommand =
     TemplateChangeVariable
@@ -279,6 +288,10 @@ templateCommands = hsubparser
            (info propagateChanges
                  (progDesc "Merge a template branch into child branches")
            )
+    <> command
+            "list-conflicts"
+            (info listConflicts
+                (progDesc "List conflicting branch combinations"))
     )
 
 runBaseM :: Sem '[TerminalInput, Terminal, Resource, Lift IO] a -> IO a
@@ -356,6 +369,8 @@ runCommand TemplateRenameBranch { templateName = t, oldBranchName = on, newBranc
     = runAppM d False $ renameTemplateBranch t on nn i
 runCommand TemplatePropagateChanges { templateName = t, branchFilter = bf, remoteChangeMode = cm, runUnattended = u, enableDebugLogging = d }
     = runAppM d u $ propagateTemplateBranchChanges t bf cm
+runCommand TemplateListConflicts { templateName = t, enableDebugLogging = d }
+    = runAppM d True $ listTemplateConflicts t
 runCommand TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d False $ changeTemplateVariableValue t ov nv i
 

@@ -11,7 +11,7 @@ import           Polysemy.Resource
 import           Data.List
 import           Data.Maybe
 import           Data.Either
-import           Data.Either.Combinators
+import           Data.Either.Combinators        ( rightToMaybe )
 import           Data.Text                      ( Text )
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
@@ -402,6 +402,34 @@ propagateTemplateBranchChanges template branchFilter pushMode =
                                          (branchName toBranch)
                 }
             else Nothing
+
+listTemplateConflicts
+    :: Members
+           '[Git, UI, Terminal, FileSystem, Logging, Resource, Error
+               TenpuretoException]
+           r
+    => Text
+    -> Sem r ()
+listTemplateConflicts template =
+    withClonedRepository (buildRepositoryUrl template) $ \repo -> do
+        templateInformation <- loadTemplateInformation repo
+        let graph        = branchesGraph templateInformation
+        let combinations = listMergeCombinations graph
+        let
+            keepConflicts combination =
+                either (const $ Just (Set.map branchName combination))
+                       (const Nothing)
+                    <$> try
+                            (  resetWorktree repo
+                            >> runMergeGraph repo graph combination
+                            )
+        conflicting <- catMaybes <$> traverse keepConflicts combinations
+        case conflicting of
+            [] -> sayLn noConflictingCombinations
+            names ->
+                sayLn $ conflictingCombinations <> line <> (indent 4 . vsep)
+                    (fmap pretty names)
+        return ()
 
 changeTemplateVariableValue
     :: Members
