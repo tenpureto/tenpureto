@@ -37,6 +37,7 @@ data FileSystem m a where
     EnsureDir ::Path b Dir -> FileSystem m ()
     EnsureEmptyDir ::Path b Dir -> FileSystem m ()
     ResolveDir ::FilePath -> FileSystem m (Path Abs Dir)
+    ResolveFile ::FilePath -> FileSystem m (Path Abs File)
     IsSymlink ::Path Abs File -> FileSystem m Bool
     GetSymbolicLinkDirTarget::Path b t -> FileSystem m FilePath
     CreateDirectoryLink ::FilePath -> Path Abs File -> FileSystem m ()
@@ -77,6 +78,9 @@ runFileSystemIO = interpret $ \case
     ResolveDir path -> sendM $ E.catch
         (Path.IO.resolveDir' path)
         (\e -> let _ = (e :: PathException) in Path.parseAbsDir path)
+    ResolveFile path -> sendM $ E.catch
+        (Path.IO.resolveFile' path)
+        (\e -> let _ = (e :: PathException) in Path.parseAbsFile path)
     IsSymlink file -> sendM $ Path.IO.isSymlink file
     GetSymbolicLinkDirTarget path ->
         sendM $ System.Directory.getSymbolicLinkTarget (toFilePath path)

@@ -21,6 +21,7 @@ module Tenpureto.TemplateLoader
 where
 
 import           Polysemy
+import           Polysemy.Error
 
 import           Data.List
 import           Data.Maybe
@@ -29,9 +30,11 @@ import           Data.ByteString.Lazy           ( ByteString )
 import qualified Data.ByteString.Lazy          as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
+import           Data.Text.Prettyprint.Doc
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           Data.Bifunctor
+import           Control.Exception              ( displayException )
 import           Control.Monad
 import           Control.Monad.Trans.Maybe
 import qualified Data.Yaml                     as Y
@@ -39,10 +42,17 @@ import qualified Data.Yaml                     as Y
 import           Path
 
 import           Tenpureto.Graph
+import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Git
 import           Tenpureto.TemplateLoader.Internal
 
 import           Tenpureto.Orphanage            ( )
+
+newtype TemplateLoaderException = TemplateYamlParseException Text
+
+instance Pretty TemplateLoaderException where
+    pretty (TemplateYamlParseException msg) =
+        "Template YAML cannot be parsed:" <+> pretty msg
 
 data BranchFilter = BranchFilterAny
                   | BranchFilterNone
@@ -82,6 +92,16 @@ loadBranchConfiguration repo branch = runMaybeT $ do
                                        , branchCommit = branchHead
                                        , templateYaml = info
                                        }
+
+loadTemplateYaml
+    :: Members '[FileSystem, Error TemplateLoaderException] r
+    => Path Abs File
+    -> Sem r TemplateYaml
+loadTemplateYaml file =
+    either (throw . TemplateYamlParseException . T.pack . displayException)
+           return
+        =<< Y.decodeEither'
+        <$> readFileAsByteString file
 
 featureDescription :: TemplateBranchInformation -> Maybe Text
 featureDescription = yamlFeatureDescription <=< templateYamlFeature

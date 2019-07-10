@@ -17,6 +17,7 @@ data TenpuretoException = TemplateBranchNotFoundException Text
                         | TenpuretoEmptyChangeset
                         | TenpuretoGitException GitException
                         | TenpuretoUIException UIException
+                        | TenpuretoTemplateLoaderException TemplateLoaderException
                         | MultipleExceptions [TenpuretoException]
                         | CancelledException
 
@@ -31,8 +32,9 @@ instance Pretty TenpuretoException where
         "Cannot create a project from an empty selection"
     pretty TenpuretoEmptyChangeset =
         "Cannot create a commit because the changeset is empty"
-    pretty (TenpuretoGitException e) = pretty e
-    pretty (TenpuretoUIException  e) = pretty e
+    pretty (TenpuretoGitException            e) = pretty e
+    pretty (TenpuretoUIException             e) = pretty e
+    pretty (TenpuretoTemplateLoaderException e) = pretty e
     pretty (MultipleExceptions ee) =
         "Multiple failures:\n" <> (align . vsep) (fmap pretty ee)
     pretty CancelledException = "Cancelled by a user"

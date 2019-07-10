@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Main where
 
 import           Polysemy
@@ -9,6 +10,7 @@ import           Data.Semigroup                 ( (<>) )
 import           Data.Foldable
 import           Data.Maybe
 import           Data.Text                      ( Text )
+import qualified Data.Set                      as Set
 import           Data.Version
 import           Data.Functor
 
@@ -21,7 +23,7 @@ import           Tenpureto.Effects.Terminal
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Process
 import           Tenpureto.Effects.UI
-import           Tenpureto.TemplateLoader       ( BranchFilter(..) )
+import           Tenpureto.TemplateLoader
 import           Tenpureto
 
 import           Paths_tenpureto                ( version )
@@ -31,6 +33,7 @@ data Command
     = Create
             { maybeTemplateName :: Maybe Text
             , maybeTargetDirectory :: Maybe FilePath
+            , maybeProjectConfiguration :: Maybe FilePath
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
             }
@@ -38,6 +41,7 @@ data Command
             { maybeTemplateName :: Maybe Text
             , maybePreviousCommit :: Maybe Text
             , maybeTargetDirectory :: Maybe FilePath
+            , maybeProjectConfiguration :: Maybe FilePath
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
             }
@@ -92,6 +96,10 @@ previousCommitOption = strOption
 targetArgument :: Parser FilePath
 targetArgument = strArgument (metavar "<dir>" <> help "Target directory")
 
+projectConfiguratonOption :: Parser FilePath
+projectConfiguratonOption = strOption
+    (long "configuration" <> metavar "<file>" <> help "Project configuration")
+
 unattendedSwitch :: Parser Bool
 unattendedSwitch = switch (long "unattended" <> help "Do not ask anything")
 
@@ -125,7 +133,7 @@ branchFilterNameOption = BranchFilterEqualTo <$> strOption
 branchFilterNamesOption :: Parser BranchFilter
 branchFilterNamesOption = many branchFilterNameOption <&> \case
     [] -> BranchFilterAny
-    bs  -> BranchFilterOr bs
+    bs -> BranchFilterOr bs
 
 branchFilterChildOfOption :: Parser BranchFilter
 branchFilterChildOfOption = BranchFilterChildOf <$> strOption
@@ -144,19 +152,23 @@ branchFilterOptions = BranchFilterAnd <$> (fmap catMaybes . traverse optional)
     [branchFilterChildOfOption, branchFilterParentOfOption]
 
 branchTypeIncludeHiddenFlag :: Parser BranchFilter
-branchTypeIncludeHiddenFlag = flag BranchFilterNone BranchFilterIsHiddenBranch
-        (  long "include-hidden"
-        <> help "Include hidden branches"
-        )
+branchTypeIncludeHiddenFlag = flag
+    BranchFilterNone
+    BranchFilterIsHiddenBranch
+    (long "include-hidden" <> help "Include hidden branches")
 
 branchTypeIncludeMergesFlag :: Parser BranchFilter
-branchTypeIncludeMergesFlag = flag BranchFilterNone BranchFilterIsMergeBranch
-                (  long "include-merges"
-                <> help "Include merge branches"
-                )
+branchTypeIncludeMergesFlag = flag
+    BranchFilterNone
+    BranchFilterIsMergeBranch
+    (long "include-merges" <> help "Include merge branches")
 
 branchTypeFilterOption :: Parser BranchFilter
-branchTypeFilterOption = BranchFilterOr <$> sequenceA [pure BranchFilterIsFeatureBranch, branchTypeIncludeHiddenFlag, branchTypeIncludeMergesFlag]
+branchTypeFilterOption = BranchFilterOr <$> sequenceA
+    [ pure BranchFilterIsFeatureBranch
+    , branchTypeIncludeHiddenFlag
+    , branchTypeIncludeMergesFlag
+    ]
 
 oldVariableValueOption :: Parser Text
 oldVariableValueOption = strOption
@@ -175,9 +187,9 @@ pullRequestFlag = flag'
 
 pullRequestMergeFlag :: Parser Bool
 pullRequestMergeFlag = switch
-        (  long "pull-request-merge-commit"
-        <> help "Create a pull request from a merge commit"
-        )
+    (  long "pull-request-merge-commit"
+    <> help "Create a pull request from a merge commit"
+    )
 
 pullRequestLabelOption :: Parser Text
 pullRequestLabelOption = strOption
@@ -209,6 +221,7 @@ createCommand =
     Create
         <$> optional templateNameOption
         <*> optional targetArgument
+        <*> optional projectConfiguratonOption
         <*> unattendedSwitch
         <*> debugSwitch
 
@@ -218,11 +231,16 @@ updateCommand =
         <$> optional templateNameOption
         <*> optional previousCommitOption
         <*> optional targetArgument
+        <*> optional projectConfiguratonOption
         <*> unattendedSwitch
         <*> debugSwitch
 
 templateGraphCommand :: Parser Command
-templateGraphCommand = TemplateGraph <$> templateNameOption <*> branchTypeFilterOption <*> debugSwitch
+templateGraphCommand =
+    TemplateGraph
+        <$> templateNameOption
+        <*> branchTypeFilterOption
+        <*> debugSwitch
 
 templateListBranchesCommand :: Parser Command
 templateListBranchesCommand =
@@ -250,9 +268,7 @@ propagateChanges =
         <*> debugSwitch
 
 listConflicts :: Parser Command
-listConflicts = TemplateListConflicts
-        <$> templateNameOption
-        <*> debugSwitch
+listConflicts = TemplateListConflicts <$> templateNameOption <*> debugSwitch
 
 changeVariableCommand :: Parser Command
 changeVariableCommand =
@@ -289,9 +305,10 @@ templateCommands = hsubparser
                  (progDesc "Merge a template branch into child branches")
            )
     <> command
-            "list-conflicts"
-            (info listConflicts
-                (progDesc "List conflicting branch combinations"))
+           "list-conflicts"
+           (info listConflicts
+                 (progDesc "List conflicting branch combinations")
+           )
     )
 
 runBaseM :: Sem '[TerminalInput, Terminal, Resource, Lift IO] a -> IO a
@@ -302,15 +319,40 @@ runAppM
     => Bool
     -> Bool
     -> Sem
-           (GitServer ': Git ': Process ': Logging ': UI ': FileSystem ': Error
-               UIException ': Error GitException ': Error TenpuretoException ': r)
+           ( GitServer
+                 ':
+                 Git
+                 ':
+                 Process
+                 ':
+                 Logging
+                 ':
+                 UI
+                 ':
+                 FileSystem
+                 ':
+                 Error
+                 TemplateLoaderException
+                 ':
+                 Error
+                 UIException
+                 ':
+                 Error
+                 GitException
+                 ':
+                 Error
+                 TenpuretoException
+                 ':
+                 r
+           )
            a
     -> Sem r a
 runAppM withDebug unattended =
-        runTenpuretoException
+    runTenpuretoException
         . runError @TenpuretoException
         . runErrorAsAnother TenpuretoGitException
         . runErrorAsAnother TenpuretoUIException
+        . runErrorAsAnother TenpuretoTemplateLoaderException
         . runFileSystemIO
         . runUI unattended
         . runLoggingTerminal (if withDebug then Debug else Silent)
@@ -338,43 +380,56 @@ runUI
 runUI False = runUIInTerminal
 runUI True  = runUIUnattended
 
-runCommand :: Members '[TerminalInput, Terminal, Resource, Lift IO] r => Command -> Sem r ()
-runCommand Create { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
+runCommand
+    :: Members '[TerminalInput, Terminal, Resource, Lift IO] r
+    => Command
+    -> Sem r ()
+runCommand Create { maybeTemplateName = t, maybeTargetDirectory = td, maybeProjectConfiguration = c, runUnattended = u, enableDebugLogging = d }
     = runAppM d u $ do
         resolvedTd <- traverse resolveDir td
+        resolvedC  <- traverse resolveFile c
+        maybeYaml  <- traverse loadTemplateYaml resolvedC
         createProject PreliminaryProjectConfiguration
             { preSelectedTemplate       = t
             , preTargetDirectory        = resolvedTd
             , prePreviousTemplateCommit = Nothing
-            , preSelectedBranches       = Nothing
-            , preVariableValues         = Nothing
+            , preSelectedBranches       = Set.map yamlFeatureName
+                .   yamlFeatures
+                <$> maybeYaml
+            , preVariableValues         = yamlVariables <$> maybeYaml
             }
-runCommand Update { maybeTemplateName = t, maybeTargetDirectory = td, maybePreviousCommit = pc, runUnattended = u, enableDebugLogging = d }
+runCommand Update { maybeTemplateName = t, maybeTargetDirectory = td, maybeProjectConfiguration = c, maybePreviousCommit = pc, runUnattended = u, enableDebugLogging = d }
     = runAppM d u $ do
         resolvedTd    <- resolveDir (fromMaybe "." td)
+        resolvedC     <- traverse resolveFile c
+        maybeYaml     <- traverse loadTemplateYaml resolvedC
         currentConfig <- loadExistingProjectConfiguration resolvedTd
-        let inputConfig = PreliminaryProjectConfiguration
+        let
+            inputConfig = PreliminaryProjectConfiguration
                 { preSelectedTemplate       = t
                 , preTargetDirectory        = Just resolvedTd
                 , prePreviousTemplateCommit = fmap Committish pc
-                , preSelectedBranches       = Nothing
-                , preVariableValues         = Nothing
+                , preSelectedBranches       = Set.map yamlFeatureName
+                    .   yamlFeatures
+                    <$> maybeYaml
+                , preVariableValues         = yamlVariables <$> maybeYaml
                 }
         updateProject (inputConfig <> currentConfig)
-runCommand TemplateGraph { templateName = t, branchFilter = bf, enableDebugLogging = d } =
-    runAppM d True $ generateTemplateGraph t bf
+runCommand TemplateGraph { templateName = t, branchFilter = bf, enableDebugLogging = d }
+    = runAppM d True $ generateTemplateGraph t bf
 runCommand TemplateListBranches { templateName = t, branchFilter = bf, enableDebugLogging = d }
     = runAppM d True $ listTemplateBranches t bf
 runCommand TemplateRenameBranch { templateName = t, oldBranchName = on, newBranchName = nn, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d False $ renameTemplateBranch t on nn i
 runCommand TemplatePropagateChanges { templateName = t, branchFilter = bf, remoteChangeMode = cm, runUnattended = u, enableDebugLogging = d }
     = runAppM d u $ propagateTemplateBranchChanges t bf cm
-runCommand TemplateListConflicts { templateName = t, enableDebugLogging = d }
-    = runAppM d True $ listTemplateConflicts t
+runCommand TemplateListConflicts { templateName = t, enableDebugLogging = d } =
+    runAppM d True $ listTemplateConflicts t
 runCommand TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d False $ changeTemplateVariableValue t ov nv i
 
-runOptParser :: Members '[TerminalInput, Terminal, Resource, Lift IO] r => Sem r ()
+runOptParser
+    :: Members '[TerminalInput, Terminal, Resource, Lift IO] r => Sem r ()
 runOptParser = do
     w <- fromMaybe 80 <$> terminalWidth
     let p = prefs (showHelpOnEmpty <> columns w)

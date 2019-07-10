@@ -106,6 +106,7 @@ runFileSystemPure = reinterpret $ \case
     EnsureDir                _        -> throwE NotImplemented
     EnsureEmptyDir           _        -> throwE NotImplemented
     ResolveDir               _        -> throwE NotImplemented
+    ResolveFile              _        -> throwE NotImplemented
     IsSymlink                _        -> throwE NotImplemented
     GetSymbolicLinkDirTarget _        -> throwE NotImplemented
     CreateDirectoryLink _ _           -> throwE NotImplemented
