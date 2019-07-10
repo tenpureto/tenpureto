@@ -252,6 +252,13 @@ isMergeBranch' bis b = any (isMergeOf b) mergeOptions
     fb           = filter isFeatureBranch bis
     mergeOptions = filter ((<) 1 . length) (subsequences fb)
 
+isMergeBranch :: TemplateInformation -> TemplateBranchInformation -> Bool
+isMergeBranch t = isMergeBranch' (branchesInformation t)
+
+managedBranches :: TemplateInformation -> [TemplateBranchInformation]
+managedBranches t = filter (\b -> isFeatureBranch b || isMergeBranch t b)
+                           (branchesInformation t)
+
 templateInformation :: [TemplateBranchInformation] -> TemplateInformation
 templateInformation branches =
     let isManagedBranch b = isFeatureBranch b || isMergeBranch' branches b

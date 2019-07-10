@@ -1,25 +1,17 @@
 module Tenpureto.MergeOptimizer where
 
 import           Data.Text                      ( Text )
-import           Data.List
 import qualified Data.Set                      as Set
 import           Data.Set                       ( Set )
 import           Data.Map                       ( Map )
-import           Data.Graph                     ( graphFromEdges
-                                                , topSort
-                                                )
 import           Control.Monad
 
 import           Tenpureto.Graph
-import           Tenpureto.TemplateLoader       ( TemplateInformation
-                                                , TemplateBranchInformation(..)
+import           Tenpureto.TemplateLoader       ( TemplateBranchInformation(..)
                                                 , TemplateYaml(..)
                                                 , TemplateYamlFeature
-                                                , managedBranches
-                                                , isMergeOf
                                                 , isFeatureBranch
                                                 , isHiddenBranch
-                                                , requiredBranches
                                                 , branchVariables
                                                 )
 
@@ -63,24 +55,6 @@ templateBranchInformationData extract bi = MergedBranchInformation
             , mergedFeatures  = (yamlFeatures . templateYaml) bi
             }
     }
-
-reorderBranches :: [TemplateBranchInformation] -> [TemplateBranchInformation]
-reorderBranches branches =
-    let mkEdge bi = (bi, branchName bi, Set.toList (requiredBranches bi))
-        (graph, nodeFromVertex, _) = graphFromEdges (fmap mkEdge branches)
-        topo                       = topSort graph
-        fst3 (a, _, _) = a
-    in  fmap (fst3 . nodeFromVertex) topo
-
-includeMergeBranches
-    :: TemplateInformation
-    -> [TemplateBranchInformation]
-    -> [TemplateBranchInformation]
-includeMergeBranches template branches =
-    let allBranches  = managedBranches template
-        mergeOptions = filter ((<) 1 . length) (subsequences branches)
-        isMerge bi = any (isMergeOf bi) mergeOptions
-    in  nub $ branches ++ filter isMerge allBranches
 
 mergeBranchesGraph
     :: (Ord a, Monad m)

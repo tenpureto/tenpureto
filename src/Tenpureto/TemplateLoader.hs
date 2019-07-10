@@ -11,12 +11,12 @@ module Tenpureto.TemplateLoader
     , TemplateYaml(..)
     , TemplateYamlFeature
     , yamlFeatureName
-    , requiredBranches
     , branchVariables
     , Graph
     , isFeatureBranch
     , isHiddenBranch
-    , isMergeOf
+    , isMergeBranch
+    , requiredBranches
     )
 where
 
@@ -89,18 +89,11 @@ featureDescription = yamlFeatureDescription <=< templateYamlFeature
 featureStability :: TemplateBranchInformation -> FeatureStability
 featureStability = maybe Stable yamlFeatureStability . templateYamlFeature
 
-isMergeBranch :: TemplateInformation -> TemplateBranchInformation -> Bool
-isMergeBranch t = isMergeBranch' (branchesInformation t)
-
 branchesConflict
     :: TemplateBranchInformation -> TemplateBranchInformation -> Bool
 branchesConflict a b =
     Set.member (branchName b) (yamlConflicts $ templateYaml a)
         || Set.member (branchName a) (yamlConflicts $ templateYaml b)
-
-managedBranches :: TemplateInformation -> [TemplateBranchInformation]
-managedBranches t = filter (\b -> isFeatureBranch b || isMergeBranch t b)
-                           (branchesInformation t)
 
 parseTemplateYaml :: ByteString -> Either Text TemplateYaml
 parseTemplateYaml yaml =
