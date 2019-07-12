@@ -1,9 +1,12 @@
+{-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE LambdaCase #-}
+
 module Main where
 
 import           Polysemy
 import           Polysemy.Error
 import           Polysemy.Resource
+import           Polysemy.IdempotentLowering
 
 import           Options.Applicative
 import           Data.Semigroup                 ( (<>) )
@@ -311,11 +314,8 @@ templateCommands = hsubparser
            )
     )
 
-runBaseM :: Sem '[TerminalInput, Terminal, Resource, Lift IO] a -> IO a
-runBaseM = (runM .@ runResourceInIO) . runTerminalIO
-
 runAppM
-    :: Members '[TerminalInput, Terminal, Resource, Lift IO] r
+    :: Members '[Terminal, Resource, Lift IO] r
     => Bool
     -> Bool
     -> Sem
@@ -330,6 +330,8 @@ runAppM
                  UI
                  ':
                  FileSystem
+                 ':
+                 TerminalInput
                  ':
                  Error
                  TemplateLoaderException
@@ -353,6 +355,7 @@ runAppM withDebug unattended =
         . runErrorAsAnother TenpuretoGitException
         . runErrorAsAnother TenpuretoUIException
         . runErrorAsAnother TenpuretoTemplateLoaderException
+        . runTerminalIOInput
         . runFileSystemIO
         . runUI unattended
         . runLoggingTerminal (if withDebug then Debug else Silent)
@@ -381,7 +384,7 @@ runUI False = runUIInTerminal
 runUI True  = runUIUnattended
 
 runCommand
-    :: Members '[TerminalInput, Terminal, Resource, Lift IO] r
+    :: Members '[Terminal, Resource, Lift IO] r
     => Command
     -> Sem r ()
 runCommand Create { maybeTemplateName = t, maybeTargetDirectory = td, maybeProjectConfiguration = c, runUnattended = u, enableDebugLogging = d }
@@ -429,7 +432,7 @@ runCommand TemplateChangeVariable { templateName = t, oldVariableValue = ov, new
     = runAppM d False $ changeTemplateVariableValue t ov nv i
 
 runOptParser
-    :: Members '[TerminalInput, Terminal, Resource, Lift IO] r => Sem r ()
+    :: Members '[Terminal, Resource, Lift IO] r => Sem r ()
 runOptParser = do
     w <- fromMaybe 80 <$> terminalWidth
     let p = prefs (showHelpOnEmpty <> columns w)
@@ -453,4 +456,6 @@ runOptParser = do
     opts = info (commands <**> versionOption <**> helper) fullDesc
 
 main :: IO ()
-main = runBaseM runOptParser
+main = do
+    handler <- nat (runM @IO) .@! runTerminalIOOutput .@! liftNat runResourceInIO
+    handler runOptParser

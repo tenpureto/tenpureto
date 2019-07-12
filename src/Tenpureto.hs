@@ -423,7 +423,10 @@ listTemplateConflicts template =
                             (  resetWorktree repo
                             >> runMergeGraph repo graph combination
                             )
-        conflicting <- catMaybes <$> traverse keepConflicts combinations
+        let info = pretty . Set.map branchName
+        conflicting <-
+            catMaybes
+                <$> traverseWithProgressBar info keepConflicts combinations
         case conflicting of
             [] -> sayLn noConflictingCombinations
             names ->

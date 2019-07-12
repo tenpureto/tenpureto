@@ -34,6 +34,7 @@ dependencies:
 - Glob
 - file-embed
 - polysemy >= 0.5.0.1
+- polysemy-zoo
 - polysemy-plugin
 
 ghc-options: -O2 -fplugin=Polysemy.Plugin -flate-specialise -fspecialise-aggressively
