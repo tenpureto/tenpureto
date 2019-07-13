@@ -249,7 +249,7 @@ prepareTemplate repository template configuration =
         mergeRecord (MergeRecord a b c) =
             "Merge" <+> pretty a <+> "and" <+> pretty b <+> "as" <+> pretty c
     in
-        do
+        withMergeCache $ do
             logInfo $ "Full branch selection:" <> line <> (indent 4 . pretty)
                 (branchName <$> Set.toList fullSelectedBranches)
             logInfo $ "Merge plan:" <> line <> (indent 4 . vsep)
@@ -411,28 +411,29 @@ listTemplateConflicts
     => Text
     -> Sem r ()
 listTemplateConflicts template =
-    withClonedRepository (buildRepositoryUrl template) $ \repo -> do
-        templateInformation <- loadTemplateInformation repo
-        let graph        = branchesGraph templateInformation
-        let combinations = listMergeCombinations graph
-        let
-            keepConflicts combination =
-                either (const $ Just (Set.map branchName combination))
-                       (const Nothing)
-                    <$> try
-                            (  resetWorktree repo
-                            >> runMergeGraph repo graph combination
-                            )
-        let info = pretty . Set.map branchName
-        conflicting <-
-            catMaybes
-                <$> traverseWithProgressBar info keepConflicts combinations
-        case conflicting of
-            [] -> sayLn noConflictingCombinations
-            names ->
-                sayLn $ conflictingCombinations <> line <> (indent 4 . vsep)
-                    (fmap pretty names)
-        return ()
+    withClonedRepository (buildRepositoryUrl template) $ \repo ->
+        withMergeCache $ do
+            templateInformation <- loadTemplateInformation repo
+            let graph        = branchesGraph templateInformation
+            let combinations = listMergeCombinations graph
+            let
+                keepConflicts combination =
+                    either (const $ Just (Set.map branchName combination))
+                           (const Nothing)
+                        <$> try
+                                (  resetWorktree repo
+                                >> runMergeGraph repo graph combination
+                                )
+            let info = pretty . Set.map branchName
+            conflicting <-
+                catMaybes
+                    <$> traverseWithProgressBar info keepConflicts combinations
+            case conflicting of
+                [] -> sayLn noConflictingCombinations
+                names ->
+                    sayLn $ conflictingCombinations <> line <> (indent 4 . vsep)
+                        (fmap pretty names)
+            return ()
 
 changeTemplateVariableValue
     :: Members

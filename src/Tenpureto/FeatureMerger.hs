@@ -2,6 +2,7 @@
 
 module Tenpureto.FeatureMerger
     ( MergeRecord(..)
+    , withMergeCache
     , runMergeGraphPure
     , runMergeGraph
     , listMergeCombinations
@@ -11,12 +12,14 @@ where
 import           Polysemy
 import           Polysemy.Input
 import           Polysemy.Output
+import           Polysemy.State
 
 import qualified Data.Text                     as T
 import           Data.Maybe
 import           Data.List
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
+import qualified Data.Map                      as Map
 import           Algebra.Graph.ToGraph
 
 import           Tenpureto.Messages
@@ -62,14 +65,26 @@ mergeCommits repo (b1c, b1n) (b2c, b2n) d = do
                             MergeTool ->
                                 runMergeTool repo >> sayLn mergeSuccess
 
+withMergeCache :: Sem (State MergeCache ': r) a -> Sem r a
+withMergeCache = fmap snd . runState mempty
+
 runMergeGraph
-    :: Members '[Git, UI, Terminal] r
+    :: Members '[Git, UI, Terminal, State MergeCache] r
     => GitRepository
     -> Graph TemplateBranchInformation
     -> Set TemplateBranchInformation
     -> Sem r (Maybe TemplateYaml)
-runMergeGraph repo = mergeBranchesGraph branchData (mergeCommits repo)
-    where branchData bi = (branchCommit bi, Leaf (branchName bi))
+runMergeGraph repo = mergeBranchesGraph branchData mergeCommitsCached
+  where
+    mergeCommitsCached a b d = do
+        cache <- get
+        case Map.lookup (a, b) cache of
+            Just r  -> return r
+            Nothing -> do
+                r <- mergeCommits repo a b d
+                modify (Map.insert (a, b) r)
+                return r
+    branchData bi = (branchCommit bi, Leaf (branchName bi))
 
 runMergeGraphPure
     :: Graph TemplateBranchInformation
