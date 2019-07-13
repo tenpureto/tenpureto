@@ -8,6 +8,7 @@ import           Data.Text.Prettyprint.Doc
 import           Data.Text.Prettyprint.Doc.Render.Terminal
 import           Data.Functor
 import           Data.Traversable
+import           Control.Monad
 
 import           System.IO                      ( stdout
                                                 , hFlush
@@ -46,8 +47,9 @@ sayLnTerminal' msg = sayTerminal' (msg <> "\n")
 
 clearLastLinesTerminal :: Int -> IO ()
 clearLastLinesTerminal n = do
-    cursorUp n
-    setCursorColumn 0
+    when (n > 0) $ do
+        cursorUp n
+        setCursorColumn 0
     clearFromCursorToScreenEnd
 
 askTerminalH :: Doc AnsiStyle -> Maybe Text -> IO (Text, Int)
