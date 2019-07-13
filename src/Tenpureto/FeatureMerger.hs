@@ -26,6 +26,7 @@ import           Tenpureto.MergeOptimizer
 import           Tenpureto.Effects.Git
 import           Tenpureto.Effects.UI
 import           Tenpureto.Effects.Terminal
+import           Tenpureto.FeatureMerger.Internal
 
 data MergeRecord = MergeRecord Text Text Text
     deriving (Show, Eq)
@@ -33,21 +34,22 @@ data MergeRecord = MergeRecord Text Text Text
 mergeCommits
     :: Members '[Git, UI, Terminal] r
     => GitRepository
-    -> Committish
-    -> Committish
+    -> (Committish, Tree Text)
+    -> (Committish, Tree Text)
     -> MergedBranchDescriptor
-    -> Sem r Committish
-mergeCommits repo b1 b2 d = do
-    checkoutBranch repo (unCommittish b1) Nothing
-    mergeResult <- mergeBranch repo (unCommittish b2)
+    -> Sem r (Committish, Tree Text)
+mergeCommits repo (b1c, b1n) (b2c, b2n) d = do
+    checkoutBranch repo (unCommittish b1c) Nothing
+    mergeResult <- mergeBranch repo (unCommittish b2c)
     writeAddFile repo
                  templateYamlFile
                  (formatTemplateYaml (descriptorToTemplateYaml d))
     case mergeResult of
         MergeSuccess                  -> return ()
         MergeConflicts mergeConflicts -> resolve d mergeConflicts
-    maybeC <- commit repo "Merge"
-    return $ fromMaybe b1 maybeC
+    let mergedTree = Node "*" [b1n, b2n]
+    maybeC <- commit repo ("Merge\n\n" <> showTree mergedTree)
+    return (fromMaybe b1c maybeC, mergedTree)
   where
     resolve _ [] = return ()
     resolve descriptor mergeConflicts =
@@ -66,7 +68,8 @@ runMergeGraph
     -> Graph TemplateBranchInformation
     -> Set TemplateBranchInformation
     -> Sem r (Maybe TemplateYaml)
-runMergeGraph repo = mergeBranchesGraph branchCommit (mergeCommits repo)
+runMergeGraph repo = mergeBranchesGraph branchData (mergeCommits repo)
+    where branchData bi = (branchCommit bi, Leaf (branchName bi))
 
 runMergeGraphPure
     :: Graph TemplateBranchInformation
