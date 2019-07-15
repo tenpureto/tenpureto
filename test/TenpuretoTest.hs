@@ -9,7 +9,6 @@ import           Path
 
 import           Tenpureto.Data
 import           Tenpureto.Messages
-import           Tenpureto.Effects.Git
 
 import           Tenpureto
 
@@ -28,13 +27,3 @@ test_extractTemplateName =
             $   extractTemplateName "A\n\nTemplate foo/bar"
             @?= Nothing
         ]
-
-test_buildRepositoryUrl :: [TestTree]
-test_buildRepositoryUrl =
-    [ testCase "should build from org/repo"
-        $   buildRepositoryUrl "f_o-o/b_a-r.r"
-        @?= RepositoryUrl "git@github.com:f_o-o/b_a-r.r.git"
-    , testCase "should build from git url"
-        $   buildRepositoryUrl "git@github.com:foo/bar.git"
-        @?= RepositoryUrl "git@github.com:foo/bar.git"
-    ]

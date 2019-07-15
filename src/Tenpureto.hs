@@ -181,7 +181,7 @@ withPreparedTemplate projectConfiguration block = do
     finalTemplateConfiguration <- makeFinalTemplateConfiguration
         projectConfiguration
     withClonedRepository
-            (buildRepositoryUrl $ selectedTemplate finalTemplateConfiguration)
+            (parseRepositoryUri $ selectedTemplate finalTemplateConfiguration)
         $ \repository -> do
               templateInformation <- loadTemplateInformation repository
               logDebug
@@ -274,7 +274,7 @@ generateTemplateGraph
     -> BranchFilter
     -> Sem r ()
 generateTemplateGraph template branchFilter =
-    withClonedRepository (buildRepositoryUrl template) $ \repo -> do
+    withClonedRepository (parseRepositoryUri template) $ \repo -> do
         templateInformation <- loadTemplateInformation repo
         let graph = filterVertices
                 (applyBranchFilter branchFilter templateInformation)
@@ -291,7 +291,7 @@ listTemplateBranches
     -> BranchFilter
     -> Sem r ()
 listTemplateBranches template branchFilter =
-    withClonedRepository (buildRepositoryUrl template) $ \repo -> do
+    withClonedRepository (parseRepositoryUri template) $ \repo -> do
         templateInformation <- loadTemplateInformation repo
         let branches = getTemplateBranches branchFilter templateInformation
         traverse_ (sayLn . pretty . branchName) branches
@@ -411,7 +411,7 @@ listTemplateConflicts
     => Text
     -> Sem r ()
 listTemplateConflicts template =
-    withClonedRepository (buildRepositoryUrl template) $ \repo ->
+    withClonedRepository (parseRepositoryUri template) $ \repo ->
         withMergeCache $ do
             templateInformation <- loadTemplateInformation repo
             let graph        = branchesGraph templateInformation
@@ -491,7 +491,7 @@ runTemplateChange
     -> (GitRepository -> Sem r [PushSpec])
     -> Sem r ()
 runTemplateChange template interactive changeMode changesNature f =
-    withClonedRepository (buildRepositoryUrl template) $ \repo -> do
+    withClonedRepository (parseRepositoryUri template) $ \repo -> do
         let diff = case changesNature of
                 ExistingChanges -> gitLog
                 NewChanges      -> gitLogDiff
@@ -571,16 +571,6 @@ extractTemplateNameRegex = ICU.regex [ICU.Multiline] "^Template: (.*)$"
 
 extractTemplateName :: Text -> Maybe Text
 extractTemplateName msg = ICU.find extractTemplateNameRegex msg >>= ICU.group 1
-
-orgRepoRegex :: ICU.Regex
-orgRepoRegex = ICU.regex [] "^[\\w-]+/[\\w.-]+$"
-
-buildRepositoryUrl :: Text -> RepositoryUrl
-buildRepositoryUrl url
-    | isJust (ICU.find orgRepoRegex url)
-    = RepositoryUrl $ "git@github.com:" <> url <> ".git"
-    | otherwise
-    = RepositoryUrl url
 
 isChildBranch :: Text -> TemplateBranchInformation -> Bool
 isChildBranch branch bi =

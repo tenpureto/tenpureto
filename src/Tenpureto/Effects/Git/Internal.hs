@@ -5,13 +5,26 @@ module Tenpureto.Effects.Git.Internal where
 import           Polysemy
 import           Polysemy.Error
 
+import           Data.Maybe
+import           Data.Either
 import           Data.ByteString.Lazy           ( ByteString )
 import qualified Data.ByteString.Lazy          as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as E
 import           Data.Text.Prettyprint.Doc
-import           Data.Maybe
+import           Text.Parsec                    ( ParsecT
+                                                , parse
+                                                , choice
+                                                , many1
+                                                , alphaNum
+                                                , char
+                                                , anyChar
+                                                , eof
+                                                , parserFail
+                                                , parserReturn
+                                                )
+import           Control.Applicative
 import           Control.Monad
 import           Data.Aeson                     ( FromJSON
                                                 , ToJSON
@@ -22,11 +35,17 @@ import           Data.Aeson                     ( FromJSON
                                                 )
 import qualified Data.Aeson                    as Aeson
 import           Data.FileEmbed
+import           Data.Functor
+import qualified Path                          as Path
 
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Process
 
 
+data RepositoryLocation = LocalRepository (Path Abs Dir)
+                        | OwnerRepoRepository Text Text
+                        | RemoteRepository Text
+    deriving (Eq, Show)
 newtype GitRepository = GitRepository { repositoryPath :: Path Abs Dir }
 newtype Committish = Committish { unCommittish :: Text } deriving (Show, Eq, Ord)
 
@@ -51,6 +70,12 @@ instance Pretty GitException where
         dquotes "hub" <+> "response cannot be parsed:" <+> pretty msg
 
 type CmdResult = (ExitCode, ByteString, ByteString)
+
+repositoryUrl :: RepositoryLocation -> Text
+repositoryUrl (LocalRepository path) = T.pack (toFilePath path)
+repositoryUrl (OwnerRepoRepository owner repo) =
+    "git@github.com:" <> owner <> "/" <> repo <> ".git"
+repositoryUrl (RemoteRepository url) = url
 
 decodeUtf8 :: ByteString -> Text
 decodeUtf8 = E.decodeUtf8 . BS.toStrict
@@ -100,6 +125,21 @@ asMaybeCommittish
 asMaybeCommittish = fmap (fmap Committish) . asFirstLineText
 
 -- Git --
+
+repositoryLocationParser :: Monad m => ParsecT Text () m RepositoryLocation
+repositoryLocationParser = choice [ownerRepoParser, localRepoParser]
+  where
+    ownerRepoParser = liftA2 OwnerRepoRepository
+                             (many1 ownerCharset <&> T.pack)
+                             (char '/' *> (many1 repoCharset <&> T.pack))
+    localRepoParser = LocalRepository <$> (many anyChar >>= parseAbsDir')
+    ownerCharset    = alphaNum <|> char '-' <|> char '_'
+    repoCharset     = ownerCharset <|> char '.'
+    parseAbsDir'    = either (parserFail . show) parserReturn . Path.parseAbsDir
+
+parseRepositoryUri :: Text -> RepositoryLocation
+parseRepositoryUri url = fromRight (RemoteRepository url)
+    $ parse (repositoryLocationParser <* eof) "repository url" url
 
 gitCmd :: Member Process r => [Text] -> Sem r CmdResult
 gitCmd cmd = runCmd ("git" :| cmd)

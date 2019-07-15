@@ -32,6 +32,7 @@ dependencies:
 - yaml
 - aeson
 - Glob
+- parsec
 - file-embed
 - polysemy >= 0.5.0.1
 - polysemy-zoo

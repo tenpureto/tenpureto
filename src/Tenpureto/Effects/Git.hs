@@ -6,11 +6,13 @@ module Tenpureto.Effects.Git
     , Committish(..)
     , GitRepository(..)
     , GitException
+    , RepositoryLocation(..)
     , Path
     , Abs
     , Rel
     , Dir
     , File
+    , parseRepositoryUri
     )
 where
 
@@ -35,8 +37,6 @@ import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Process
 import           Tenpureto.Effects.Git.Internal
 
-newtype RepositoryUrl = RepositoryUrl Text deriving (Eq, Show)
-
 newtype BranchRef = BranchRef { reference :: Text } deriving (Eq, Show)
 
 data PushSpec = CreateBranch { sourceCommit :: Committish, destinationRef :: BranchRef }
@@ -54,7 +54,7 @@ data MergeResult = MergeSuccess
 
 data Git m a where
     InitRepository ::Path Abs Dir -> Git m GitRepository
-    AddRepositoryOrigin ::GitRepository -> RepositoryUrl -> Git m ()
+    AddRepositoryOrigin ::GitRepository -> RepositoryLocation -> Git m ()
     InitWorktree ::GitRepository -> Committish -> Path Abs Dir -> Git m GitRepository
     DeleteWorktree ::GitRepository -> Path Abs Dir -> Git m ()
     ListBranches ::GitRepository -> Git m [Text]
@@ -100,12 +100,12 @@ withRepository path f = f (GitRepository path)
 
 withClonedRepository
     :: Members '[Resource, FileSystem, Git] r
-    => RepositoryUrl
+    => RepositoryLocation
     -> (GitRepository -> Sem r a)
     -> Sem r a
-withClonedRepository url f = withSystemTempDir "tenpureto" $ \dir -> do
+withClonedRepository location f = withSystemTempDir "tenpureto" $ \dir -> do
     repo <- initRepository dir
-    addRepositoryOrigin repo url
+    addRepositoryOrigin repo location
     f repo
 
 withNewWorktree
@@ -128,8 +128,8 @@ runGit = interpret $ \case
         gitCmd ["init", T.pack (toFilePath dir)] >>= asUnit
         return $ GitRepository dir
 
-    AddRepositoryOrigin repo (RepositoryUrl url) -> do
-        gitRepoCmd repo ["remote", "add", "origin", url] >>= asUnit
+    AddRepositoryOrigin repo location -> do
+        gitRepoCmd repo ["remote", "add", "origin", repositoryUrl location] >>= asUnit
         gitRepoCmd repo ["fetch", "origin"] >>= asUnit
 
     InitWorktree repo (Committish c) dir -> do
