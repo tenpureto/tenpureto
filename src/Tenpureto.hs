@@ -391,26 +391,39 @@ propagateTemplateBranchChanges template branchFilter pushMode =
     propagateFromBranch repo (fromBranch, toBranch) = do
         logInfo
             $   "Checking diff between"
-            <+> pretty fromBranch
+            <+> pretty (branchName fromBranch)
             <+> "and"
-            <+> pretty toBranch
+            <+> pretty (branchName toBranch)
         needsMerge <- gitDiffHasCommits repo
                                         (branchCommit fromBranch)
                                         (branchCommit toBranch)
-        return $ if needsMerge
-            then Just $ UpdateBranch
-                { sourceCommit     = branchCommit fromBranch
-                , sourceRef        = BranchRef $ branchName fromBranch
-                , destinationRef   = BranchRef $ branchName toBranch
-                , pullRequestRef   = BranchRef
-                                     $  branchName fromBranch
-                                     <> "/"
-                                     <> branchName toBranch
-                , pullRequestTitle = pullRequestBranchIntoBranchTitle
-                                         (branchName fromBranch)
-                                         (branchName toBranch)
-                }
-            else Nothing
+        if not needsMerge
+            then return Nothing
+            else do
+                checkoutBranch repo
+                               (unCommittish $ branchCommit toBranch)
+                               Nothing
+                preMergeResult <- mergeBranch
+                    repo
+                    MergeAllowFastForward
+                    (unCommittish $ branchCommit fromBranch)
+                let title = pullRequestBranchIntoBranchTitle
+                        (branchName fromBranch)
+                        (branchName toBranch)
+                maybePreMergeCommit <- case preMergeResult of
+                    MergeSuccessCommitted   -> Just <$> getCurrentHead repo
+                    MergeSuccessUncommitted -> commit repo title
+                    MergeConflicts _        -> mergeAbort repo $> Nothing
+                return $ maybePreMergeCommit <&> \preMergeCommit -> UpdateBranch
+                    { sourceCommit     = preMergeCommit
+                    , sourceRef        = BranchRef $ branchName fromBranch
+                    , destinationRef   = BranchRef $ branchName toBranch
+                    , pullRequestRef   = BranchRef
+                                         $  branchName fromBranch
+                                         <> "/"
+                                         <> branchName toBranch
+                    , pullRequestTitle = title
+                    }
 
 listTemplateConflicts
     :: Members
