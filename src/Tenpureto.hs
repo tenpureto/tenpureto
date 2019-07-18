@@ -377,7 +377,7 @@ propagateTemplateBranchChanges template branchFilter pushMode =
         catMaybes <$> traverse (propagateFromBranch repo) pairs
   where
     propagateFromBranch
-        :: Members '[Logging, Git] r
+        :: Members '[Logging, Git, Error TenpuretoException] r
         => GitRepository
         -> (TemplateBranchInformation, TemplateBranchInformation)
         -> Sem r (Maybe PushSpec)
@@ -403,11 +403,13 @@ propagateTemplateBranchChanges template branchFilter pushMode =
                 let title = pullRequestBranchIntoBranchTitle
                         (branchName fromBranch)
                         (branchName toBranch)
-                maybePreMergeCommit <- case preMergeResult of
-                    MergeSuccessCommitted   -> Just <$> getCurrentHead repo
-                    MergeSuccessUncommitted -> Just <$> commit repo title
-                    MergeConflicts _        -> mergeAbort repo $> Nothing
-                return $ maybePreMergeCommit <&> \preMergeCommit -> UpdateBranch
+                preMergeCommit <- case preMergeResult of
+                    MergeSuccessCommitted   -> getCurrentHead repo
+                    MergeSuccessUncommitted -> commit repo title
+                    MergeConflicts _        -> throw $ TenpuretoMergeConflict
+                        (branchName fromBranch)
+                        (branchName toBranch)
+                return $ Just $ UpdateBranch
                     { sourceCommit     = preMergeCommit
                     , sourceRef        = BranchRef $ branchName fromBranch
                     , destinationRef   = BranchRef $ branchName toBranch
