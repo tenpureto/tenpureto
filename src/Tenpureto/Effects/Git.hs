@@ -53,6 +53,7 @@ data MergeStrategy = MergeNoFastForward
 data MergeResult = MergeSuccessCommitted
                  | MergeSuccessUncommitted
                  | MergeConflicts [Path Rel File]
+                 deriving (Eq, Show)
 
 data Git m a where
     InitRepository ::Path Abs Dir -> Git m GitRepository
@@ -69,7 +70,7 @@ data Git m a where
     GetWorkingCopyFile ::GitRepository -> Path Rel File -> Git m (Maybe ByteString)
     WriteRepoFile ::GitRepository -> Path Rel File -> ByteString -> Git m ()
     AddFiles ::GitRepository -> [Path Rel File] -> Git m ()
-    Commit ::GitRepository -> Text -> Git m (Maybe Committish)
+    Commit ::GitRepository -> Text -> Git m Committish
     FindCommitByRef ::GitRepository -> BranchRef -> Git m (Maybe Committish)
     FindCommitByMessage ::GitRepository -> Text -> Git m (Maybe Committish)
     GetCommitMessage ::GitRepository -> Committish -> Git m Text
@@ -77,6 +78,7 @@ data Git m a where
     GitLog ::GitRepository -> Committish -> Committish -> Git m Text
     GitLogDiff ::GitRepository -> Committish -> Committish -> Git m Text
     ListFiles ::GitRepository -> Git m [Path Rel File]
+    HasChangedFiles ::GitRepository -> Git m Bool
     GetCurrentBranch ::GitRepository -> Git m Text
     GetCurrentHead ::GitRepository -> Git m Committish
     RenameCurrentBranch ::GitRepository -> Text -> Git m ()
@@ -169,9 +171,10 @@ runGit = interpret $ \case
             (["merge", "--no-commit"] <> options strategy <> [branch])
         case mergeResult of
             ExitSuccess ->
-                gitRepoCmd repo ["diff", "--name-only"] >>= asFiles <&> \case
-                    [] -> MergeSuccessCommitted
-                    _  -> MergeSuccessUncommitted
+                gitRepoCmd repo ["rev-parse", "--verify", "MERGE_HEAD"]
+                    <&> \case
+                            (ExitFailure _, _, _) -> MergeSuccessCommitted
+                            (ExitSuccess  , _, _) -> MergeSuccessUncommitted
             ExitFailure _ ->
                 gitRepoCmd repo ["diff", "--name-only", "--diff-filter=U"]
                     >>= asFiles
@@ -205,15 +208,9 @@ runGit = interpret $ \case
             >>= asUnit
 
     Commit repo message -> do
-        staged <-
-            gitRepoCmd repo ["diff", "--cached", "--name-only"] >>= asFiles
-        if null staged
-            then return Nothing
-            else do
-                gitRepoCmd repo ["commit", "--message", message] >>= asUnit
-                gitRepoCmd repo ["rev-parse", "--verify", "HEAD"]
-                    >>= asCommittish
-                    <&> Just
+        gitRepoCmd repo ["commit", "--allow-empty", "--message", message]
+            >>= asUnit
+        gitRepoCmd repo ["rev-parse", "--verify", "HEAD"] >>= asCommittish
 
     FindCommitByRef repo (BranchRef branch) ->
         gitRepoCmd repo ["rev-parse", "--verify", branch] >>= asMaybeCommittish
@@ -248,13 +245,16 @@ runGit = interpret $ \case
 
     ListFiles repo -> gitRepoCmd repo ["ls-files"] >>= asFiles
 
+    HasChangedFiles repo ->
+        gitRepoCmd repo ["status", "--porcelain"] >>= asText <&> (not . T.null)
+
     GetCurrentBranch repo ->
         gitRepoCmd repo ["rev-parse", "--abbrev-ref", "HEAD"]
             >>= asText
             <&> T.strip
 
     GetCurrentHead repo ->
-        gitRepoCmd repo ["rev-parse", "HEAD"] >>= asCommittish
+        gitRepoCmd repo ["rev-parse", "--verify", "HEAD"] >>= asCommittish
 
     RenameCurrentBranch repo name ->
         gitRepoCmd repo ["branch", "--move", name] >>= asUnit

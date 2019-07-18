@@ -46,8 +46,8 @@ mergeCommits repo (b1c, b1n) (b2c, b2n) d = do
     let mergedTree = Node "*" [b1n, b2n]
     checkoutBranch repo (unCommittish b1c) Nothing
     mergeResult <- mergeBranch repo MergeAllowFastForward (unCommittish b2c)
-    maybeC      <- case mergeResult of
-        MergeSuccessCommitted   -> Just <$> getCurrentHead repo
+    c           <- case mergeResult of
+        MergeSuccessCommitted   -> getCurrentHead repo
         MergeSuccessUncommitted -> do
             updateTemplateYaml
             commit repo ("Merge\n\n" <> showTree mergedTree)
@@ -56,7 +56,7 @@ mergeCommits repo (b1c, b1n) (b2c, b2n) d = do
             resolve d mergeConflicts
             commit repo ("Merge\n\n" <> showTree mergedTree)
 
-    return (fromMaybe b1c maybeC, mergedTree)
+    return (c, mergedTree)
   where
     resolve _ [] = return ()
     resolve descriptor mergeConflicts =

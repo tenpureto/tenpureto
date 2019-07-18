@@ -35,7 +35,6 @@ import           Tenpureto.TemplateLoader
 import           Tenpureto.Templater
 import           Tenpureto.Internal
 
-
 data RemoteChangeMode = PushDirectly
                       | UpstreamPullRequest { pullRequestSettings :: PullRequestSettings }
 
@@ -125,22 +124,25 @@ updateProject projectConfiguration = do
                                                 template
                                                 (repositoryPath staging)
                                   addFiles staging files
-                                  result <- commit
-                                      staging
-                                      (commitUpdateMessage
-                                          (selectedTemplate
-                                              finalTemplateConfiguration
-                                          )
-                                      )
-                                  case result of
-                                      Just (Committish c) -> do
+                                  hasChanges <- hasChangedFiles staging
+                                  if hasChanges
+                                      then do
+                                          updatedTemplateCommit <- commit
+                                              staging
+                                              (commitUpdateMessage
+                                                  (selectedTemplate
+                                                      finalTemplateConfiguration
+                                                  )
+                                              )
                                           logInfo
                                               $   "Updated template commit:"
-                                              <+> pretty c
+                                              <+> pretty updatedTemplateCommit
                                           mergeResult <- mergeBranch
                                               project
                                               MergeAllowFastForward
-                                              c
+                                              (unCommittish
+                                                  updatedTemplateCommit
+                                              )
                                           case mergeResult of
                                               MergeSuccessCommitted ->
                                                   sayLn
@@ -167,8 +169,7 @@ updateProject projectConfiguration = do
                                                             (repositoryPath
                                                                 project
                                                             )
-                                      Nothing ->
-                                          sayLn noRelevantTemplateChanges
+                                      else sayLn noRelevantTemplateChanges
 
 withPreparedTemplate
     :: Members
@@ -266,14 +267,6 @@ prepareTemplate repository template configuration =
             runMergeGraph repository graph fullSelectedBranches
                 >>= maybe (throw TenpuretoEmptySelection) return
 
-commit_
-    :: Members '[Git, Error TenpuretoException] r
-    => GitRepository
-    -> Text
-    -> Sem r Committish
-commit_ repo message =
-    commit repo message >>= maybe (throw TenpuretoEmptyChangeset) return
-
 generateTemplateGraph
     :: Members
            '[Git, Terminal, FileSystem, Logging, Resource, Error
@@ -329,7 +322,7 @@ renameTemplateBranch template oldBranch newBranch interactive =
                 writeAddFile repo
                              templateYamlFile
                              (formatTemplateYaml newDescriptor)
-                commit_ repo (commitRenameBranchMessage oldBranch newBranch)
+                commit repo (commitRenameBranchMessage oldBranch newBranch)
         let childBranches = filter (isChildBranch oldBranch) bis
         let deleteOld = DeleteBranch { destinationRef = BranchRef oldBranch }
         pushNew <-
@@ -412,7 +405,7 @@ propagateTemplateBranchChanges template branchFilter pushMode =
                         (branchName toBranch)
                 maybePreMergeCommit <- case preMergeResult of
                     MergeSuccessCommitted   -> Just <$> getCurrentHead repo
-                    MergeSuccessUncommitted -> commit repo title
+                    MergeSuccessUncommitted -> Just <$> commit repo title
                     MergeConflicts _        -> mergeAbort repo $> Nothing
                 return $ maybePreMergeCommit <&> \preMergeCommit -> UpdateBranch
                     { sourceCommit     = preMergeCommit
@@ -487,8 +480,7 @@ changeTemplateVariableValue template oldValue newValue interactive =
                 writeAddFile repo
                              templateYamlFile
                              (formatTemplateYaml newDescriptor)
-                c <- commit_ repo
-                             (commitChangeVariableMessage oldValue newValue)
+                c <- commit repo (commitChangeVariableMessage oldValue newValue)
                 return UpdateBranch
                     { sourceCommit     = c
                     , sourceRef        = BranchRef $ branchName bi
