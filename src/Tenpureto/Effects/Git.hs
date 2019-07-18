@@ -26,13 +26,11 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Functor
 import           Data.List
-import           Data.Maybe
 import           Data.Text.Prettyprint.Doc
 import           Control.Monad
 
 import           Path
 
-import           Tenpureto.Messages
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Process
 import           Tenpureto.Effects.Git.Internal
@@ -49,7 +47,11 @@ data PullRequestSettings = PullRequestSettings { pullRequestAddLabels :: [Text]
                                                , pullRequestPreMerge :: Bool
                                                }
 
-data MergeResult = MergeSuccess
+data MergeStrategy = MergeNoFastForward
+                   | MergeAllowFastForward
+
+data MergeResult = MergeSuccessCommitted
+                 | MergeSuccessUncommitted
                  | MergeConflicts [Path Rel File]
 
 data Git m a where
@@ -59,7 +61,7 @@ data Git m a where
     DeleteWorktree ::GitRepository -> Path Abs Dir -> Git m ()
     ListBranches ::GitRepository -> Git m [Text]
     CheckoutBranch ::GitRepository -> Text -> Maybe Text -> Git m ()
-    MergeBranch ::GitRepository -> Text -> Git m MergeResult
+    MergeBranch ::GitRepository -> MergeStrategy -> Text -> Git m MergeResult
     MergeAbort ::GitRepository -> Git m ()
     RunMergeTool ::GitRepository -> Git m ()
     ResetWorktree ::GitRepository -> Git m ()
@@ -83,7 +85,7 @@ data Git m a where
 makeSem ''Git
 
 data GitServer m a where
-    CreateOrUpdatePullRequest ::GitRepository -> PullRequestSettings -> Committish -> Text -> Text -> Text -> Text -> GitServer m ()
+    CreateOrUpdatePullRequest ::GitRepository -> PullRequestSettings -> Committish -> Text -> Text -> Text -> GitServer m ()
 
 makeSem ''GitServer
 
@@ -129,7 +131,8 @@ runGit = interpret $ \case
         return $ GitRepository dir
 
     AddRepositoryOrigin repo location -> do
-        gitRepoCmd repo ["remote", "add", "origin", repositoryUrl location] >>= asUnit
+        gitRepoCmd repo ["remote", "add", "origin", repositoryUrl location]
+            >>= asUnit
         gitRepoCmd repo ["fetch", "origin"] >>= asUnit
 
     InitWorktree repo (Committish c) dir -> do
@@ -160,16 +163,22 @@ runGit = interpret $ \case
         asName Nothing  = ["checkout", "--detach"]
         asName (Just n) = ["checkout", "-b", n]
 
-    MergeBranch repo branch -> do
+    MergeBranch repo strategy branch -> do
         (mergeResult, _, _) <- gitRepoCmd
             repo
-            ["merge", "--no-commit", "--no-ff", branch]
+            (["merge", "--no-commit"] <> options strategy <> [branch])
         case mergeResult of
-            ExitSuccess -> return MergeSuccess
+            ExitSuccess ->
+                gitRepoCmd repo ["diff", "--name-only"] >>= asFiles <&> \case
+                    [] -> MergeSuccessCommitted
+                    _  -> MergeSuccessUncommitted
             ExitFailure _ ->
                 gitRepoCmd repo ["diff", "--name-only", "--diff-filter=U"]
                     >>= asFiles
                     <&> MergeConflicts
+      where
+        options MergeAllowFastForward = []
+        options MergeNoFastForward    = ["--no-ff"]
 
     MergeAbort    repo -> gitRepoCmd repo ["merge", "--abort"] >>= asUnit
 
@@ -268,71 +277,57 @@ runGitHub
     -> Sem r a
 runGitHub = interpret $ \case
 
-    CreateOrUpdatePullRequest repo settings commitish title originalSource source target
-        -> do
-            commitish' <- preparePullRequestHead
-                (pullRequestPreMerge settings)
-                commitish
-            gitRepoCmd
+    CreateOrUpdatePullRequest repo settings commitish title source target -> do
+        gitRepoCmd
+                repo
+                [ "push"
+                , "origin"
+                , unCommittish commitish <> ":" <> "refs/heads/" <> source
+                ]
+            >>= asUnit
+        owner <- hubApiGraphQL repo hubOwnerQuery [] >>= asApiResponse
+        exitingPullRequests <-
+            hubApiGetCmd
                     repo
-                    [ "push"
-                    , "origin"
-                    , unCommittish commitish' <> ":" <> "refs/heads/" <> source
+                    "/repos/{owner}/{repo}/pulls"
+                    [ ("head", ownerLogin owner <> ":" <> source)
+                    , ("base", target)
                     ]
-                >>= asUnit
-            owner <- hubApiGraphQL repo hubOwnerQuery [] >>= asApiResponse
-            exitingPullRequests <-
-                hubApiGetCmd
+                >>= asApiResponse
+        pullRequest <- case exitingPullRequests of
+            pullRequest : _ -> return pullRequest
+            [] ->
+                hubApiCmd
                         repo
+                        ApiPost
                         "/repos/{owner}/{repo}/pulls"
-                        [ ("head", (ownerLogin owner) <> ":" <> source)
-                        , ("base", target)
-                        ]
+                        PullRequestInputPayload
+                            { pullRequestHead     = source
+                            , pullRequestBase     = target
+                            , setPullRequestTitle = Just title
+                            }
                     >>= asApiResponse
-            pullRequest <- case exitingPullRequests of
-                pullRequest : _ -> return pullRequest
-                [] ->
-                    hubApiCmd
-                            repo
-                            ApiPost
-                            "/repos/{owner}/{repo}/pulls"
-                            PullRequestInputPayload
-                                { pullRequestHead     = source
-                                , pullRequestBase     = target
-                                , setPullRequestTitle = Just title
-                                }
-                        >>= asApiResponse
-            hubApiCmd
-                    repo
-                    ApiPatch
-                    (  "/repos/{owner}/{repo}/issues/"
-                    <> (T.pack . show . pullRequestNumber) pullRequest
-                    )
-                    IssueInputPayload
-                        { setIssueAssignees = nub
-                                              $  fmap
-                                                     assigneeLogin
-                                                     (pullRequestAssignees
-                                                         pullRequest
-                                                     )
-                                              ++ pullRequestAssignTo settings
-                        , setIssueLabels    = nub
-                                              $  fmap
-                                                     labelName
-                                                     (pullRequestLabels pullRequest)
-                                              ++ pullRequestAddLabels settings
-                        }
-                >>= asUnit
-      where
-        preparePullRequestHead False c              = return c
-        preparePullRequestHead True  (Committish c) = do
-            checkoutBranch repo c Nothing
-            mergeResult <- mergeBranch repo ("origin/" <> target)
-            case mergeResult of
-                MergeSuccess -> fromMaybe (Committish c) <$> commit
-                    repo
-                    (commitMergeMessage originalSource target)
-                MergeConflicts _ -> mergeAbort repo *> return (Committish c)
+        hubApiCmd
+                repo
+                ApiPatch
+                (  "/repos/{owner}/{repo}/issues/"
+                <> (T.pack . show . pullRequestNumber) pullRequest
+                )
+                IssueInputPayload
+                    { setIssueAssignees = nub
+                                          $  fmap
+                                                 assigneeLogin
+                                                 (pullRequestAssignees
+                                                     pullRequest
+                                                 )
+                                          ++ pullRequestAssignTo settings
+                    , setIssueLabels    = nub
+                                          $  fmap
+                                                 labelName
+                                                 (pullRequestLabels pullRequest)
+                                          ++ pullRequestAddLabels settings
+                    }
+            >>= asUnit
 
 instance Pretty BranchRef where
     pretty ref = pretty $ reference ref

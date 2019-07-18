@@ -137,9 +137,18 @@ updateProject projectConfiguration = do
                                           logInfo
                                               $   "Updated template commit:"
                                               <+> pretty c
-                                          mergeResult <- mergeBranch project c
+                                          mergeResult <- mergeBranch
+                                              project
+                                              MergeAllowFastForward
+                                              c
                                           case mergeResult of
-                                              MergeSuccess -> do
+                                              MergeSuccessCommitted ->
+                                                  sayLn
+                                                      $ projectUpdated
+                                                            (repositoryPath
+                                                                project
+                                                            )
+                                              MergeSuccessUncommitted -> do
                                                   _ <- commit
                                                       project
                                                       (commitUpdateMergeMessage
@@ -527,13 +536,12 @@ runTemplateChange template interactive changeMode changesNature f =
             pullRequest _ (CreateBranch _ (BranchRef dst)) = do
                 sayLn $ createBranchManually dst
                 return $ Left $ TenpuretoBranchNotCreated dst
-            pullRequest settings UpdateBranch { sourceCommit = c, sourceRef = BranchRef src, destinationRef = BranchRef dst, pullRequestRef = BranchRef pr, pullRequestTitle = title }
+            pullRequest settings UpdateBranch { sourceCommit = c, destinationRef = BranchRef dst, pullRequestRef = BranchRef pr, pullRequestTitle = title }
                 = try $ createOrUpdatePullRequest
                     repo
                     settings
                     c
                     title
-                    src
                     (internalBranchPrefix <> pr)
                     dst
         let pushRefsToServer PushDirectly changes = pushRefs repo changes

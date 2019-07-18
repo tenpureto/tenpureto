@@ -20,6 +20,7 @@ import           Data.List
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
+import           Control.Monad
 import           Algebra.Graph.ToGraph
 
 import           Tenpureto.Messages
@@ -42,16 +43,19 @@ mergeCommits
     -> MergedBranchDescriptor
     -> Sem r (Committish, Tree Text)
 mergeCommits repo (b1c, b1n) (b2c, b2n) d = do
-    checkoutBranch repo (unCommittish b1c) Nothing
-    mergeResult <- mergeBranch repo (unCommittish b2c)
-    writeAddFile repo
-                 templateYamlFile
-                 (formatTemplateYaml (descriptorToTemplateYaml d))
-    case mergeResult of
-        MergeSuccess                  -> return ()
-        MergeConflicts mergeConflicts -> resolve d mergeConflicts
     let mergedTree = Node "*" [b1n, b2n]
-    maybeC <- commit repo ("Merge\n\n" <> showTree mergedTree)
+    checkoutBranch repo (unCommittish b1c) Nothing
+    mergeResult <- mergeBranch repo MergeAllowFastForward (unCommittish b2c)
+    maybeC      <- case mergeResult of
+        MergeSuccessCommitted   -> Just <$> getCurrentHead repo
+        MergeSuccessUncommitted -> do
+            updateTemplateYaml
+            commit repo ("Merge\n\n" <> showTree mergedTree)
+        MergeConflicts mergeConflicts -> do
+            updateTemplateYaml
+            resolve d mergeConflicts
+            commit repo ("Merge\n\n" <> showTree mergedTree)
+
     return (fromMaybe b1c maybeC, mergedTree)
   where
     resolve _ [] = return ()
@@ -64,6 +68,10 @@ mergeCommits repo (b1c, b1n) (b2c, b2n) d = do
                             AlreadyResolved -> return ()
                             MergeTool ->
                                 runMergeTool repo >> sayLn mergeSuccess
+    updateTemplateYaml = writeAddFile
+        repo
+        templateYamlFile
+        (formatTemplateYaml (descriptorToTemplateYaml d))
 
 withMergeCache :: Sem (State MergeCache ': r) a -> Sem r a
 withMergeCache = fmap snd . runState mempty
@@ -74,7 +82,15 @@ runMergeGraph
     -> Graph TemplateBranchInformation
     -> Set TemplateBranchInformation
     -> Sem r (Maybe TemplateYaml)
-runMergeGraph repo = mergeBranchesGraph branchData mergeCommitsCached
+runMergeGraph repo graph branchInformation = do
+    mbd <- mergeBranchesGraph branchData
+                              mergeCommitsCached
+                              graph
+                              branchInformation
+    forM_ mbd $ \d -> do
+        writeAddFile repo templateYamlFile (formatTemplateYaml d)
+        commit repo $ "Update " <> (T.pack . show) templateYamlFile
+    return mbd
   where
     mergeCommitsCached a b d = do
         cache <- get
