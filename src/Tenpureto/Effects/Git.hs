@@ -238,7 +238,8 @@ runGit = interpret $ \case
             <&> ("0" /=)
 
     GitLog repo (Committish c) (Committish base) ->
-        gitRepoCmd repo ["log", "--color", c, "^" <> base] >>= asText
+        gitRepoCmd repo ["log", "--color", "--oneline", c, "^" <> base]
+            >>= asText
 
     GitLogDiff repo (Committish c) (Committish base) ->
         gitRepoCmd repo ["log", "--patch", "--color", c, "^" <> base] >>= asText
