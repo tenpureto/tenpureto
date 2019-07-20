@@ -11,6 +11,7 @@ import           Data.Text                      ( Text )
 import qualified Data.Set                      as Set
 import           Data.Set                       ( Set )
 import           Data.Map                       ( Map )
+import           Data.Semigroup.Foldable
 import           Control.Monad
 
 import           Tenpureto.Graph
@@ -117,4 +118,4 @@ mergeGraph mergeCommits = foldTopologically vcombine hcombine
                                                  , mergedBranchDescriptor = d
                                                  }
     vcombine = foldM (combine vcombineD)
-    hcombine = combine hcombineD
+    hcombine = foldlM1 (combine hcombineD)

@@ -19,6 +19,7 @@ dependencies:
 - path-io
 - directory
 - containers
+- semigroupoids
 - unordered-containers
 - algebraic-graphs
 - insert-ordered-containers

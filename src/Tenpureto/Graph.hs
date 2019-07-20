@@ -32,12 +32,14 @@ import           Algebra.Graph.ToGraph          ( ToVertex
                                                 )
 import qualified Algebra.Graph.NonEmpty.AdjacencyMap
                                                as NAM
-import           Data.List.NonEmpty             ( NonEmpty(..) )
+import           Data.List.NonEmpty             ( NonEmpty(..)
+                                                , nonEmpty
+                                                )
 import           Algebra.Graph.AdjacencyMap.Algorithm
                                                 ( scc )
+import           Data.Semigroup.Foldable
 import           Data.Functor
 import           Data.Functor.Identity
-import           Control.Monad
 
 data Graph a = Graph { unGraph :: G.Graph a, graphNormalized :: G.Graph a }
     deriving (Show)
@@ -121,9 +123,9 @@ graphAncestors g vs =
 foldTopologically
     :: (Ord a, Monad m)
     => (a -> [b] -> m b)
-    -> (b -> b -> m b)
+    -> (NonEmpty b -> m c)
     -> Graph a
-    -> m (Maybe b)
+    -> m (Maybe c)
 foldTopologically vcombine hcombine g =
     let leaves  = graphLeaves g
         parents = adjacencyMap (toAdjacencyMapTranspose g)
@@ -131,7 +133,7 @@ foldTopologically vcombine hcombine g =
         foldVertex v = do
             pbs <- traverse foldVertex (parent v)
             vcombine v pbs
-    in  foldMaybeM hcombine =<< traverse foldVertex leaves
+    in  traverse foldVertex leaves >>= (mapM hcombine . nonEmpty)
 
 data GraphSubsetDecision = MustDrop | PreferDrop | PreferKeep | MustKeep
     deriving (Show, Eq, Ord, Enum, Bounded)
@@ -139,19 +141,20 @@ data GraphSubsetDecision = MustDrop | PreferDrop | PreferKeep | MustKeep
 graphSubset :: Ord a => (a -> GraphSubsetDecision) -> Graph a -> Graph a
 graphSubset f g = runIdentity $ do
     (must, _) <-
-        fromMaybe (mempty, Nothing) <$> foldTopologically vcombine hcombine g
+        fromMaybe (mempty, Nothing)
+            <$> foldTopologically vcombine (return . fold1) g
     return $ filterVertices (`Set.member` must) g
   where
-    vcombine c ps = return $ case f c of
-        MustDrop   -> (must, Nothing)
-        PreferDrop -> (must, fmap (Set.insert c) may)
-        PreferKeep -> (must <> maybe mempty (Set.insert c) may, may $> mempty)
-        MustKeep   -> (Set.insert c must <> fromMaybe mempty may, Just mempty)
-      where
-        must = foldMap fst ps
-        may  = fmap mconcat (traverse snd ps)
-    hcombine (xmust, xmay) (ymust, ymay) =
-        return (xmust <> ymust, xmay <> ymay)
+    vcombine c ps =
+        let must = foldMap fst ps
+            may  = fmap mconcat (traverse snd ps)
+        in  return $ case f c of
+                MustDrop   -> (must, Nothing)
+                PreferDrop -> (must, fmap (Set.insert c) may)
+                PreferKeep ->
+                    (must <> maybe mempty (Set.insert c) may, may $> mempty)
+                MustKeep ->
+                    (Set.insert c must <> fromMaybe mempty may, Just mempty)
 
 -- Internal
 
@@ -185,9 +188,3 @@ dropCycles = (>>= vertexOrEmpty) . toGraph . scc . toAdjacencyMap
 
 normalize :: Ord a => G.Graph a -> G.Graph a
 normalize = removeTransitiveEdges . dropCycles . removeLoops
-
-foldMaybeM :: (Monad m, Traversable t) => (a -> a -> m a) -> t a -> m (Maybe a)
-foldMaybeM combine = foldM combine' Nothing
-  where
-    combine' Nothing  x = Just <$> return x
-    combine' (Just x) y = Just <$> combine x y

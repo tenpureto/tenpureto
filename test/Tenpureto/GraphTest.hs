@@ -91,7 +91,7 @@ test_foldTopologically =
     foldSet :: Graph Text -> Maybe (Set Text)
     foldSet = runIdentity . foldTopologically setVCombine setHCombine
     setVCombine x ys = pure $ Set.insert x (mconcat ys)
-    setHCombine x y = pure $ Set.union x y
+    setHCombine = pure . fold
 
     foldLast :: Graph Text -> Maybe (Set Text)
     foldLast = runIdentity . foldTopologically lastVCombine setHCombine
