@@ -20,6 +20,6 @@ showTree' (Leaf a) = pretty a
 showTree' (Node a children) =
     pretty a <> indent 2 (vsep (fmap showTree' children))
 
-type MergeCacheElement = (Committish, Tree Text)
+type MergeCacheElement = (Committish, Text, Tree Text)
 type MergeCacheKey = (MergeCacheElement, MergeCacheElement)
 type MergeCache = Map MergeCacheKey MergeCacheElement

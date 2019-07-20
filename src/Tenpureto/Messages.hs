@@ -30,6 +30,9 @@ commitChangeVariableMessage from to =
 commitMergeMessage :: Text -> Text -> Text
 commitMergeMessage from to = "Merge branch '" <> from <> "' into " <> to
 
+commitUpdateTemplateYaml :: Text
+commitUpdateTemplateYaml = "Update .template.yaml"
+
 -- Pull request messages
 
 pullRequestChangeVariableTitle :: Text -> Text -> Text -> Text
@@ -102,4 +105,5 @@ noConflictingCombinations =
     "All good, there are no feature combinations that have merge conflicts."
 
 conflictingCombinations :: Doc a
-conflictingCombinations = "The following feature combinations have merge conflicts:"
+conflictingCombinations =
+    "The following feature combinations have merge conflicts:"

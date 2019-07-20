@@ -37,13 +37,13 @@ v c = TemplateBranchInformation
                          }
     }
 
-test_mergeGraph :: [TestTree]
-test_mergeGraph =
+test_runMergeGraphPure :: [TestTree]
+test_runMergeGraphPure =
     [ testGroup
         "merge order"
         [ testCase "path"
         $   fst (runMergeGraphPure' (path [v "a", v "b", v "c"]))
-        @?= [MergeRecord "b" "a" "merge-1", MergeRecord "c" "merge-1" "merge-2"]
+        @?= [MergeRecord "b" "a" "b", MergeRecord "c" "b" "c"]
         , testCase "diamond"
         $   fst
                 (runMergeGraphPure'
@@ -51,10 +51,10 @@ test_mergeGraph =
                              (path [v "a", v "c", v "d"])
                     )
                 )
-        @?= [ MergeRecord "b"       "a"       "merge-1"
-            , MergeRecord "c"       "a"       "merge-2"
-            , MergeRecord "d"       "merge-1" "merge-3"
-            , MergeRecord "merge-3" "merge-2" "merge-4"
+        @?= [ MergeRecord "b" "a" "b"
+            , MergeRecord "c" "a" "c"
+            , MergeRecord "d" "b" "d"
+            , MergeRecord "d" "c" "d"
             ]
         ]
     , testGroup

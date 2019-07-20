@@ -1,4 +1,11 @@
-module Tenpureto.MergeOptimizer where
+module Tenpureto.MergeOptimizer
+    ( MergedBranchInformation(..)
+    , MergedBranchDescriptor(..)
+    , descriptorToTemplateYaml
+    , mergeBranchesGraph
+    , mergeGraph
+    )
+where
 
 import           Data.Text                      ( Text )
 import qualified Data.Set                      as Set
@@ -22,7 +29,8 @@ data MergedBranchInformation a = MergedBranchInformation
     deriving (Show, Eq, Ord)
 
 data MergedBranchDescriptor = MergedBranchDescriptor
-    { mergedVariables :: Map Text Text
+    { mergedBranchName :: Text
+    , mergedVariables :: Map Text Text
     , mergedExcludes :: Set Text
     , mergedConflicts :: Set Text
     , mergedFeatures :: Set TemplateYamlFeature
@@ -49,10 +57,11 @@ templateBranchInformationData extract bi = MergedBranchInformation
     { mergedBranchMeta       = extract bi
     , mergedBranchDescriptor =
         MergedBranchDescriptor
-            { mergedVariables = branchVariables bi
-            , mergedExcludes  = (yamlExcludes . templateYaml) bi
-            , mergedConflicts = (yamlConflicts . templateYaml) bi
-            , mergedFeatures  = (yamlFeatures . templateYaml) bi
+            { mergedBranchName = branchName bi
+            , mergedVariables  = branchVariables bi
+            , mergedExcludes   = (yamlExcludes . templateYaml) bi
+            , mergedConflicts  = (yamlConflicts . templateYaml) bi
+            , mergedFeatures   = (yamlFeatures . templateYaml) bi
             }
     }
 
@@ -86,16 +95,18 @@ mergeGraph
 mergeGraph mergeCommits = foldTopologically vcombine hcombine
   where
     vcombineD d1 d2 = MergedBranchDescriptor
-        { mergedVariables = mergedVariables d1 <> mergedVariables d2
-        , mergedExcludes  = mergedExcludes d1 <> mergedExcludes d2
-        , mergedConflicts = mergedConflicts d1
-        , mergedFeatures  = mergedFeatures d1 <> mergedFeatures d2
+        { mergedBranchName = mergedBranchName d1
+        , mergedVariables  = mergedVariables d1 <> mergedVariables d2
+        , mergedExcludes   = mergedExcludes d1 <> mergedExcludes d2
+        , mergedConflicts  = mergedConflicts d1
+        , mergedFeatures   = mergedFeatures d1 <> mergedFeatures d2
         }
     hcombineD d1 d2 = MergedBranchDescriptor
-        { mergedVariables = mergedVariables d1 <> mergedVariables d2
-        , mergedExcludes  = mergedExcludes d1 <> mergedExcludes d2
-        , mergedConflicts = mergedConflicts d1 <> mergedConflicts d2
-        , mergedFeatures  = mergedFeatures d1 <> mergedFeatures d2
+        { mergedBranchName = mergedBranchName d1 <> "+" <> mergedBranchName d2
+        , mergedVariables  = mergedVariables d1 <> mergedVariables d2
+        , mergedExcludes   = mergedExcludes d1 <> mergedExcludes d2
+        , mergedConflicts  = mergedConflicts d1 <> mergedConflicts d2
+        , mergedFeatures   = mergedFeatures d1 <> mergedFeatures d2
         }
     combine combineD b1 b2 =
         let d = combineD (mergedBranchDescriptor b1)

@@ -257,7 +257,7 @@ prepareTemplate repository template configuration =
             Set.fromList $ graphAncestors graph selectedBranches
         (mergeLog, _) = runMergeGraphPure graph fullSelectedBranches
         mergeRecord (MergeRecord a b c) =
-            "Merge" <+> pretty a <+> "and" <+> pretty b <+> "as" <+> pretty c
+            "Merge" <+> pretty b <+> "into" <+> pretty a <+> "as" <+> pretty c
     in
         withMergeCache $ do
             logInfo $ "Full branch selection:" <> line <> (indent 4 . pretty)
