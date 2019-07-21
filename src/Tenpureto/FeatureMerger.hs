@@ -140,7 +140,7 @@ listMergeCombinations graph =
             $   addAncestors
             <$> combinations
 
-data PropagatePushMode = PropagatePushAsOne | PropagatePushAsMany
+data PropagatePushMode = PropagatePushMerged | PropagatePushSeparately
 data PropagateData = PropagateData { propagateCurrentCommit :: Committish
                                    , propagateUpstreamCommit :: Committish
                                    , propagateBranchName :: Text
@@ -168,66 +168,72 @@ runPropagateGraph repo mode graph branches =
                                   , propagateUpstreamCommit = branchCommit bi
                                   , propagateBranchName     = branchName bi
                                   }
-    propagateOne PropagatePushAsMany mi a =
-        let mid = mergedBranchMeta mi
-        in
-            do
-                needsMerge <- gitDiffHasCommits
+    mergeOne mid a = do
+        needsMerge <- gitDiffHasCommits repo
+                                        (propagateCurrentCommit a)
+                                        (propagateUpstreamCommit mid)
+        if not needsMerge
+            then return (propagateCurrentCommit mid, mempty)
+            else do
+                checkoutBranch repo
+                               (unCommittish $ propagateCurrentCommit mid)
+                               Nothing
+                preMergeResult <- mergeBranch
                     repo
-                    (propagateCurrentCommit a)
-                    (propagateUpstreamCommit mid)
-                if not needsMerge
-                    then return (mid, mempty)
-                    else do
-                        checkoutBranch
-                            repo
-                            (unCommittish $ propagateCurrentCommit mid)
-                            Nothing
-                        preMergeResult <- mergeBranch
-                            repo
-                            MergeAllowFastForward
-                            (unCommittish $ propagateCurrentCommit a)
-                        let title = pullRequestBranchIntoBranchTitle
-                                (propagateBranchName a)
-                                (propagateBranchName mid)
-                        let success c =
-                                ( PropagateData
-                                    { propagateCurrentCommit = c
-                                    , propagateUpstreamCommit =
-                                        propagateUpstreamCommit mid
-                                    , propagateBranchName = propagateBranchName
-                                                                mid
-                                    }
-                                , Set.singleton $ Right $ UpdateBranch
-                                    { sourceCommit     = c
-                                    , sourceRef        = BranchRef
-                                                             $ propagateBranchName a
-                                    , destinationRef   =
-                                        BranchRef $ propagateBranchName mid
-                                    , pullRequestRef   =
-                                        BranchRef
-                                        $  propagateBranchName a
-                                        <> "/"
-                                        <> propagateBranchName mid
-                                    , pullRequestTitle = title
-                                    }
-                                )
-                            failure =
-                                ( mid
-                                , Set.singleton $ Left $ PropagateFailure
-                                    (propagateBranchName a)
-                                    (propagateBranchName mid)
-                                )
-                        case preMergeResult of
-                            MergeSuccessCommitted ->
-                                success <$> getCurrentHead repo
-                            MergeSuccessUncommitted ->
-                                success <$> commit repo title
-                            MergeConflicts _ -> failure <$ mergeAbort repo
-    propagateOne PropagatePushAsOne mi a = do
-        (a', actions) <- propagateOne PropagatePushAsMany mi a
-        return (a', Set.filter isLeft actions)
-    propagateMerge PropagatePushAsOne b =
+                    MergeAllowFastForward
+                    (unCommittish $ propagateCurrentCommit a)
+                let title = pullRequestBranchIntoBranchTitle
+                        (propagateBranchName a)
+                        (propagateBranchName mid)
+                let success c =
+                        ( c
+                        , Set.singleton $ Right $ UpdateBranch
+                            { sourceCommit     = c
+                            , sourceRef = BranchRef $ propagateBranchName a
+                            , destinationRef   = BranchRef
+                                                     $ propagateBranchName mid
+                            , pullRequestRef   = BranchRef
+                                                 $  propagateBranchName a
+                                                 <> "/"
+                                                 <> propagateBranchName mid
+                            , pullRequestTitle = title
+                            }
+                        )
+                    failure =
+                        ( propagateCurrentCommit mid
+                        , Set.singleton $ Left $ PropagateFailure
+                            (propagateBranchName a)
+                            (propagateBranchName mid)
+                        )
+                case preMergeResult of
+                    MergeSuccessCommitted   -> success <$> getCurrentHead repo
+                    MergeSuccessUncommitted -> success <$> commit repo title
+                    MergeConflicts _        -> failure <$ mergeAbort repo
+    propagateOne PropagatePushSeparately mi a =
+        let mid = mergedBranchMeta mi
+        in  do
+                (_, actions) <- mergeOne mid a
+                return
+                    ( PropagateData
+                        { propagateCurrentCommit  = propagateCurrentCommit mid
+                        , propagateUpstreamCommit = propagateUpstreamCommit mid
+                        , propagateBranchName     = propagateBranchName mid
+                        }
+                    , actions
+                    )
+    propagateOne PropagatePushMerged mi a =
+        let mid = mergedBranchMeta mi
+        in  do
+                (c, actions) <- mergeOne mid a
+                return
+                    ( PropagateData
+                        { propagateCurrentCommit  = c
+                        , propagateUpstreamCommit = propagateUpstreamCommit mid
+                        , propagateBranchName     = propagateBranchName mid
+                        }
+                    , Set.filter isLeft actions
+                    )
+    propagateMerge PropagatePushMerged b =
         let
             bd        = mergedBranchMeta b
             needsPush = propagateCurrentCommit bd /= propagateUpstreamCommit bd
@@ -246,4 +252,4 @@ runPropagateGraph repo mode graph branches =
                       }
                 | needsPush
                 ]
-    propagateMerge PropagatePushAsMany _ = return mempty
+    propagateMerge PropagatePushSeparately _ = return mempty

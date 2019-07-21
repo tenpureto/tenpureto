@@ -359,8 +359,8 @@ propagateTemplateBranchChanges template branchFilter pushMode =
             templateInformation <- loadTemplateInformation repo
             let branches = getTemplateBranches branchFilter templateInformation
             let mode = case pushMode of
-                    PushDirectly          -> PropagatePushAsMany
-                    UpstreamPullRequest{} -> PropagatePushAsOne
+                    PushDirectly          -> PropagatePushMerged
+                    UpstreamPullRequest{} -> PropagatePushSeparately
             logInfo $ "Propagating changes for" <+> pretty
                 (fmap branchName branches)
             changes <- runPropagateGraph repo

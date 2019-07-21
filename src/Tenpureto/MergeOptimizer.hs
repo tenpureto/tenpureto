@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveFunctor #-}
+
 module Tenpureto.MergeOptimizer
     ( MergedBranchInformation(..)
     , MergedBranchDescriptor(..)
@@ -29,7 +31,7 @@ data MergedBranchInformation a = MergedBranchInformation
     { mergedBranchMeta :: a
     , mergedBranchDescriptor :: MergedBranchDescriptor
     }
-    deriving (Show, Eq, Ord)
+    deriving (Show, Eq, Ord, Functor)
 
 data MergedBranchDescriptor = MergedBranchDescriptor
     { mergedBranchName :: Text
@@ -91,15 +93,17 @@ propagateBranchesGraph
     -> m b
 propagateBranchesGraph extract propagateOne propagateMerge graph selectedBranches
     = propagateGraph propagateOne' propagateMerge'
-        $ mapVertices (templateBranchInformationData extract) graph
+        $ mapVertices (templateBranchInformationData extract') graph
   where
+    extract' bi = (extract bi, branchName bi)
     branchNames = Set.map branchName selectedBranches
     name        = mergedBranchName . mergedBranchDescriptor
-    propagateOne' mi | name mi `Set.member` branchNames = propagateOne mi
-                     | otherwise = const $ return (mergedBranchMeta mi, mempty)
-    propagateMerge' mi
-        | name mi `Set.member` branchNames = propagateMerge mi
-        | otherwise                        = return mempty
+    propagateOne' mi (a, aname)
+        | (name mi `Set.member` branchNames) || (aname `Set.member` branchNames) = do
+            (a', b) <- propagateOne (fmap fst mi) a
+            return ((a', name mi), b)
+        | otherwise = return (mergedBranchMeta mi, mempty)
+    propagateMerge' mi = propagateMerge (fmap fst mi)
 
 vertexDecision
     :: Set TemplateBranchInformation
