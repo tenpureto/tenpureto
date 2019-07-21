@@ -4,18 +4,22 @@ module Tenpureto.GraphTest where
 
 import           Test.Tasty
 import           Test.Tasty.HUnit
+import           Test.Tasty.Hedgehog
 import           Hedgehog
 import qualified Hedgehog.Gen                  as Gen
 import qualified Hedgehog.Range                as Range
 
 import           Data.Ix
+import           Data.List
 import           Data.Text                      ( Text )
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
 import           Algebra.Graph.ToGraph
 import           Data.Foldable
+import           Data.Functor
 import           Data.Functor.Identity
+import           Control.Monad.Trans.State
 
 import           Tenpureto.Graph
 
@@ -86,16 +90,25 @@ test_foldTopologically =
     , testCase "merge disconnected graphs"
         $   foldLast (overlay (path ["a", "b"]) (path ["c", "d"]))
         @?= Just (Set.fromList ["b", "d"])
+    , testProperty "process every vertex once" propertyProcessVertexOnce
     ]
   where
     foldSet :: Graph Text -> Maybe (Set Text)
     foldSet = runIdentity . foldTopologically setVCombine setHCombine
     setVCombine x ys = pure $ Set.insert x (mconcat ys)
     setHCombine = pure . fold
-
     foldLast :: Graph Text -> Maybe (Set Text)
     foldLast = runIdentity . foldTopologically lastVCombine setHCombine
     lastVCombine x _ = pure $ Set.singleton x
+
+propertyProcessVertexOnce :: Property
+propertyProcessVertexOnce = property $ do
+    graph <- forAll $ genIntGraph (Range.linear 0 100)
+    let graphVertices = vertexList graph
+    let record a _ = modify (a :) $> ()
+    let ignore _ = return ()
+    (_, foldedVertices) <- runStateT (foldTopologically record ignore graph) []
+    sort foldedVertices === sort graphVertices
 
 test_graphSubset :: [TestTree]
 test_graphSubset =
@@ -165,10 +178,11 @@ test_graphSubset =
                 )
                 (overlay (path ["a", "c"]) (path ["b", "c"]))
         @?= path @Text ["b"]
+    , testProperty "respect vertex decisions" propertyGraphSubsetRespectsDecisions
     ]
 
-hprop_graphSubsetRespectsDecisions :: Property
-hprop_graphSubsetRespectsDecisions = property $ do
+propertyGraphSubsetRespectsDecisions :: Property
+propertyGraphSubsetRespectsDecisions = property $ do
     graph <- forAll $ genIntGraph (Range.linear 0 100)
     let graphVertices = vertexList graph
     decisions <- forAll

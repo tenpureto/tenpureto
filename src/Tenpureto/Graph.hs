@@ -40,6 +40,7 @@ import           Algebra.Graph.AdjacencyMap.Algorithm
 import           Data.Semigroup.Foldable
 import           Data.Functor
 import           Data.Functor.Identity
+import           Control.Monad.Memo
 
 data Graph a = Graph { unGraph :: G.Graph a, graphNormalized :: G.Graph a }
 
@@ -135,9 +136,10 @@ foldTopologically vcombine hcombine g =
         parents = adjacencyMap (toAdjacencyMapTranspose g)
         parent  = maybe mempty Set.toList . flip Map.lookup parents
         foldVertex v = do
-            pbs <- traverse foldVertex (parent v)
-            vcombine v pbs
-    in  traverse foldVertex leaves >>= (mapM hcombine . nonEmpty)
+            pbs <- traverse (memo foldVertex) (parent v)
+            lift $ vcombine v pbs
+    in  startEvalMemoT (traverse (memo foldVertex) leaves)
+            >>= (mapM hcombine . nonEmpty)
 
 data GraphSubsetDecision = MustDrop | PreferDrop | PreferKeep | MustKeep
     deriving (Show, Eq, Ord, Enum, Bounded)

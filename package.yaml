@@ -35,6 +35,7 @@ dependencies:
 - Glob
 - parsec
 - file-embed
+- monad-memo
 - polysemy >= 0.5.0.1
 - polysemy-zoo
 - polysemy-plugin
