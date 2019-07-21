@@ -151,15 +151,17 @@ inputBranches graph initialNameSelection = askUntil initial request process
     initialSelection :: Set TemplateBranchInformation
     initialSelection = Set.fromList
         $ filterBranchesByNames (vertexList graph) initialNameSelection
-    roots :: Set TemplateBranchInformation
-    roots = Set.fromList (graphRoots graph)
+    roots :: [TemplateBranchInformation]
+    roots = graphRoots graph
     available :: Set TemplateBranchInformation -> [TemplateBranchInformation]
     available selected =
-        let fullSelection = filterBranchesByNames (vertexList graph)
+        let
+            fullSelection = filterBranchesByNames (vertexList graph)
                 $ Set.unions (Set.map requiredBranches selected)
-            reachableFromSelection = Set.unions
-                $ fmap (Set.fromList . flip reachable graph) fullSelection
-        in  Set.toList $ reachableFromSelection `Set.union` roots
+            reachableFromSelection =
+                concatMap (`reachable` graph) fullSelection
+        in
+            nub $ roots <> reachableFromSelection
     initial :: InputBranchState
     initial = (available initialSelection, initialSelection, Nothing)
     request :: InputBranchState -> (Doc AnsiStyle, Maybe Text)
