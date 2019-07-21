@@ -92,6 +92,10 @@ data GitServer m a where
 makeSem ''GitServer
 
 
+internalBranchPrefix :: Text
+internalBranchPrefix = "tenpureto/"
+
+
 writeAddFile
     :: Member Git r => GitRepository -> Path Rel File -> ByteString -> Sem r ()
 writeAddFile repo file content = do
@@ -282,8 +286,13 @@ runGitHub = interpret $ \case
         gitRepoCmd
                 repo
                 [ "push"
+                , "--force"
                 , "origin"
-                , unCommittish commitish <> ":" <> "refs/heads/" <> source
+                , unCommittish commitish
+                <> ":"
+                <> "refs/heads/"
+                <> internalBranchPrefix
+                <> source
                 ]
             >>= asUnit
         owner <- hubApiGraphQL repo hubOwnerQuery [] >>= asApiResponse

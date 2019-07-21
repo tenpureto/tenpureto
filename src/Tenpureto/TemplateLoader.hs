@@ -65,9 +65,6 @@ data BranchFilter = BranchFilterAny
                   | BranchFilterIsHiddenBranch
                   | BranchFilterIsMergeBranch
 
-internalBranchPrefix :: Text
-internalBranchPrefix = "tenpureto/"
-
 loadTemplateInformation
     :: Members '[Git] r => GitRepository -> Sem r TemplateInformation
 loadTemplateInformation repo = do

@@ -496,13 +496,7 @@ runTemplateChange template interactive changeMode changesNature f =
                 sayLn $ createBranchManually dst
                 return $ Left $ TenpuretoBranchNotCreated dst
             pullRequest settings UpdateBranch { sourceCommit = c, destinationRef = BranchRef dst, pullRequestRef = BranchRef pr, pullRequestTitle = title }
-                = try $ createOrUpdatePullRequest
-                    repo
-                    settings
-                    c
-                    title
-                    (internalBranchPrefix <> pr)
-                    dst
+                = try $ createOrUpdatePullRequest repo settings c title pr dst
         let pushRefsToServer PushDirectly changes = pushRefs repo changes
             pushRefsToServer UpstreamPullRequest { pullRequestSettings = settings } changes
                 = do
