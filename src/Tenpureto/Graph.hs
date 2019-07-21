@@ -42,7 +42,11 @@ import           Data.Functor
 import           Data.Functor.Identity
 
 data Graph a = Graph { unGraph :: G.Graph a, graphNormalized :: G.Graph a }
-    deriving (Show)
+
+instance Show a => Show (Graph a) where
+    showsPrec i g = showParen
+        (i >= 11)
+        (showString "Graph " . showsPrec 11 (graphNormalized g))
 
 instance Ord a => Eq (Graph a) where
     x == y = toGraph x == toGraph y
