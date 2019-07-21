@@ -282,62 +282,70 @@ runGitHub
     -> Sem r a
 runGitHub = interpret $ \case
 
-    CreateOrUpdatePullRequest repo settings commitish title source target -> do
-        gitRepoCmd
-                repo
-                [ "push"
-                , "--force"
-                , "origin"
-                , unCommittish commitish
-                <> ":"
-                <> "refs/heads/"
-                <> internalBranchPrefix
-                <> source
-                ]
-            >>= asUnit
-        owner <- hubApiGraphQL repo hubOwnerQuery [] >>= asApiResponse
-        exitingPullRequests <-
-            hubApiGetCmd
-                    repo
-                    "/repos/{owner}/{repo}/pulls"
-                    [ ("head", ownerLogin owner <> ":" <> source)
-                    , ("base", target)
-                    ]
-                >>= asApiResponse
-        pullRequest <- case exitingPullRequests of
-            pullRequest : _ -> return pullRequest
-            [] ->
-                hubApiCmd
-                        repo
-                        ApiPost
-                        "/repos/{owner}/{repo}/pulls"
-                        PullRequestInputPayload
-                            { pullRequestHead     = source
-                            , pullRequestBase     = target
-                            , setPullRequestTitle = Just title
-                            }
-                    >>= asApiResponse
-        hubApiCmd
-                repo
-                ApiPatch
-                (  "/repos/{owner}/{repo}/issues/"
-                <> (T.pack . show . pullRequestNumber) pullRequest
-                )
-                IssueInputPayload
-                    { setIssueAssignees = nub
-                                          $  fmap
-                                                 assigneeLogin
-                                                 (pullRequestAssignees
-                                                     pullRequest
-                                                 )
-                                          ++ pullRequestAssignTo settings
-                    , setIssueLabels    = nub
-                                          $  fmap
-                                                 labelName
-                                                 (pullRequestLabels pullRequest)
-                                          ++ pullRequestAddLabels settings
-                    }
-            >>= asUnit
+    CreateOrUpdatePullRequest repo settings commitish title localSource target
+        -> let source = internalBranchPrefix <> localSource
+           in
+               do
+                   gitRepoCmd
+                           repo
+                           [ "push"
+                           , "--force"
+                           , "origin"
+                           , unCommittish commitish
+                           <> ":"
+                           <> "refs/heads/"
+                           <> source
+                           ]
+                       >>= asUnit
+                   owner <-
+                       hubApiGraphQL repo hubOwnerQuery [] >>= asApiResponse
+                   exitingPullRequests <-
+                       hubApiGetCmd
+                               repo
+                               "/repos/{owner}/{repo}/pulls"
+                               [ ("head", ownerLogin owner <> ":" <> source)
+                               , ("base", target)
+                               ]
+                           >>= asApiResponse
+                   pullRequest <- case exitingPullRequests of
+                       pullRequest : _ -> return pullRequest
+                       [] ->
+                           hubApiCmd
+                                   repo
+                                   ApiPost
+                                   "/repos/{owner}/{repo}/pulls"
+                                   PullRequestInputPayload
+                                       { pullRequestHead     = source
+                                       , pullRequestBase     = target
+                                       , setPullRequestTitle = Just title
+                                       }
+                               >>= asApiResponse
+                   hubApiCmd
+                           repo
+                           ApiPatch
+                           (  "/repos/{owner}/{repo}/issues/"
+                           <> (T.pack . show . pullRequestNumber)
+                                  pullRequest
+                           )
+                           IssueInputPayload
+                               { setIssueAssignees = nub
+                                                     $  fmap
+                                                            assigneeLogin
+                                                            (pullRequestAssignees
+                                                                pullRequest
+                                                            )
+                                                     ++ pullRequestAssignTo
+                                                            settings
+                               , setIssueLabels    = nub
+                                                     $  fmap
+                                                            labelName
+                                                            (pullRequestLabels
+                                                                pullRequest
+                                                            )
+                                                     ++ pullRequestAddLabels
+                                                            settings
+                               }
+                       >>= asUnit
 
 instance Pretty BranchRef where
     pretty ref = pretty $ reference ref
