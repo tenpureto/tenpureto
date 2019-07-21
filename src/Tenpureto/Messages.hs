@@ -47,6 +47,9 @@ pullRequestBranchIntoBranchTitle :: Text -> Text -> Text
 pullRequestBranchIntoBranchTitle from to =
     "Merge \"" <> from <> "\" into \"" <> to <> "\""
 
+pullRequestBranchUpdateTitle :: Text -> Text
+pullRequestBranchUpdateTitle to = "Update \"" <> to <> "\""
+
 
 -- UI messages
 
@@ -107,3 +110,7 @@ noConflictingCombinations =
 conflictingCombinations :: Doc a
 conflictingCombinations =
     "The following feature combinations have merge conflicts:"
+
+propagateMergeFailed :: Text -> Text -> Doc a
+propagateMergeFailed src dst =
+    "Cannot merge" <+> dquotes (pretty src) <+> "into" <+> dquotes (pretty dst)

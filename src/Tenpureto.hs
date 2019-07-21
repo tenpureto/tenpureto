@@ -8,7 +8,6 @@ import           Polysemy
 import           Polysemy.Error
 import           Polysemy.Resource
 
-import           Data.List
 import           Data.Maybe
 import           Data.Either
 import           Data.Either.Combinators        ( rightToMaybe )
@@ -355,70 +354,23 @@ propagateTemplateBranchChanges
     -> RemoteChangeMode
     -> Sem r ()
 propagateTemplateBranchChanges template branchFilter pushMode =
-    runTemplateChange template False pushMode ExistingChanges $ \repo -> do
-        templateInformation <- loadTemplateInformation repo
-        let branches = getTemplateBranches branchFilter templateInformation
-        logInfo $ "Propagating changes for" <+> pretty branches
-        let toBranches =
-                [ (a, b)
-                | b <- branches
-                , a <- getTemplateBranches
-                    (BranchFilterParentOf (branchName b))
-                    templateInformation
-                ]
-        let fromBranches =
-                [ (a, b)
-                | a <- branches
-                , b <- getTemplateBranches
-                    (BranchFilterChildOf (branchName a))
-                    templateInformation
-                ]
-        let pairs = nub (toBranches ++ fromBranches)
-        catMaybes <$> traverse (propagateFromBranch repo) pairs
-  where
-    propagateFromBranch
-        :: Members '[Logging, Git, Error TenpuretoException] r
-        => GitRepository
-        -> (TemplateBranchInformation, TemplateBranchInformation)
-        -> Sem r (Maybe PushSpec)
-    propagateFromBranch repo (fromBranch, toBranch) = do
-        logInfo
-            $   "Checking diff between"
-            <+> pretty (branchName fromBranch)
-            <+> "and"
-            <+> pretty (branchName toBranch)
-        needsMerge <- gitDiffHasCommits repo
-                                        (branchCommit fromBranch)
-                                        (branchCommit toBranch)
-        if not needsMerge
-            then return Nothing
-            else do
-                checkoutBranch repo
-                               (unCommittish $ branchCommit toBranch)
-                               Nothing
-                preMergeResult <- mergeBranch
-                    repo
-                    MergeAllowFastForward
-                    (unCommittish $ branchCommit fromBranch)
-                let title = pullRequestBranchIntoBranchTitle
-                        (branchName fromBranch)
-                        (branchName toBranch)
-                preMergeCommit <- case preMergeResult of
-                    MergeSuccessCommitted   -> getCurrentHead repo
-                    MergeSuccessUncommitted -> commit repo title
-                    MergeConflicts _        -> throw $ TenpuretoMergeConflict
-                        (branchName fromBranch)
-                        (branchName toBranch)
-                return $ Just $ UpdateBranch
-                    { sourceCommit     = preMergeCommit
-                    , sourceRef        = BranchRef $ branchName fromBranch
-                    , destinationRef   = BranchRef $ branchName toBranch
-                    , pullRequestRef   = BranchRef
-                                         $  branchName fromBranch
-                                         <> "/"
-                                         <> branchName toBranch
-                    , pullRequestTitle = title
-                    }
+    runTemplateChange template False pushMode ExistingChanges $ \repo ->
+        withMergeCache $ do
+            templateInformation <- loadTemplateInformation repo
+            let branches = getTemplateBranches branchFilter templateInformation
+            let mode = case pushMode of
+                    PushDirectly          -> PropagatePushAsMany
+                    UpstreamPullRequest{} -> PropagatePushAsOne
+            logInfo $ "Propagating changes for" <+> pretty
+                (fmap branchName branches)
+            changes <- runPropagateGraph repo
+                                         mode
+                                         (branchesGraph templateInformation)
+                                         (Set.fromList branches)
+            let (failures, pushspecs) = partitionEithers changes
+            for_ failures $ \(PropagateFailure from to) ->
+                sayLn $ propagateMergeFailed from to
+            return pushspecs
 
 listTemplateConflicts
     :: Members

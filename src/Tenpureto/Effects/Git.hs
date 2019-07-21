@@ -35,12 +35,12 @@ import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Process
 import           Tenpureto.Effects.Git.Internal
 
-newtype BranchRef = BranchRef { reference :: Text } deriving (Eq, Show)
+newtype BranchRef = BranchRef { reference :: Text } deriving (Eq, Ord, Show)
 
 data PushSpec = CreateBranch { sourceCommit :: Committish, destinationRef :: BranchRef }
               | UpdateBranch { sourceCommit :: Committish, sourceRef :: BranchRef, destinationRef :: BranchRef, pullRequestRef :: BranchRef, pullRequestTitle :: Text }
               | DeleteBranch { destinationRef :: BranchRef }
-              deriving (Eq, Show)
+              deriving (Eq, Ord, Show)
 
 data PullRequestSettings = PullRequestSettings { pullRequestAddLabels :: [Text]
                                                , pullRequestAssignTo :: [Text]

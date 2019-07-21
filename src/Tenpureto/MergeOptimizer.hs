@@ -4,9 +4,11 @@ module Tenpureto.MergeOptimizer
     , descriptorToTemplateYaml
     , mergeBranchesGraph
     , mergeGraph
+    , propagateBranchesGraph
     )
 where
 
+import           Data.Maybe
 import           Data.Text                      ( Text )
 import qualified Data.Set                      as Set
 import           Data.Set                       ( Set )
@@ -79,6 +81,26 @@ mergeBranchesGraph extract mergeCommits graph selectedBranches =
         $ mapVertices (templateBranchInformationData extract)
         $ graphSubset (vertexDecision selectedBranches) graph
 
+propagateBranchesGraph
+    :: (Ord a, Monoid b, Monad m)
+    => (TemplateBranchInformation -> a)
+    -> (MergedBranchInformation a -> a -> m (a, b))
+    -> (MergedBranchInformation a -> m b)
+    -> Graph TemplateBranchInformation
+    -> Set TemplateBranchInformation
+    -> m b
+propagateBranchesGraph extract propagateOne propagateMerge graph selectedBranches
+    = propagateGraph propagateOne' propagateMerge'
+        $ mapVertices (templateBranchInformationData extract) graph
+  where
+    branchNames = Set.map branchName selectedBranches
+    name        = mergedBranchName . mergedBranchDescriptor
+    propagateOne' mi | name mi `Set.member` branchNames = propagateOne mi
+                     | otherwise = const $ return (mergedBranchMeta mi, mempty)
+    propagateMerge' mi
+        | name mi `Set.member` branchNames = propagateMerge mi
+        | otherwise                        = return mempty
+
 vertexDecision
     :: Set TemplateBranchInformation
     -> TemplateBranchInformation
@@ -95,13 +117,6 @@ mergeGraph
     -> m (Maybe (MergedBranchInformation a))
 mergeGraph mergeCommits = foldTopologically vcombine hcombine
   where
-    vcombineD d1 d2 = MergedBranchDescriptor
-        { mergedBranchName = mergedBranchName d1
-        , mergedVariables  = mergedVariables d1 <> mergedVariables d2
-        , mergedExcludes   = mergedExcludes d1 <> mergedExcludes d2
-        , mergedConflicts  = mergedConflicts d1
-        , mergedFeatures   = mergedFeatures d1 <> mergedFeatures d2
-        }
     hcombineD d1 d2 = MergedBranchDescriptor
         { mergedBranchName = mergedBranchName d1 <> "+" <> mergedBranchName d2
         , mergedVariables  = mergedVariables d1 <> mergedVariables d2
@@ -119,3 +134,38 @@ mergeGraph mergeCommits = foldTopologically vcombine hcombine
                                                  }
     vcombine = foldM (combine vcombineD)
     hcombine = foldlM1 (combine hcombineD)
+
+propagateGraph
+    :: (Ord a, Monoid b, Monad m)
+    => (MergedBranchInformation a -> a -> m (a, b))
+    -> (MergedBranchInformation a -> m b)
+    -> Graph (MergedBranchInformation a)
+    -> m b
+propagateGraph propagateOne propagateMerge graph =
+    fromMaybe mempty <$> foldTopologically vcombine hcombine graph
+  where
+    vcombine v ps = do
+        (combined, acc) <- foldM vcombineOne (v, mempty) ps
+        acc'            <- propagateMerge combined
+        return (combined, acc' <> acc)
+    vcombineOne (v, vacc) (p, pacc) =
+        let md = vcombineD (mergedBranchDescriptor v)
+                           (mergedBranchDescriptor p)
+        in  do
+                (v', acc') <- propagateOne
+                    (MergedBranchInformation (mergedBranchMeta v) md)
+                    (mergedBranchMeta p)
+                return (MergedBranchInformation v' md, acc' <> vacc <> pacc)
+    hcombine = return . foldMap snd
+
+vcombineD
+    :: MergedBranchDescriptor
+    -> MergedBranchDescriptor
+    -> MergedBranchDescriptor
+vcombineD d1 d2 = MergedBranchDescriptor
+    { mergedBranchName = mergedBranchName d1
+    , mergedVariables  = mergedVariables d1 <> mergedVariables d2
+    , mergedExcludes   = mergedExcludes d1 <> mergedExcludes d2
+    , mergedConflicts  = mergedConflicts d1
+    , mergedFeatures   = mergedFeatures d1 <> mergedFeatures d2
+    }
