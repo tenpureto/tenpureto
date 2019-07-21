@@ -136,12 +136,19 @@ updateProject projectConfiguration = do
                                           logInfo
                                               $   "Updated template commit:"
                                               <+> pretty updatedTemplateCommit
+                                          let
+                                              commitMessage =
+                                                  commitUpdateMergeMessage
+                                                      (selectedTemplate
+                                                          finalTemplateConfiguration
+                                                      )
                                           mergeResult <- mergeBranch
                                               project
                                               MergeAllowFastForward
                                               (unCommittish
                                                   updatedTemplateCommit
                                               )
+                                              commitMessage
                                           case mergeResult of
                                               MergeSuccessCommitted ->
                                                   sayLn
@@ -150,13 +157,8 @@ updateProject projectConfiguration = do
                                                                 project
                                                             )
                                               MergeSuccessUncommitted -> do
-                                                  _ <- commit
-                                                      project
-                                                      (commitUpdateMergeMessage
-                                                          (selectedTemplate
-                                                              finalTemplateConfiguration
-                                                          )
-                                                      )
+                                                  _ <- commit project
+                                                              commitMessage
                                                   sayLn
                                                       $ projectUpdated
                                                             (repositoryPath
@@ -526,8 +528,8 @@ runTemplateChange template interactive changeMode changesNature f =
             then sayLn noRelevantTemplateChanges
             else do
                 shouldPush <- case changeMode of
-                                    PushDirectly -> confirmPush deletes creates updates
-                                    UpstreamPullRequest{} -> confirmPullRequest updates closes
+                    PushDirectly          -> confirmPush deletes creates updates
+                    UpstreamPullRequest{} -> confirmPullRequest updates closes
                 if shouldPush
                     then pushRefsToServer changeMode changes
                     else throw CancelledException

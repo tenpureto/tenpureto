@@ -46,21 +46,21 @@ mergeCommits
     -> Sem r (Committish, Text, Tree Text)
 mergeCommits repo (b1c, b1n, b1t) (b2c, b2n, b2t) d = do
     let mergedTree = Node (mergedBranchName d) [b2t, b1t]
+    let message    = commitMergeMessage b2n b1n <> "\n\n" <> showTree mergedTree
     checkoutBranch repo (unCommittish b1c) Nothing
-    mergeResult <- mergeBranch repo MergeAllowFastForward (unCommittish b2c)
-    c           <- case mergeResult of
+    mergeResult <- mergeBranch repo
+                               MergeAllowFastForward
+                               (unCommittish b2c)
+                               message
+    c <- case mergeResult of
         MergeSuccessCommitted   -> getCurrentHead repo
         MergeSuccessUncommitted -> do
             updateTemplateYaml
-            commit
-                repo
-                (commitMergeMessage b2n b1n <> "\n\n" <> showTree mergedTree)
+            commit repo message
         MergeConflicts mergeConflicts -> do
             updateTemplateYaml
             resolve d mergeConflicts
-            commit
-                repo
-                (commitMergeMessage b2n b1n <> "\n\n" <> showTree mergedTree)
+            commit repo message
 
     return (c, mergedBranchName d, mergedTree)
   where
@@ -187,13 +187,14 @@ runPropagateGraph repo mode graph branches =
                 checkoutBranch repo
                                (unCommittish $ propagateCurrentCommit mid)
                                Nothing
+                let title = pullRequestBranchIntoBranchTitle
+                        (propagateBranchName a)
+                        (propagateBranchName mid)
                 preMergeResult <- mergeBranch
                     repo
                     MergeAllowFastForward
                     (unCommittish $ propagateCurrentCommit a)
-                let title = pullRequestBranchIntoBranchTitle
-                        (propagateBranchName a)
-                        (propagateBranchName mid)
+                    title
                 let success c =
                         ( c
                         , Set.singleton $ Right $ UpdateBranch

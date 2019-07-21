@@ -64,7 +64,7 @@ data Git m a where
     DeleteWorktree ::GitRepository -> Path Abs Dir -> Git m ()
     ListBranches ::GitRepository -> Git m [Text]
     CheckoutBranch ::GitRepository -> Text -> Maybe Text -> Git m ()
-    MergeBranch ::GitRepository -> MergeStrategy -> Text -> Git m MergeResult
+    MergeBranch ::GitRepository -> MergeStrategy -> Text -> Text -> Git m MergeResult
     MergeAbort ::GitRepository -> Git m ()
     RunMergeTool ::GitRepository -> Git m ()
     ResetWorktree ::GitRepository -> Git m ()
@@ -172,10 +172,13 @@ runGit = interpret $ \case
         asName Nothing  = ["checkout", "--detach"]
         asName (Just n) = ["checkout", "-b", n]
 
-    MergeBranch repo strategy branch -> do
+    MergeBranch repo strategy branch message -> do
         (mergeResult, _, _) <- gitRepoCmd
             repo
-            (["merge", "--no-commit"] <> options strategy <> [branch])
+            (  ["merge", "--no-commit", "--message", message]
+            <> options strategy
+            <> [branch]
+            )
         case mergeResult of
             ExitSuccess ->
                 gitRepoCmd repo ["rev-parse", "--verify", "MERGE_HEAD"]
