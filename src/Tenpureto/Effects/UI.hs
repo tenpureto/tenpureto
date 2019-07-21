@@ -37,7 +37,8 @@ data UI m a where
     InputProjectConfiguration ::TemplateInformation -> PreliminaryProjectConfiguration -> UI m FinalProjectConfiguration
     InputResolutionStrategy ::Path Abs Dir -> [Path Rel File] -> UI m ConflictResolutionStrategy
     ConfirmShellToAmend ::UI m Bool
-    ConfirmPush ::[BranchRef] -> [BranchRef] -> [BranchRef]  -> UI m Bool
+    ConfirmPush ::[BranchRef] -> [BranchRef] -> [BranchRef] -> UI m Bool
+    ConfirmPullRequest ::[BranchRef] -> Int -> UI m Bool
 
 makeSem ''UI
 
@@ -83,6 +84,9 @@ runUIInTerminal = interpret $ \case
     ConfirmPush deletes creates updates ->
         confirm (confirmPushMessage deletes creates updates) (Just False)
 
+    ConfirmPullRequest updates cleanups ->
+        confirm (confirmPullRequestMessage updates cleanups) (Just False)
+
 runUIUnattended :: Member (Error UIException) r => Sem (UI ': r) a -> Sem r a
 runUIUnattended = interpret $ \case
 
@@ -97,12 +101,9 @@ runUIUnattended = interpret $ \case
 
     InputProjectConfiguration templateInformation providedConfiguration ->
         FinalProjectConfiguration
-            <$> maybe
-                    (notPossible "selected branches")
-                    return
-                    (fmap (templateBranchesByNames templateInformation)
-                          (preSelectedBranches providedConfiguration)
-                    )
+            <$> maybe (notPossible "selected branches")
+                      (return . templateBranchesByNames templateInformation)
+                      (preSelectedBranches providedConfiguration)
             <*> maybe (notPossible "variable values")
                       return
                       (preVariableValues providedConfiguration)
@@ -111,7 +112,9 @@ runUIUnattended = interpret $ \case
 
     ConfirmShellToAmend         -> return False
 
-    ConfirmPush _ _ _           -> return True
+    ConfirmPush{}               -> return True
+
+    ConfirmPullRequest{}        -> return True
 
   where
     notPossible :: Member (Error UIException) r => Text -> Sem r a

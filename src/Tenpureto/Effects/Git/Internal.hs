@@ -176,7 +176,7 @@ newtype PullRequestAssignee = PullRequestAssignee { assigneeLogin :: Text }
 newtype PullRequestLabel = PullRequestLabel { labelName :: Text }
 data PullRequest = PullRequest { pullRequestNumber :: Int, pullRequestAssignees :: [PullRequestAssignee], pullRequestLabels :: [PullRequestLabel] }
 
-data PullRequestInputPayload = PullRequestInputPayload { pullRequestHead :: Text, pullRequestBase :: Text, setPullRequestTitle :: Maybe Text }
+data PullRequestInputPayload = PullRequestInputPayload { pullRequestHead :: Text, pullRequestBase :: Text, setPullRequestTitle :: Maybe Text, setPullRequestState :: Maybe Text }
 data IssueInputPayload = IssueInputPayload { setIssueAssignees :: [Text], setIssueLabels :: [Text] }
 
 instance Pretty Committish where
@@ -214,9 +214,9 @@ instance FromJSON PullRequest where
     parseJSON _ = fail "Invalid template YAML definition"
 
 instance ToJSON PullRequestInputPayload where
-    toJSON PullRequestInputPayload { pullRequestHead = h, pullRequestBase = b, setPullRequestTitle = t }
+    toJSON PullRequestInputPayload { pullRequestHead = h, pullRequestBase = b, setPullRequestTitle = t, setPullRequestState = s }
         = Aeson.object $ ["head" .= h, "base" .= b] ++ catMaybes
-            [fmap ("title" .=) t]
+            [fmap ("title" .=) t, fmap ("state" .=) s]
 
 instance ToJSON IssueInputPayload where
     toJSON IssueInputPayload { setIssueAssignees = a, setIssueLabels = l } =
@@ -286,3 +286,18 @@ hubApiGraphQL (GitRepository path) query fields = runCmd
 
 hubOwnerQuery :: Text
 hubOwnerQuery = $(embedStringFile "src/Tenpureto/Effects/Git/owner.graphql")
+
+hubApiFindPullRequest
+    :: Members '[Process, Error GitException] r
+    => GitRepository
+    -> Text
+    -> Text
+    -> Sem r (Maybe PullRequest)
+hubApiFindPullRequest repo source target = do
+    owner <- hubApiGraphQL repo hubOwnerQuery [] >>= asApiResponse
+    hubApiGetCmd
+            repo
+            "/repos/{owner}/{repo}/pulls"
+            [("head", ownerLogin owner <> ":" <> source), ("base", target)]
+        >>= asApiResponse
+        <&> listToMaybe

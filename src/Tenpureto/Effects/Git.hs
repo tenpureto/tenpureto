@@ -20,6 +20,7 @@ import           Polysemy
 import           Polysemy.Error
 import           Polysemy.Resource
 
+import           Data.Maybe
 import           Data.ByteString.Lazy           ( ByteString )
 import qualified Data.ByteString.Lazy          as BS
 import           Data.Text                      ( Text )
@@ -40,6 +41,7 @@ newtype BranchRef = BranchRef { reference :: Text } deriving (Eq, Ord, Show)
 data PushSpec = CreateBranch { sourceCommit :: Committish, destinationRef :: BranchRef }
               | UpdateBranch { sourceCommit :: Committish, sourceRef :: BranchRef, destinationRef :: BranchRef, pullRequestRef :: BranchRef, pullRequestTitle :: Text }
               | DeleteBranch { destinationRef :: BranchRef }
+              | CloseBranchUpdate { pullRequestRef :: BranchRef, destinationRef :: BranchRef }
               deriving (Eq, Ord, Show)
 
 data PullRequestSettings = PullRequestSettings { pullRequestAddLabels :: [Text]
@@ -88,6 +90,7 @@ makeSem ''Git
 
 data GitServer m a where
     CreateOrUpdatePullRequest ::GitRepository -> PullRequestSettings -> Committish -> Text -> Text -> Text -> GitServer m ()
+    ClosePullRequest ::GitRepository -> PullRequestSettings -> Text -> Text -> GitServer m ()
 
 makeSem ''GitServer
 
@@ -265,15 +268,17 @@ runGit = interpret $ \case
         gitRepoCmd repo ["branch", "--move", name] >>= asUnit
 
     PushRefs repo refs ->
-        gitRepoCmd repo (["push", "--atomic", "origin"] ++ fmap refspec refs)
+        gitRepoCmd repo
+                   (["push", "--atomic", "origin"] ++ mapMaybe refspec refs)
             >>= asUnit
       where
         ref (BranchRef dst) = "refs/heads/" <> dst
         refspec CreateBranch { sourceCommit = (Committish c), destinationRef = dst }
-            = c <> ":" <> ref dst
+            = Just $ c <> ":" <> ref dst
         refspec UpdateBranch { sourceCommit = (Committish c), destinationRef = dst }
-            = c <> ":" <> ref dst
-        refspec DeleteBranch { destinationRef = dst } = ":" <> ref dst
+            = Just $ c <> ":" <> ref dst
+        refspec DeleteBranch { destinationRef = dst } = Just $ ":" <> ref dst
+        refspec CloseBranchUpdate{}                   = Nothing
 
 
 runGitHub
@@ -297,19 +302,12 @@ runGitHub = interpret $ \case
                            <> source
                            ]
                        >>= asUnit
-                   owner <-
-                       hubApiGraphQL repo hubOwnerQuery [] >>= asApiResponse
-                   exitingPullRequests <-
-                       hubApiGetCmd
-                               repo
-                               "/repos/{owner}/{repo}/pulls"
-                               [ ("head", ownerLogin owner <> ":" <> source)
-                               , ("base", target)
-                               ]
-                           >>= asApiResponse
+                   exitingPullRequests <- hubApiFindPullRequest repo
+                                                                source
+                                                                target
                    pullRequest <- case exitingPullRequests of
-                       pullRequest : _ -> return pullRequest
-                       [] ->
+                       Just pullRequest -> return pullRequest
+                       Nothing ->
                            hubApiCmd
                                    repo
                                    ApiPost
@@ -318,6 +316,7 @@ runGitHub = interpret $ \case
                                        { pullRequestHead     = source
                                        , pullRequestBase     = target
                                        , setPullRequestTitle = Just title
+                                       , setPullRequestState = Nothing
                                        }
                                >>= asApiResponse
                    hubApiCmd
@@ -346,6 +345,12 @@ runGitHub = interpret $ \case
                                                             settings
                                }
                        >>= asUnit
+
+    ClosePullRequest repo _ localSource _ ->
+        let source = internalBranchPrefix <> localSource
+        in  gitRepoCmd repo ["push", "origin", ":" <> "refs/heads/" <> source]
+                >>= asUnit
+
 
 instance Pretty BranchRef where
     pretty ref = pretty $ reference ref

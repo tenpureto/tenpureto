@@ -476,7 +476,6 @@ runTemplateChange template interactive changeMode changesNature f =
                                 runShell (repositoryPath repo)
                                 getCurrentHead repo
                             else return src
-            confirmCommit refspec@(DeleteBranch _) = return refspec
             confirmCommit CreateBranch { sourceCommit = src, destinationRef = dst }
                 = confirmUpdate src dst <&> \c ->
                     CreateBranch { sourceCommit = c, destinationRef = dst }
@@ -489,6 +488,9 @@ runTemplateChange template interactive changeMode changesNature f =
                     , pullRequestRef   = prRef
                     , pullRequestTitle = title
                     }
+            confirmCommit refspec@DeleteBranch{}      = return refspec
+            confirmCommit refspec@CloseBranchUpdate{} = return refspec
+
         let pullRequest _ (DeleteBranch (BranchRef dst)) = do
                 sayLn $ deleteBranchManually dst
                 return $ Left $ TenpuretoBranchNotDeleted dst
@@ -497,6 +499,8 @@ runTemplateChange template interactive changeMode changesNature f =
                 return $ Left $ TenpuretoBranchNotCreated dst
             pullRequest settings UpdateBranch { sourceCommit = c, destinationRef = BranchRef dst, pullRequestRef = BranchRef pr, pullRequestTitle = title }
                 = try $ createOrUpdatePullRequest repo settings c title pr dst
+            pullRequest settings CloseBranchUpdate { destinationRef = BranchRef dst, pullRequestRef = BranchRef pr }
+                = try $ closePullRequest repo settings pr dst
         let pushRefsToServer PushDirectly changes = pushRefs repo changes
             pushRefsToServer UpstreamPullRequest { pullRequestSettings = settings } changes
                 = do
@@ -505,18 +509,25 @@ runTemplateChange template interactive changeMode changesNature f =
                         [] -> return ()
                         e  -> throw $ MultipleExceptions e
         changes <- f repo >>= traverse confirmCommit
-        if null changes
+        let cuIncrement = case changeMode of
+                PushDirectly          -> 0
+                UpstreamPullRequest{} -> 1
+        let collectPushRefs DeleteBranch { destinationRef = r } (d, c, u, cu) =
+                (r : d, c, u, cu)
+            collectPushRefs CreateBranch { destinationRef = r } (d, c, u, cu) =
+                (d, r : c, u, cu)
+            collectPushRefs UpdateBranch { destinationRef = r } (d, c, u, cu) =
+                (d, c, r : u, cu)
+            collectPushRefs CloseBranchUpdate{} (d, c, u, cu) =
+                (d, c, u, cu + cuIncrement)
+        let (deletes, creates, updates, closes) =
+                foldr collectPushRefs ([], [], [], 0) changes
+        if null deletes && null creates && null updates && closes == 0
             then sayLn noRelevantTemplateChanges
             else do
-                let collectPushRefs DeleteBranch { destinationRef = r } (d, c, u)
-                        = (r : d, c, u)
-                    collectPushRefs CreateBranch { destinationRef = r } (d, c, u)
-                        = (d, r : c, u)
-                    collectPushRefs UpdateBranch { destinationRef = r } (d, c, u)
-                        = (d, c, r : u)
-                    (deletes, creates, updates) =
-                        foldr collectPushRefs ([], [], []) changes
-                shouldPush <- confirmPush deletes creates updates
+                shouldPush <- case changeMode of
+                                    PushDirectly -> confirmPush deletes creates updates
+                                    UpstreamPullRequest{} -> confirmPullRequest updates closes
                 if shouldPush
                     then pushRefsToServer changeMode changes
                     else throw CancelledException

@@ -173,7 +173,16 @@ runPropagateGraph repo mode graph branches =
                                         (propagateCurrentCommit a)
                                         (propagateUpstreamCommit mid)
         if not needsMerge
-            then return (propagateCurrentCommit mid, mempty)
+            then return
+                ( propagateCurrentCommit mid
+                , Set.singleton $ Right $ CloseBranchUpdate
+                    { destinationRef = BranchRef $ propagateBranchName mid
+                    , pullRequestRef = BranchRef
+                                       $  propagateBranchName a
+                                       <> "/"
+                                       <> propagateBranchName mid
+                    }
+                )
             else do
                 checkoutBranch repo
                                (unCommittish $ propagateCurrentCommit mid)

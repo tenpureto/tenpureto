@@ -83,10 +83,22 @@ confirmPushMessage :: Pretty r => [r] -> [r] -> [r] -> Doc a
 confirmPushMessage deletes creates updates = "Do you want to"
     <+> (fillSep . punctuate " and") (toDelete ++ toCreate ++ toUpdate)
   where
-    branchList = fillSep . punctuate comma . fmap (dquotes . pretty)
-    toDelete   = if null deletes then [] else ["delete" <+> branchList deletes]
-    toCreate   = if null deletes then [] else ["create" <+> branchList creates]
-    toUpdate   = if null updates then [] else ["push to" <+> branchList updates]
+    toDelete = [ "delete" <+> branchList deletes | not (null deletes) ]
+    toCreate = [ "create" <+> branchList creates | not (null creates) ]
+    toUpdate = [ "push to" <+> branchList updates | not (null updates) ]
+
+confirmPullRequestMessage :: Pretty r => [r] -> Int -> Doc a
+confirmPullRequestMessage updates cleanups = "Do you want to"
+    <+> (fillSep . punctuate " and") (toUpdate ++ toCleanup)
+  where
+    toUpdate =
+        [ "update pull requests to" <+> branchList updates
+        | not (null updates)
+        ]
+    toCleanup =
+        [ "potentially cleanup" <+> pretty cleanups <+> "pull requests"
+        | cleanups > 0
+        ]
 
 confirmShellToAmendMessage :: Doc a
 confirmShellToAmendMessage = "Do you want to enter a shell to amend the commit"
@@ -114,3 +126,8 @@ conflictingCombinations =
 propagateMergeFailed :: Text -> Text -> Doc a
 propagateMergeFailed src dst =
     "Cannot merge" <+> dquotes (pretty src) <+> "into" <+> dquotes (pretty dst)
+
+-- Utilities
+
+branchList :: Pretty r => [r] -> Doc a
+branchList = fillSep . punctuate comma . fmap (dquotes . pretty)
