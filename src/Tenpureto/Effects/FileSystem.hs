@@ -65,39 +65,39 @@ withSystemTempDir template =
     bracket (createSystemTempDir template) removeDirRecur
 
 
-runFileSystemIO :: Member (Lift IO) r => Sem (FileSystem ': r) a -> Sem r a
+runFileSystemIO :: Member (Embed IO) r => Sem (FileSystem ': r) a -> Sem r a
 runFileSystemIO = interpret $ \case
-    ParseRelFile   filePath -> sendM $ Path.parseRelFile filePath
-    EnsureDir      dir      -> sendM $ Path.IO.ensureDir dir
-    EnsureEmptyDir dir      -> sendM $ do
+    ParseRelFile   filePath -> embed $ Path.parseRelFile filePath
+    EnsureDir      dir      -> embed $ Path.IO.ensureDir dir
+    EnsureEmptyDir dir      -> embed $ do
         Path.IO.createDirIfMissing False dir
         Path.IO.listDir dir >>= \(dirs, files) -> bool
             (E.throwIO $ userError "Directory is not empty")
             (return ())
             (null dirs && null files)
-    ResolveDir path -> sendM $ E.catch
+    ResolveDir path -> embed $ E.catch
         (Path.IO.resolveDir' path)
         (\e -> let _ = (e :: PathException) in Path.parseAbsDir path)
-    ResolveFile path -> sendM $ E.catch
+    ResolveFile path -> embed $ E.catch
         (Path.IO.resolveFile' path)
         (\e -> let _ = (e :: PathException) in Path.parseAbsFile path)
-    IsSymlink file -> sendM $ Path.IO.isSymlink file
+    IsSymlink file -> embed $ Path.IO.isSymlink file
     GetSymbolicLinkDirTarget path ->
-        sendM $ System.Directory.getSymbolicLinkTarget (toFilePath path)
+        embed $ System.Directory.getSymbolicLinkTarget (toFilePath path)
     CreateDirectoryLink dst file ->
-        sendM $ System.Directory.createDirectoryLink dst (toFilePath file)
-    CopyPermissions src  dst  -> sendM $ Path.IO.copyPermissions src dst
-    RenameFile      from to   -> sendM $ Path.IO.renameFile from to
-    RemoveFile           file -> sendM $ Path.IO.removeFile file
-    ReadFileAsByteString file -> sendM $ BS.readFile (toFilePath file)
+        embed $ System.Directory.createDirectoryLink dst (toFilePath file)
+    CopyPermissions src  dst  -> embed $ Path.IO.copyPermissions src dst
+    RenameFile      from to   -> embed $ Path.IO.renameFile from to
+    RemoveFile           file -> embed $ Path.IO.removeFile file
+    ReadFileAsByteString file -> embed $ BS.readFile (toFilePath file)
     ReadFileAsMaybeByteString file ->
-        sendM $ Path.IO.forgivingAbsence $ BS.readFile (toFilePath file)
+        embed $ Path.IO.forgivingAbsence $ BS.readFile (toFilePath file)
     WriteFileAsByteString file content ->
-        sendM $ BS.writeFile (toFilePath file) content
+        embed $ BS.writeFile (toFilePath file) content
     OpenBinaryTempFile dir template ->
-        sendM $ Path.IO.openBinaryTempFile dir template
+        embed $ Path.IO.openBinaryTempFile dir template
     CreateSystemTempDir template ->
-        sendM $ Path.IO.getTempDir >>= flip Path.IO.createTempDir template
-    RemoveDirRecur dir            -> sendM $ Path.IO.removeDirRecur dir
-    HPutByteString handle content -> sendM $ BS.hPut handle content
-    HClose handle                 -> sendM $ System.IO.hClose handle
+        embed $ Path.IO.getTempDir >>= flip Path.IO.createTempDir template
+    RemoveDirRecur dir            -> embed $ Path.IO.removeDirRecur dir
+    HPutByteString handle content -> embed $ BS.hPut handle content
+    HClose handle                 -> embed $ System.IO.hClose handle

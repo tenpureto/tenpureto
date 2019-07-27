@@ -315,7 +315,7 @@ templateCommands = hsubparser
     )
 
 runAppM
-    :: Members '[Terminal, Resource, Lift IO] r
+    :: Members '[Terminal, Resource, Embed IO] r
     => Bool
     -> Bool
     -> Sem
@@ -352,9 +352,9 @@ runAppM
 runAppM withDebug unattended =
     runTenpuretoException
         . runError @TenpuretoException
-        . runErrorAsAnother TenpuretoGitException
-        . runErrorAsAnother TenpuretoUIException
-        . runErrorAsAnother TenpuretoTemplateLoaderException
+        . mapError TenpuretoGitException
+        . mapError TenpuretoUIException
+        . mapError TenpuretoTemplateLoaderException
         . runTerminalIOInput
         . runFileSystemIO
         . runUI unattended
@@ -365,7 +365,7 @@ runAppM withDebug unattended =
         . runGitHub
 
 runTenpuretoException
-    :: Members '[Lift IO, Terminal] r
+    :: Members '[Embed IO, Terminal] r
     => Sem r (Either TenpuretoException a)
     -> Sem r a
 runTenpuretoException = (=<<) handleResult
@@ -373,7 +373,7 @@ runTenpuretoException = (=<<) handleResult
     handleResult (Right a) = return a
     handleResult (Left  e) = do
         sayLn $ pretty e
-        sendM $ exitWith (ExitFailure 1)
+        embed $ exitWith (ExitFailure 1)
 
 runUI
     :: Members '[FileSystem, Terminal, TerminalInput, Error UIException] r
@@ -384,7 +384,7 @@ runUI False = runUIInTerminal
 runUI True  = runUIUnattended
 
 runCommand
-    :: Members '[Terminal, Resource, Lift IO] r
+    :: Members '[Terminal, Resource, Embed IO] r
     => Command
     -> Sem r ()
 runCommand Create { maybeTemplateName = t, maybeTargetDirectory = td, maybeProjectConfiguration = c, runUnattended = u, enableDebugLogging = d }
@@ -432,11 +432,11 @@ runCommand TemplateChangeVariable { templateName = t, oldVariableValue = ov, new
     = runAppM d False $ changeTemplateVariableValue t ov nv i
 
 runOptParser
-    :: Members '[Terminal, Resource, Lift IO] r => Sem r ()
+    :: Members '[Terminal, Resource, Embed IO] r => Sem r ()
 runOptParser = do
     w <- fromMaybe 80 <$> terminalWidth
     let p = prefs (showHelpOnEmpty <> columns w)
-    c <- sendM (customExecParser p opts)
+    c <- embed (customExecParser p opts)
     runCommand c
   where
     commands = hsubparser
@@ -457,5 +457,5 @@ runOptParser = do
 
 main :: IO ()
 main = do
-    handler <- nat (runM @IO) .@! runTerminalIOOutput .@! liftNat runResourceInIO
+    handler <- nat (runM @IO) .@! runTerminalIOOutput .@! liftNat lowerResource
     handler runOptParser

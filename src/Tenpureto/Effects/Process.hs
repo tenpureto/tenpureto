@@ -44,20 +44,20 @@ data Process m a where
 
 makeSem ''Process
 
-runProcessIO :: Member (Lift IO) r => Sem (Process ': r) a -> Sem r a
+runProcessIO :: Member (Embed IO) r => Sem (Process ': r) a -> Sem r a
 runProcessIO = interpret $ \case
 
-    RunCmd (cmd :| args) -> sendM $ readProcess $ setStdin closed $ proc
+    RunCmd (cmd :| args) -> embed $ readProcess $ setStdin closed $ proc
         (T.unpack cmd)
         (map T.unpack args)
 
     RunInputCmd (cmd :| args) input ->
-        sendM $ readProcess $ setStdin (byteStringInput input) $ proc
+        embed $ readProcess $ setStdin (byteStringInput input) $ proc
             (T.unpack cmd)
             (map T.unpack args)
 
     RunInteractiveCmd (cmd :| args) ->
-        sendM
+        embed
             $ runProcess
             $ setStdin inherit
             $ setStdout inherit
@@ -65,7 +65,7 @@ runProcessIO = interpret $ \case
             $ proc (T.unpack cmd) (map T.unpack args)
 
     RunShell dir ->
-        sendM $ runProcess_ $ setWorkingDir (toFilePath dir) $ shell "$SHELL"
+        embed $ runProcess_ $ setWorkingDir (toFilePath dir) $ shell "$SHELL"
 
 
 withProcessLogging :: (Member Logging r, Member Process r) => Sem r a -> Sem r a

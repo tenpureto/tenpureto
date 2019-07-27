@@ -111,7 +111,7 @@ runMergeGraphPure
     -> ([MergeRecord], Maybe TemplateYaml)
 runMergeGraphPure graph selectedBranches =
     run
-        . runFoldMapOutput pure
+        . runOutputMonoid pure
         $ let logMerges b1 b2 d =
                   let mc = mergedBranchName d
                   in  output (MergeRecord b1 b2 mc) $> mc

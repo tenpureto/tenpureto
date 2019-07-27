@@ -36,7 +36,7 @@ dependencies:
 - parsec
 - file-embed
 - monad-memo
-- polysemy >= 0.5.0.1
+- polysemy >= 1.0.0.0
 - polysemy-zoo
 - polysemy-plugin
 

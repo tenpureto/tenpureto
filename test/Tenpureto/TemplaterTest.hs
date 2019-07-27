@@ -128,5 +128,4 @@ runFileSystemPure = reinterpret $ \case
     throwE e = throw $ E.SomeException e
 
 runTest :: Sem '[Logging, FileSystem, Error String] a -> Either String a
-runTest =
-    run . runError . runErrorAsAnother show . runFileSystemPure . runNoLogging
+runTest = run . runError . mapError show . runFileSystemPure . runNoLogging

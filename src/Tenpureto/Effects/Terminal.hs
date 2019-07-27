@@ -64,27 +64,27 @@ traverseWithProgressBar info action tasks =
     in  traverseWithIndex fullAction tasks
 
 runTerminalIOOutput
-    :: Member (Lift IO) r
+    :: Member (Embed IO) r
     => (forall x . Sem r x -> IO x)
     -> IO (forall a . Sem (Terminal ': r) a -> Sem r a)
 runTerminalIOOutput _ = do
     ioRef <- newIORef (TemporaryHeight 0)
-    nat $ runStateInIORef ioRef . reinterpret \case
-        TerminalWidth -> sendM getTerminalWidth
+    nat $ runStateIORef ioRef . reinterpret \case
+        TerminalWidth -> embed getTerminalWidth
         SayLn msg     -> do
             TemporaryHeight ph <- get
-            sendM $ clearLastLinesTerminal ph
+            embed $ clearLastLinesTerminal ph
             put $ TemporaryHeight 0
-            sendM $ sayLnTerminal msg
+            embed $ sayLnTerminal msg
         SayLnTemporary msg -> do
             TemporaryHeight ph <- get
-            sendM $ clearLastLinesTerminal ph
-            h <- sendM $ sayLnTerminal' msg
+            embed $ clearLastLinesTerminal ph
+            h <- embed $ sayLnTerminal' msg
             put $ TemporaryHeight h
 
 runTerminalIOInput
-    :: Member (Lift IO) r => Sem (TerminalInput ': r) a -> Sem r a
+    :: Member (Embed IO) r => Sem (TerminalInput ': r) a -> Sem r a
 runTerminalIOInput = interpret $ \case
-    Ask msg defans -> sendM $ askTerminal msg defans
+    Ask msg defans -> embed $ askTerminal msg defans
     AskUntil state request process ->
-        sendM $ askTerminalUntil state request process
+        embed $ askTerminalUntil state request process
