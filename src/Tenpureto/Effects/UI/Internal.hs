@@ -61,10 +61,10 @@ preMergeBranches
     -> Set TemplateBranchInformation
     -> TemplateYaml
 preMergeBranches graph selectedBranches =
-    fold $ runIdentity $ mergeBranchesGraph (const ())
-                                            (\_ _ _ -> return ())
-                                            graph
-                                            selectedBranches
+    fold $ fmap snd $ runIdentity $ mergeBranchesGraph (const ())
+                                                       (\_ _ _ -> return ())
+                                                       graph
+                                                       selectedBranches
 
 inputBranchList
     :: Graph TemplateBranchInformation

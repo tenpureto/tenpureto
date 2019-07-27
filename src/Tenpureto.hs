@@ -259,6 +259,7 @@ prepareTemplate repository template configuration =
         (mergeLog, _) = runMergeGraphPure graph fullSelectedBranches
         mergeRecord (MergeRecord a b c) =
             "Merge" <+> pretty b <+> "into" <+> pretty a <+> "as" <+> pretty c
+        mergeRecord (CheckoutRecord a) = "Checkout" <+> pretty a
     in
         withMergeCache $ do
             logInfo $ "Full branch selection:" <> line <> (indent 4 . pretty)

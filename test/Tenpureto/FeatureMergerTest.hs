@@ -43,7 +43,10 @@ test_runMergeGraphPure =
         "merge order"
         [ testCase "path"
         $   fst (runMergeGraphPure' (path [v "a", v "b", v "c"]))
-        @?= [MergeRecord "b" "a" "b", MergeRecord "c" "b" "c"]
+        @?= [ MergeRecord "b" "a" "b"
+            , MergeRecord "c" "b" "c"
+            , CheckoutRecord "c"
+            ]
         , testCase "diamond"
         $   fst
                 (runMergeGraphPure'
@@ -55,6 +58,7 @@ test_runMergeGraphPure =
             , MergeRecord "c" "a" "c"
             , MergeRecord "d" "b" "d"
             , MergeRecord "d" "c" "d"
+            , CheckoutRecord "d"
             ]
         ]
     , testGroup

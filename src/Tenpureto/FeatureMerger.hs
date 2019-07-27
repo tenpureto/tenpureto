@@ -16,6 +16,7 @@ import           Polysemy
 import           Polysemy.Output
 import           Polysemy.State
 
+import           Data.Maybe
 import           Data.Either
 import           Data.List
 import           Data.Set                       ( Set )
@@ -34,7 +35,8 @@ import           Tenpureto.Effects.UI
 import           Tenpureto.Effects.Terminal
 import           Tenpureto.FeatureMerger.Internal
 
-data MergeRecord = MergeRecord Text Text Text
+data MergeRecord = CheckoutRecord Text
+                 | MergeRecord Text Text Text
     deriving (Show, Eq)
 
 mergeCommits
@@ -90,10 +92,11 @@ runMergeGraph
     -> Sem r (Maybe TemplateYaml)
 runMergeGraph repo graph branches = do
     mbd <- mergeBranchesGraph branchData mergeCommitsCached graph branches
-    forM_ mbd $ \d -> do
+    forM_ mbd $ \((c, _, _), d) -> do
+        checkoutBranch repo (unCommittish c) Nothing
         writeAddFile repo templateYamlFile (formatTemplateYaml d)
         commit repo commitUpdateTemplateYaml
-    return mbd
+    return $ fmap snd mbd
   where
     mergeCommitsCached a b d = do
         cache <- get
@@ -110,12 +113,16 @@ runMergeGraphPure
     -> Set TemplateBranchInformation
     -> ([MergeRecord], Maybe TemplateYaml)
 runMergeGraphPure graph selectedBranches =
-    run
-        . runOutputMonoid pure
-        $ let logMerges b1 b2 d =
-                  let mc = mergedBranchName d
-                  in  output (MergeRecord b1 b2 mc) $> mc
-          in  mergeBranchesGraph branchName logMerges graph selectedBranches
+    let (records, c) = run . runOutputMonoid pure $ mergeBranchesGraph
+            branchName
+            logMerges
+            graph
+            selectedBranches
+        co = maybeToList $ fmap (CheckoutRecord . fst) c
+    in  (records <> co, fmap snd c)
+  where
+    logMerges b1 b2 d =
+        let mc = mergedBranchName d in output (MergeRecord b1 b2 mc) $> mc
 
 listMergeCombinations
     :: Graph TemplateBranchInformation -> [Set TemplateBranchInformation]

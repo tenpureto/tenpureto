@@ -50,9 +50,11 @@ descriptorToTemplateYaml d = TemplateYaml { yamlVariables = mergedVariables d
                                           }
 
 mergedBranchInformationToTemplateYaml
-    :: MergedBranchInformation a -> TemplateYaml
-mergedBranchInformationToTemplateYaml =
-    descriptorToTemplateYaml . mergedBranchDescriptor
+    :: MergedBranchInformation a -> (a, TemplateYaml)
+mergedBranchInformationToTemplateYaml mbi =
+    ( mergedBranchMeta mbi
+    , (descriptorToTemplateYaml . mergedBranchDescriptor) mbi
+    )
 
 templateBranchInformationData
     :: (TemplateBranchInformation -> a)
@@ -76,7 +78,7 @@ mergeBranchesGraph
     -> (a -> a -> MergedBranchDescriptor -> m a)
     -> Graph TemplateBranchInformation
     -> Set TemplateBranchInformation
-    -> m (Maybe TemplateYaml)
+    -> m (Maybe (a, TemplateYaml))
 mergeBranchesGraph extract mergeCommits graph selectedBranches =
     fmap (fmap mergedBranchInformationToTemplateYaml)
         $ mergeGraph mergeCommits
