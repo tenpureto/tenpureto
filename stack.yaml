@@ -6,6 +6,9 @@ extra-deps:
 - hedgehog-classes-0.2.1@sha256:17efa4f03e2de7936c119266d8b3710b167b2615a3455b45461c2dfa23b82fb6,5351
 - semirings-0.3.1.2@sha256:ecb57a0ba210409f1376646b3cfd1f48a756ad8ab8467fce98d50e2e15e1c528,3759 # for hedgehog-classes
 
+nix:
+  packages: [ icu ]
+
 flags:
   polysemy:
     error-messages: False
