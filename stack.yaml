@@ -7,7 +7,7 @@ extra-deps:
 - semirings-0.3.1.2@sha256:ecb57a0ba210409f1376646b3cfd1f48a756ad8ab8467fce98d50e2e15e1c528,3759 # for hedgehog-classes
 
 nix:
-  packages: [ icu ]
+  packages: [ icu, zlib ]
 
 flags:
   polysemy:
