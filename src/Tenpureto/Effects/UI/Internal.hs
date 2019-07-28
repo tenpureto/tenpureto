@@ -146,13 +146,17 @@ inputBranches
     => Graph TemplateBranchInformation
     -> Set Text
     -> Sem r (Set TemplateBranchInformation)
-inputBranches graph initialNameSelection = askUntil initial request process
+inputBranches graph initialNameSelection = case initial of
+    Left  initial' -> askUntil initial' request process
+    Right auto     -> return auto
   where
     initialSelection :: Set TemplateBranchInformation
     initialSelection = Set.fromList
         $ filterBranchesByNames (vertexList graph) initialNameSelection
+
     roots :: [TemplateBranchInformation]
     roots = graphRoots graph
+
     available :: Set TemplateBranchInformation -> [TemplateBranchInformation]
     available selected =
         let
@@ -162,8 +166,22 @@ inputBranches graph initialNameSelection = askUntil initial request process
                 concatMap (`reachable` graph) fullSelection
         in
             nub $ roots <> reachableFromSelection
-    initial :: InputBranchState
-    initial = (available initialSelection, initialSelection, Nothing)
+
+    autoselect
+        :: InputBranchState
+        -> Either InputBranchState (Set TemplateBranchInformation)
+    autoselect ([single], selection, badInput)
+        | Set.size selection == 0
+        = let newSelection = Set.singleton single
+          in  autoselect (available newSelection, newSelection, badInput)
+        | Set.size selection == 1
+        = Right selection
+    autoselect other = Left other
+
+    initial :: Either InputBranchState (Set TemplateBranchInformation)
+    initial =
+        autoselect (available initialSelection, initialSelection, Nothing)
+
     request :: InputBranchState -> (Doc AnsiStyle, Maybe Text)
     request (availableBranches, selected, badInput) =
         let
@@ -181,13 +199,14 @@ inputBranches graph initialNameSelection = askUntil initial request process
                            badInput
                     <> "Add or remove a feature:"
         in  (doc, Nothing)
+
     process
         :: InputBranchState
         -> Text
         -> Either InputBranchState (Set TemplateBranchInformation)
     process (_, selected, _) "" = Right selected
     process (availableBranches, selected, _) input =
-        Left $ case branchByIndex availableBranches input of
+        autoselect $ case branchByIndex availableBranches input of
             Just bi ->
                 let newSelected = if bi `Set.member` selected
                         then bi `Set.delete` selected
