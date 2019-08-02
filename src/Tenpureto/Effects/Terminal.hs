@@ -21,6 +21,9 @@ import           Data.Text.Prettyprint.Doc
 import           Data.Text.Prettyprint.Doc.Render.Terminal
 import           Data.IORef
 
+import           System.IO                      ( stdout )
+import           System.Console.ANSI            ( hSupportsANSI )
+
 import           Tenpureto.Effects.Terminal.Internal
 
 data Terminal m a where
@@ -68,18 +71,21 @@ runTerminalIOOutput
     => (forall x . Sem r x -> IO x)
     -> IO (forall a . Sem (Terminal ': r) a -> Sem r a)
 runTerminalIOOutput _ = do
-    ioRef <- newIORef (TemporaryHeight 0)
+    ioRef        <- newIORef (TemporaryHeight 0)
+    supportsANSI <- hSupportsANSI stdout
+    let fmt :: Doc AnsiStyle -> Doc AnsiStyle
+        fmt = if supportsANSI then id else unAnnotate
     nat $ runStateIORef ioRef . reinterpret \case
         TerminalWidth -> embed getTerminalWidth
         SayLn msg     -> do
             TemporaryHeight ph <- get
             embed $ clearLastLinesTerminal ph
             put $ TemporaryHeight 0
-            embed $ sayLnTerminal msg
+            embed $ sayLnTerminal (fmt msg)
         SayLnTemporary msg -> do
             TemporaryHeight ph <- get
             embed $ clearLastLinesTerminal ph
-            h <- embed $ sayLnTerminal' msg
+            h <- embed $ sayLnTerminal' (fmt msg)
             put $ TemporaryHeight h
 
 runTerminalIOInput
