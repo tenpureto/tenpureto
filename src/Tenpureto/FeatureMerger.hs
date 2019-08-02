@@ -3,7 +3,6 @@
 module Tenpureto.FeatureMerger
     ( MergeRecord(..)
     , PropagatePushMode(..)
-    , PropagateFailure(..)
     , withMergeCache
     , runMergeGraphPure
     , runMergeGraph
@@ -17,7 +16,6 @@ import           Polysemy.Output
 import           Polysemy.State
 
 import           Data.Maybe
-import           Data.Either
 import           Data.List
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
@@ -153,8 +151,6 @@ data PropagateData = PropagateData { propagateCurrentCommit :: Committish
                                    , propagateBranchName :: Text
                                    }
                         deriving (Eq, Ord, Show)
-data PropagateFailure = PropagateFailure Text Text
-                            deriving (Eq, Ord, Show)
 
 runPropagateGraph
     :: Members '[Git, Terminal, State MergeCache] r
@@ -162,7 +158,7 @@ runPropagateGraph
     -> PropagatePushMode
     -> Graph TemplateBranchInformation
     -> Set TemplateBranchInformation
-    -> Sem r [Either PropagateFailure PushSpec]
+    -> Sem r [PushSpec]
 runPropagateGraph repo mode graph branches =
     Set.toList
         <$> propagateBranchesGraph branchData
@@ -182,7 +178,7 @@ runPropagateGraph repo mode graph branches =
         if not needsMerge
             then return
                 ( propagateCurrentCommit mid
-                , Set.singleton $ Right $ CloseBranchUpdate
+                , Set.singleton $ CloseBranchUpdate
                     { destinationRef = BranchRef $ propagateBranchName mid
                     , pullRequestRef = BranchRef
                                        $  propagateBranchName a
@@ -202,9 +198,10 @@ runPropagateGraph repo mode graph branches =
                     MergeAllowFastForward
                     (unCommittish $ propagateCurrentCommit a)
                     title
-                let success c =
+                let
+                    success c =
                         ( c
-                        , Set.singleton $ Right $ UpdateBranch
+                        , Set.singleton $ UpdateBranch
                             { sourceCommit     = c
                             , sourceRef = BranchRef $ propagateBranchName a
                             , destinationRef   = BranchRef
@@ -216,16 +213,11 @@ runPropagateGraph repo mode graph branches =
                             , pullRequestTitle = title
                             }
                         )
-                    failure =
-                        ( propagateCurrentCommit mid
-                        , Set.singleton $ Left $ PropagateFailure
-                            (propagateBranchName a)
-                            (propagateBranchName mid)
-                        )
                 case preMergeResult of
                     MergeSuccessCommitted   -> success <$> getCurrentHead repo
                     MergeSuccessUncommitted -> success <$> commit repo title
-                    MergeConflicts _        -> failure <$ mergeAbort repo
+                    MergeConflicts _ ->
+                        mergeAbort repo $> success (propagateCurrentCommit a)
     propagateOne PropagatePushSeparately mi a =
         let mid = mergedBranchMeta mi
         in  do
@@ -248,7 +240,7 @@ runPropagateGraph repo mode graph branches =
                         , propagateUpstreamCommit = propagateUpstreamCommit mid
                         , propagateBranchName     = propagateBranchName mid
                         }
-                    , Set.filter isLeft actions
+                    , actions
                     )
     propagateMerge PropagatePushMerged b =
         let
@@ -256,7 +248,7 @@ runPropagateGraph repo mode graph branches =
             needsPush = propagateCurrentCommit bd /= propagateUpstreamCommit bd
         in
             return $ Set.fromList
-                [ Right $ UpdateBranch
+                [ UpdateBranch
                       { sourceCommit     = propagateCurrentCommit bd
                       , sourceRef        = BranchRef $ propagateBranchName bd
                       , destinationRef   = BranchRef $ propagateBranchName bd

@@ -366,14 +366,11 @@ propagateTemplateBranchChanges template branchFilter pushMode =
                     UpstreamPullRequest{} -> PropagatePushSeparately
             logInfo $ "Propagating changes for" <+> pretty
                 (fmap branchName branches)
-            changes <- runPropagateGraph repo
-                                         mode
-                                         (branchesGraph templateInformation)
-                                         (Set.fromList branches)
-            let (failures, pushspecs) = partitionEithers changes
-            for_ failures $ \(PropagateFailure from to) ->
-                sayLn $ propagateMergeFailed from to
-            return pushspecs
+            runPropagateGraph
+                repo
+                mode
+                (branchesGraph templateInformation)
+                (Set.fromList branches)
 
 listTemplateConflicts
     :: Members
