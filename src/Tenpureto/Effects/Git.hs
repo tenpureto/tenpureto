@@ -352,7 +352,7 @@ runGitHub = interpret $ \case
     ClosePullRequest repo _ localSource _ ->
         let source = internalBranchPrefix <> localSource
         in  gitRepoCmd repo ["push", "origin", ":" <> "refs/heads/" <> source]
-                >>= asUnit
+                $> ()
 
 
 instance Pretty BranchRef where
