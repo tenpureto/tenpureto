@@ -18,7 +18,7 @@ showTree a =
 showTree' :: Tree Text -> Doc ()
 showTree' (Leaf a) = pretty a
 showTree' (Node a children) =
-    pretty a <> indent 2 (vsep (fmap showTree' children))
+    pretty a <> "\n" <> indent 2 (vsep (fmap showTree' children))
 
 type MergeCacheElement = (Committish, Text, Tree Text)
 type MergeCacheKey = (MergeCacheElement, MergeCacheElement)
