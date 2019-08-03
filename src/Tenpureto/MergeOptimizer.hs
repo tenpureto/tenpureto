@@ -138,7 +138,7 @@ mergeGraph mergeCommits = foldTopologically vcombine hcombine
                 return $ MergedBranchInformation { mergedBranchMeta       = c
                                                  , mergedBranchDescriptor = d
                                                  }
-    vcombine = foldM (combine vcombineD)
+    vcombine v _ = return v
     hcombine = foldlM1 (combine hcombineD)
 
 propagateGraph

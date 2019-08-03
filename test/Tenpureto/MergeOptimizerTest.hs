@@ -12,9 +12,9 @@ import           Tenpureto.MergeOptimizer
 
 test_mergeGraph :: [TestTree]
 test_mergeGraph =
-      [ testCase "merge parents into children"
+      [ testCase "not merge parents into children"
             $ let graph = edge (v 1 "1") (v 2 "2")
-              in  runIdentity (mergeGraph mergeCommits graph) @?= Just (v 3 "2")
+              in  runIdentity (mergeGraph mergeCommits graph) @?= Just (v 2 "2")
       , testCase "merge siblings"
             $ let graph = overlay (vertex $ v 1 "1") (vertex $ v 2 "2")
               in  runIdentity (mergeGraph mergeCommits graph)

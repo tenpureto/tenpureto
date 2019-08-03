@@ -43,10 +43,7 @@ test_runMergeGraphPure =
         "merge order"
         [ testCase "path"
         $   fst (runMergeGraphPure' (path [v "a", v "b", v "c"]))
-        @?= [ MergeRecord "b" "a" "b"
-            , MergeRecord "c" "b" "c"
-            , CheckoutRecord "c"
-            ]
+        @?= [CheckoutRecord "c"]
         , testCase "diamond"
         $   fst
                 (runMergeGraphPure'
@@ -54,23 +51,35 @@ test_runMergeGraphPure =
                              (path [v "a", v "c", v "d"])
                     )
                 )
-        @?= [ MergeRecord "b" "a" "b"
-            , MergeRecord "c" "a" "c"
-            , MergeRecord "d" "b" "d"
-            , MergeRecord "d" "c" "d"
-            , CheckoutRecord "d"
+        @?= [CheckoutRecord "d"]
+        , testCase "fork"
+        $   fst
+                (runMergeGraphPure'
+                    (overlay (path [v "a", v "b"]) (path [v "a", v "c"]))
+                )
+        @?= [MergeRecord "b" "c" "b+c", CheckoutRecord "b+c"]
+        , testCase "thee unrelated braches"
+        $   fst (runMergeGraphPure' (vertices [v "a", v "b", v "c"]))
+        @?= [ MergeRecord "a"   "b" "a+b"
+            , MergeRecord "a+b" "c" "a+b+c"
+            , CheckoutRecord "a+b+c"
             ]
         ]
     , testGroup
         "merge data"
         [ testCase "features"
         $   (fmap (Set.map yamlFeatureName . yamlFeatures) . snd)
-                (runMergeGraphPure' (path [v "a", v "b"]))
+                (runMergeGraphPure' (vertices [v "a", v "b"]))
         @?= Just (Set.fromList ["a", "b"])
         , testCase "variables"
-        $ (fmap yamlVariables . snd) (runMergeGraphPure' (path [v "a", v "b"]))
+        $   (fmap yamlVariables . snd)
+                (runMergeGraphPure' (vertices [v "a", v "b"]))
         @?= Just (Map.fromList [("a", "a"), ("b", "b")])
-        , testCase "conflicts"
+        , testCase "conflicts for different vertices"
+        $   (fmap yamlConflicts . snd)
+                (runMergeGraphPure' (vertices [v "a", v "b"]))
+        @?= Just (Set.fromList ["a", "b"])
+        , testCase "conflicts for a path"
         $ (fmap yamlConflicts . snd) (runMergeGraphPure' (path [v "a", v "b"]))
         @?= Just (Set.fromList ["b"])
         ]
