@@ -12,12 +12,12 @@ packages:
   original:
     hackage: text-regex-replace-0.1.1.3@sha256:e7f612df671c93ced54a3d26528db37852069884e5cb67d5afbb49d3defb5eb9
 - completed:
-    hackage: hedgehog-classes-0.2.1@sha256:17efa4f03e2de7936c119266d8b3710b167b2615a3455b45461c2dfa23b82fb6,5351
+    hackage: hedgehog-classes-0.2.2@sha256:1a5b6459ab9af30bd277ac0ecd2986b36584dfa07ceca8b89bf59cecd7883236,5240
     pantry-tree:
-      size: 4974
-      sha256: 625a4d7494774e9d1f58420c3520dc652d36798c97d7018763435e42fb8908e8
+      size: 4798
+      sha256: abcdc66f67bb9d9f187c1713a6f40a3139ddcdc58bfa1037ead3b807dae13e58
   original:
-    hackage: hedgehog-classes-0.2.1@sha256:17efa4f03e2de7936c119266d8b3710b167b2615a3455b45461c2dfa23b82fb6,5351
+    hackage: hedgehog-classes-0.2.2@sha256:1a5b6459ab9af30bd277ac0ecd2986b36584dfa07ceca8b89bf59cecd7883236,5240
 - completed:
     hackage: semirings-0.3.1.2@sha256:ecb57a0ba210409f1376646b3cfd1f48a756ad8ab8467fce98d50e2e15e1c528,3759
     pantry-tree:
@@ -27,7 +27,7 @@ packages:
     hackage: semirings-0.3.1.2@sha256:ecb57a0ba210409f1376646b3cfd1f48a756ad8ab8467fce98d50e2e15e1c528,3759
 snapshots:
 - completed:
-    size: 521697
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2019/7/27.yaml
-    sha256: 04abea78c29b5c667534d75da41d698645f4bad79dd3bb919c779bbef0dc499e
-  original: nightly-2019-07-27
+    size: 523443
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/14/0.yaml
+    sha256: 283773e7120f5446d961eab35ea95c9af9c24187cc178537bd29273200a05171
+  original: lts-14.0
