@@ -46,10 +46,9 @@ sayLnTerminal' :: Doc AnsiStyle -> IO Int
 sayLnTerminal' msg = sayTerminal' (msg <> "\n")
 
 clearLastLinesTerminal :: Int -> IO ()
-clearLastLinesTerminal n = do
-    when (n > 0) $ do
-        cursorUp n
-        setCursorColumn 0
+clearLastLinesTerminal n = when (n > 0) $ do
+    cursorUp n
+    setCursorColumn 0
     clearFromCursorToScreenEnd
 
 askTerminalH :: Doc AnsiStyle -> Maybe Text -> IO (Text, Int)
