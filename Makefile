@@ -8,6 +8,9 @@ stack_install = $(stack) install
 
 dist = dist
 
+docs_dir  = docs
+docs_dist = $(docs_dir)/.vuepress/dist
+
 staging_dir                      = .build/staging
 staging_bin                      = $(staging_dir)/bin
 staging_etc                      = $(staging_dir)/etc
@@ -27,7 +30,8 @@ install_zsh_completions_dir  = $(install_share)/zsh/site-functions
 metadata_version         = $(shell $(stack) query locals $(package) version)
 metadata_git_describe    = $(shell git describe)
 metadata_git_version     = $(metadata_git_describe:v%=%)
-metadata_homepage        = "https://github.com/rtimush/tenpureto"
+metadata_domain          = "tenpureto.org"
+metadata_homepage        = "https://$(metadata_domain)"
 metadata_description     = "Simple and flexible project templates"
 metadata_maintainer      = "Roman Timushev"
 
@@ -60,7 +64,8 @@ clean:
 	rm -rf .build/*/.stack-work
 	rm -rf staging
 	rm -rf .build/*/staging
-	rm -rf dist
+	rm -rf $(dist)
+	rm -rf $(docs_dist)
 	OS_DISTRIBUTION="amzn2" $(docker_compose) down --remove-orphans --rmi local
 	OS_DISTRIBUTION="bionic" $(docker_compose) down --remove-orphans --rmi local
 	OS_DISTRIBUTION="buster" $(docker_compose) down --remove-orphans --rmi local
@@ -184,3 +189,23 @@ bintray-publish-deb:
 	jfrog bt version-publish --user $(BINTRAY_API_USER) \
 	                         --key $(BINTRAY_API_KEY) \
 	                         tenpureto/$(deb_repository)/$(package)/$(deb_version)
+
+.PHONY: npm-ci-docs
+npm-ci-docs:
+	cd $(docs_dir) && npm ci
+
+.PHONY: test-docs
+test-docs:
+	cd $(docs_dir) && npm run format:check
+
+.PHONY: build-docs
+build-docs:
+	cd $(docs_dir) && npm run build
+	echo "$(metadata_domain)" > $(docs_dist)/CNAME
+
+.PHONY: publish-docs
+publish-docs: build-docs
+	git -C $(docs_dist) init
+	git -C $(docs_dist) add -A
+	git -C $(docs_dist) commit -m deploy
+	git -C $(docs_dist) push -f git@github.com:$(package)/$(package).github.io.git master

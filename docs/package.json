@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "dev": "vuepress dev .",
+    "build": "vuepress build .",
+    "format": "prettier --write '**/*.{js,md,yaml}'",
+    "format:check": "prettier --check '**/*.{js,md,yaml}'"
+  },
+  "devDependencies": {
+    "prettier": "1.18.2",
+    "vuepress": "^1.0.4"
+  }
+}

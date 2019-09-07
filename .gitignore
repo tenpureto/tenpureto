@@ -4,3 +4,6 @@
 /tenpureto.cabal
 /dist
 *~
+
+/docs/node_modules/
+/docs/.vuepress/dist/
