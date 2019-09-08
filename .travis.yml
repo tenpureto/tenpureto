@@ -13,7 +13,7 @@ stages:
   - test
   - package
   - name: publish
-    if: branch = master OR tag =~ ^v.*
+    if: fork = false AND type = push AND ( branch = master OR tag =~ ^v.* )
 
 env:
   global:
@@ -25,18 +25,19 @@ env:
     - secure: "bHBpco7QFXghA9BdE8LS1DTrkHpR49N2oFHuQnjC1cP1JEdg+liEwq+QK/iFI5FVBG9tLomcW18ZGSYYwf2qA4d1HfJENVWyfJsVUu/I6Q8oLHy+s3n6uZB0l3H4Ee/Wp66Tx8EKf05Ri+tD8L4/R4wHFSN5cMzpkU4qgXgejtomdwKRQrofGOI6KXs/wY4YtNd1nY/CLgXXr0eyCOD/K2AagwTWywBJIxBlptxgZJQV9PeGJzDiQ1i55CCzJcd9k5X4vgnxjFcdHFdK7E+3YjEhEetwhTKdCdU21/kJEeRXdvITn1DGvY6NWfAyGLh5vFvf7xpgSGM2r93NhiX4Ta7Q6rDIAqEZTR/Avj/SAA38MiWUr4hogK1IZqCEuRKyzxX8hRYbiJHfwkrQ/RjC5734rayEwWWbLNw8AZZ/06fZFxl84XGfyJ+rh/8ZZSOBpVOqniNmjLgK676ssqmglmaFFHcrIjQR2mJTAPRdKf0VRj03i1VTDhYbjJQAgc8+qnddciEUHk7UE92ynnTobdvJ46dNrbSGlC1do/HAIIVo7cCN9wyLRyPLkYbwLoRAUQHSFacmU0ZznE/TdMq7Q8650/qVcb8oajfsDPXYr7LUNMPaOXH2pPu6EFeH9A5lrqx4qeN7GmJss1XxciGqR6GFjT6KipqGrfUL9a8zt6U="
 
 before_install:
-  - export PACKAGE_ACTION=$(if [[ "$TRAVIS_BRANCH" == "master" || $TRAVIS_TAG =~ ^v.* ]]; then echo bintray-upload; else echo package; fi)
+  - export SHOULD_PUBLISH=$(if [[ "$TRAVIS_PULL_REQUEST" == "false" && ( "$TRAVIS_BRANCH" == "master" || $TRAVIS_TAG =~ ^v.* ) ]]; then echo true; else echo false; fi)
+  - export PACKAGE_ACTION=$(if [[ "$SHOULD_PUBLISH" == "true" ]]; then echo bintray-upload; else echo package; fi)
   - mkdir -p ~/.local/bin
   - export PATH=$HOME/.local/bin:$PATH
   - pushd ~/.local/bin && (curl -fL https://getcli.jfrog.io | sh) && popd
-  - docker login -u "${BINTRAY_API_USER}" -p "${BINTRAY_API_KEY}" tenpureto-docker-snapshots.bintray.io
+  - if [[ ! -z "$BINTRAY_API_USER" ]]; then docker login -u "${BINTRAY_API_USER}" -p "${BINTRAY_API_KEY}" tenpureto-docker-snapshots.bintray.io; fi
 
 .package: &package
   stage: package
   script:
     - make bintray-cache-pull-$OS || true
     - make $PACKAGE_ACTION-$OS
-    - "[[ $TRAVIS_BRANCH == master || $TRAVIS_TAG =~ ^v.* ]] && make bintray-cache-push-$OS || true"
+    - "[[ $SHOULD_PUBLISH == true ]] && make bintray-cache-push-$OS || true"
   cache:
     directories:
       - .build/$OS/.stack
@@ -85,7 +86,7 @@ jobs:
       env: CACHE_NAME=publish
       script: make bintray-publish-rpm bintray-publish-deb
     - name: Documentation
-      if: branch = master
+      if: fork = false AND type = push AND branch = master
       env: CACHE_NAME=publish-docs
       before_script:
         - mkdir -p ~/.ssh
