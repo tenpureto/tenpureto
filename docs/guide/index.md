@@ -18,7 +18,7 @@ On **Linux** you can install `tenpureto` from the binary packages available on
 [BinTray](https://bintray.com/tenpureto/).
 
 If there is no pre-built package available for your OS, you can build `tenpureto` from
-[sources](https://github.com/rtimush/tenpureto/blob/master/README.md#build-from-sources).
+[sources](https://github.com/tenpureto/tenpureto/blob/master/README.md#build-from-sources).
 
 ## Scaffolding a new project
 

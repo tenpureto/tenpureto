@@ -1,4 +1,4 @@
-# tenpureto [![Build Status](https://travis-ci.com/rtimush/tenpureto.svg?branch=master)](https://travis-ci.com/rtimush/tenpureto)
+# tenpureto [![Build Status](https://travis-ci.com/tenpureto/tenpureto.svg?branch=master)](https://travis-ci.com/tenpureto/tenpureto)
 
 ## Introduction
 
@@ -18,8 +18,8 @@ reasonable amount of flexibility:
 
 You can install `tenpureto` with [Homebrew](https://brew.sh):
 
-```sh 
-$ brew tap rtimush/tap # you need it only once 
+```sh
+$ brew tap rtimush/tap # you need it only once
 $ brew install tenpureto
 ```
 
@@ -27,29 +27,29 @@ $ brew install tenpureto
 
 You need to get [Haskell Stack](https://haskellstack.org) first.
 
-If you are building on macOS, you will also need `icu4c`: 
+If you are building on macOS, you will also need `icu4c`:
 
-```sh 
-$ brew install icu4c 
-``` 
+```sh
+$ brew install icu4c
+```
 
 Let `Stack` know the location of the `icu4c` library by adding
-the following snippet to your `~/.stack/config.yaml`: 
+the following snippet to your `~/.stack/config.yaml`:
 
 ```yaml
 extra-lib-dirs:
   - /usr/local/opt/icu4c/lib
 
 extra-include-dirs:
-  - /usr/local/opt/icu4c/include 
+  - /usr/local/opt/icu4c/include
 ```
 
 On Linux you will need to install `libicu-devel` (on RPM-based distributions)
 or `libicu-dev` (on DEB-based distibutions).
 
-Once you have everything set up, get `tenpureto` sources and run 
+Once you have everything set up, get `tenpureto` sources and run
 
-```sh 
+```sh
 # will install tenpureto binary to ~/.local/bin
 $ stack install
 ```
@@ -61,11 +61,11 @@ $ stack run -- <tenpureto options here>
 
 ## Usage
 
-To create a new project run the following command: 
+To create a new project run the following command:
 
-```sh 
-$ tenpureto create --template <repository> <directory> 
-``` 
+```sh
+$ tenpureto create --template <repository> <directory>
+```
 where
 
 * `<repository>` — Git URL of a template repository (for GitHub you can just
@@ -79,8 +79,8 @@ You will be asked to choose a subset of template features you want to include,
 and to provide some variable values, and then the project will be created.
 
 If you want to incorporate changes that were made in a template into a project
-that you previously created, run 
+that you previously created, run
 
-```sh 
-$ tenpureto update <directory> 
+```sh
+$ tenpureto update <directory>
 ```

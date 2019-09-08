@@ -2,11 +2,11 @@ name:                tenpureto
 version:             0.3.1
 author:              "Roman Timushev"
 maintainer:          "rtimush@gmail.com"
-github:              "rtimush/tenpureto"
-homepage:            "https://github.com/rtimush/tenpureto#readme"
+github:              "tenpureto/tenpureto"
+homepage:            "https://tenpureto.org"
 copyright:           "2019 Roman Timushev"
 synopsis:            "Simple and flexible project templates"
-description:         "Please see the README on GitHub at <https://github.com/rtimush/tenpureto#readme>"
+description:         "Please see the README on GitHub at <https://github.com/tenpureto/tenpureto#readme>"
 
 dependencies:
 - base >= 4.7 && < 5
