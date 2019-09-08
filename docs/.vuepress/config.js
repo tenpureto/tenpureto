@@ -7,5 +7,13 @@ module.exports = {
     repo: "tenpureto/tenpureto",
     docsDir: "docs",
     editLinks: true
-  }
+  },
+  plugins: [
+    [
+      "@vuepress/google-analytics",
+      {
+        ga: "UA-147427487-1"
+      }
+    ]
+  ]
 };
