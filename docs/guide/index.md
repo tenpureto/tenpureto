@@ -43,4 +43,91 @@ Created /workspace/my-cool-project/.
 
 ## Creating your own templates
 
-See [authoring templates](/guide/authoring/).
+Let's now create a very simple template for an Open Source project. Let's assume that every Open Source project needs a
+README file and a LICENSE which is either Apache License 2.0 or MIT. So, we will create a template with the following
+features:
+
+- `master`
+- `license.apache`
+- `license.bsd`
+
+First we will create a new git repository for the template:
+
+```sh
+$ git init open-source-project-template
+$ cd open-source-project-template
+```
+
+Create a `README.md` file with the following content:
+
+```md
+# open-source-project-template
+
+Project description
+```
+
+As you see the README file contains some placeholder text. We can tell Tenpureto that this placeholders needs to be
+replaced with user-provided values by creating a `.template.yaml`:
+
+```yaml
+variables:
+  Project name: open-source-project-template
+  Description: Project description
+features:
+  - master:
+      description: Basic Open Source project
+```
+
+```sh
+$ git add README.md .template.yaml
+$ git commit -m "Basic template"
+```
+
+Now we can create two branches for different licenses
+
+```sh
+$ git checkout -b license.apache master
+```
+
+Copy Apache License 2.0 text to `LICENSE`, and change the `features` section of `.template.yaml` (do not change the
+`variables` section):
+
+```yaml
+features:
+  - master:
+      description: Basic Open Source project
+  - license.apache:
+      description: Apache License 2.0
+```
+
+Commit your changes:
+
+```sh
+$ git add LICENSE .template.yaml
+$ git commit -m "Apache License 2.0"
+```
+
+Repeat the same for a BSD license branch (use `license.bsd` as a branch name).
+
+Now you can test your template:
+
+```sh
+$ cd /tmp
+$ tenpureto create --template /full/path/to/open-source-project-template cool-project
+ ✓ 1) master          Basic Open Source project
+ ✓ 2) license.apache  Apache License 2.0
+   3) license.bsd     BSD License
+Add or remove a feature:
+Project name [open-source-project-template] cool-project
+Description [Project description] Trying out Tenpureto
+Created /tmp/cool-project/.
+$ cat /tmp/cool-project/README
+# cool-project
+
+Trying out Tenpureto
+```
+
+If you want to make you template available to other people, create a public repository on GitHub (or you can of course
+use any other Git hosting), and push all three branches to the remote.
+
+For more details see the [authoring templates](/guide/authoring/) section.
