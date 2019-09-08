@@ -34,6 +34,41 @@ test_translateFile =
             @?= Right [relfile|a/xxx/yyy/e/f.txt|]
         ]
 
+test_translateFile_toVariablesHasSpace :: [TestTree]
+test_translateFile_toVariablesHasSpace =
+    let Right settings = runTest $ compileSettings TemplaterSettings
+            { templaterFromVariables = InsOrdHashMap.singleton "A" "bbb-ccc-ddd"
+            , templaterToVariables   = InsOrdHashMap.singleton "A" "xxx yyy"
+            , templaterExcludes      = Set.empty
+            }
+        mv = runTest . translateFile settings
+    in  [ testCase "should replace in file name"
+            $   mv [relfile|a-bbb-ccc-ddd-e.txt|]
+            @?= Right [relfile|a-xxx-yyy-e.txt|]
+        , testCase "should replace in path"
+            $   mv [relfile|a/bbb/ccc/ddd/e/f.txt|]
+            @?= Right [relfile|a/xxx/yyy/e/f.txt|]
+        ]
+
+test_translateFile_toVariablesHasUpperCaseCharaters :: [TestTree]
+test_translateFile_toVariablesHasUpperCaseCharaters =
+    let Right settings = runTest $ compileSettings TemplaterSettings
+            { templaterFromVariables = InsOrdHashMap.singleton "A" "bbb-ccc-ddd"
+            , templaterToVariables   = InsOrdHashMap.singleton "A" "Xxx Yyy"
+            , templaterExcludes      = Set.empty
+            }
+        mv = runTest . translateFile settings
+    in  [ testCase "should replace in file name"
+            $   mv [relfile|a-bbb-ccc-ddd-e.txt|]
+            @?= Right [relfile|a-xxx-yyy-e.txt|]
+        , testCase "should replace in path"
+            $   mv [relfile|a/bbb/ccc/ddd/e/f.txt|]
+            @?= Right [relfile|a/xxx/yyy/e/f.txt|]
+        , testCase "should replace in path"
+            $   mv [relfile|a/bbb-ccc-ddd/e/f.txt|]
+            @?= Right [relfile|a/xxx-yyy/e/f.txt|]
+        ]
+
 test_excludes :: [TestTree]
 test_excludes =
     let

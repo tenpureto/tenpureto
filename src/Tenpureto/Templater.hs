@@ -4,6 +4,7 @@ import           Polysemy
 import           Polysemy.Resource
 
 import           Data.ByteString                ( ByteString )
+import           Data.List
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Set                       ( Set )
@@ -42,7 +43,7 @@ data TemplaterException = TemplaterException
 
 expandReplacement :: (Text, Text) -> [(Text, Text)]
 expandReplacement (a, b) =
-    [ (templateValueText av, templateValueText bv)
+    removeDuplicated [ (templateValueText av, templateValueText bv)
     | av <- variations a
     , bv <- variations b
     , sameStyle av bv
@@ -51,6 +52,7 @@ expandReplacement (a, b) =
     variations text = Set.toList . Set.fromList $ concatMap
         styleVariations
         (textToTemplateValues text)
+    removeDuplicated = nubBy (\(t1, _) (t2, _) -> t1 == t2)
 
 expandReplacements
     :: InsOrdHashMap Text Text -> InsOrdHashMap Text Text -> [(Text, Text)]
