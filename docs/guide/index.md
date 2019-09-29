@@ -121,7 +121,7 @@ Add or remove a feature:
 Project name [open-source-project-template] cool-project
 Description [Project description] Trying out Tenpureto
 Created /tmp/cool-project/.
-$ cat /tmp/cool-project/README
+$ cat /tmp/cool-project/README.md
 # cool-project
 
 Trying out Tenpureto
