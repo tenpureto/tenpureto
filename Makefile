@@ -46,7 +46,7 @@ rpm_arch          = x86_64
 
 deb_version       = $(metadata_git_version)
 deb_repository    = deb-snapshots
-deb_distributions = bionic buster
+deb_distributions = bionic disco buster
 deb_arch          = amd64
 
 rpm_amzn2_family  = amzn
