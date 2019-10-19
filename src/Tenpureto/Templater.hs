@@ -18,7 +18,7 @@ import           Control.Monad
 import qualified Data.Text.ICU                 as ICU
 import           Data.Text.Encoding
 import           Data.Text.ICU.Replace
-import           System.FilePath.Glob
+import           System.FilePattern
 
 import           Tenpureto.Effects.Logging
 import           Tenpureto.Effects.FileSystem
@@ -42,8 +42,8 @@ data TemplaterException = TemplaterException
     deriving Show
 
 expandReplacement :: (Text, Text) -> [(Text, Text)]
-expandReplacement (a, b) =
-    removeDuplicated [ (templateValueText av, templateValueText bv)
+expandReplacement (a, b) = removeDuplicated
+    [ (templateValueText av, templateValueText bv)
     | av <- variations a
     , bv <- variations b
     , sameStyle av bv
@@ -131,20 +131,17 @@ translateFile settings =
 
 compileExcludes :: Set Text -> Path Rel File -> Bool
 compileExcludes excludes =
-    let
-        handleLeadingSlash p = maybe [p, "**/" <> p] pure (T.stripPrefix "/" p)
+    let handleLeadingSlash p = fromMaybe ("**/" <> p) (T.stripPrefix "/" p)
         handleTrailingSlash p =
-            maybe [p, p <> "/**"] (pure . (<> "/**")) (T.stripSuffix "/" p)
-        transformPattern = handleLeadingSlash >=> handleTrailingSlash
-        patterns =
-            fmap (simplify . compile . T.unpack)
-                $   transformPattern
-                =<< Set.toList excludes
-        matches :: [FilePath -> Bool]
-        matches = fmap match patterns
+                maybe (p <> "/**") (<> "/**/*") (T.stripSuffix "/" p)
+        matches =
+                (?==)
+                    .   T.unpack
+                    .   handleLeadingSlash
+                    .   handleTrailingSlash
+                    <$> Set.toList excludes
         fab ?? a = fmap ($ a) fab
-    in
-        or . (??) matches . fromRelFile
+    in  or . (??) matches . fromRelFile
 
 copyAbsFile
     :: (Member FileSystem r, Member Logging r)
