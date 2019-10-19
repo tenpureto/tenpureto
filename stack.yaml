@@ -1,10 +1,9 @@
-resolver: lts-14.3
+resolver: lts-14.10
 packages:
 - .
 extra-deps:
 - replace-attoparsec-1.0.3.0@sha256:f5a6ed1ab83a2291c3190fc152c76967a1ccafbc488041f51519425716784ea6,2465
-- hedgehog-classes-0.2.2@sha256:1a5b6459ab9af30bd277ac0ecd2986b36584dfa07ceca8b89bf59cecd7883236,5240
-- semirings-0.3.1.2@sha256:ecb57a0ba210409f1376646b3cfd1f48a756ad8ab8467fce98d50e2e15e1c528,3759 # for hedgehog-classes
+- hedgehog-classes-0.2.4@sha256:f38ce9900e03e45108cb0f27860b8bf3671e0261d5e2197b4fa1bc27acb77df7,5355
 
 nix:
   packages: [ icu, zlib ]

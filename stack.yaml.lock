@@ -12,22 +12,15 @@ packages:
   original:
     hackage: replace-attoparsec-1.0.3.0@sha256:f5a6ed1ab83a2291c3190fc152c76967a1ccafbc488041f51519425716784ea6,2465
 - completed:
-    hackage: hedgehog-classes-0.2.2@sha256:1a5b6459ab9af30bd277ac0ecd2986b36584dfa07ceca8b89bf59cecd7883236,5240
+    hackage: hedgehog-classes-0.2.4@sha256:f38ce9900e03e45108cb0f27860b8bf3671e0261d5e2197b4fa1bc27acb77df7,5355
     pantry-tree:
-      size: 4798
-      sha256: abcdc66f67bb9d9f187c1713a6f40a3139ddcdc58bfa1037ead3b807dae13e58
+      size: 5059
+      sha256: a294760bf52590c0998b139993d53169aa4a6f031f8d2e130c6d1742e82e0c71
   original:
-    hackage: hedgehog-classes-0.2.2@sha256:1a5b6459ab9af30bd277ac0ecd2986b36584dfa07ceca8b89bf59cecd7883236,5240
-- completed:
-    hackage: semirings-0.3.1.2@sha256:ecb57a0ba210409f1376646b3cfd1f48a756ad8ab8467fce98d50e2e15e1c528,3759
-    pantry-tree:
-      size: 497
-      sha256: 137bca19e577fb43bada17365847ca5b68252aa7a862165c3a3edad2a016cb61
-  original:
-    hackage: semirings-0.3.1.2@sha256:ecb57a0ba210409f1376646b3cfd1f48a756ad8ab8467fce98d50e2e15e1c528,3759
+    hackage: hedgehog-classes-0.2.4@sha256:f38ce9900e03e45108cb0f27860b8bf3671e0261d5e2197b4fa1bc27acb77df7,5355
 snapshots:
 - completed:
-    size: 523878
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/14/3.yaml
-    sha256: 470c46c27746a48c7c50f829efc0cf00112787a7804ee4ac7a27754658f6d92c
-  original: lts-14.3
+    size: 524130
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/14/10.yaml
+    sha256: 04841e0397d7ce6364f19359fce89aa45ca8684609d665845db80d398002baa9
+  original: lts-14.10
