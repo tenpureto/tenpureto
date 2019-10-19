@@ -9,15 +9,15 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
-import qualified Data.Map                      as Map
 import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Maybe
 import           Data.Foldable
+import           Data.Functor
 import           Control.Monad
-import qualified Data.Text.ICU                 as ICU
 import           Data.Text.Encoding
-import           Data.Text.ICU.Replace
+import           Data.Attoparsec.Text
+import           Replace.Attoparsec.Text
 import           System.FilePattern
 
 import           Tenpureto.Effects.Logging
@@ -96,14 +96,11 @@ compileSettings TemplaterSettings { templaterFromVariables = tfv, templaterToVar
 
 replaceVariables :: [(Text, Text)] -> Text -> Text
 replaceVariables []    = id
-replaceVariables rules = replaceAll regex replacement
+replaceVariables rules = runReplace
   where
-    rulesMap = Map.fromList rules
-    quote text = "\\Q" <> T.replace "\\E" "\\\\E" text <> "\\E"
-    regex = ICU.regex [] $ T.intercalate "|" $ fmap (quote . fst) rules
-    findReplacement mtch = fromMaybe matchText (Map.lookup matchText rulesMap)
-        where matchText = fold $ ICU.group 0 mtch
-    replacement = rtfn findReplacement
+    replaceOne (from, to) = string from $> to
+    replaceAll = choice $ fmap replaceOne rules
+    runReplace = streamEdit replaceAll id
 
 data FileContent = BinaryContent ByteString
                  | TextContent Text (Text -> ByteString)
