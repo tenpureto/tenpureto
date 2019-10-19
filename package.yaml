@@ -14,7 +14,8 @@ dependencies:
 - either
 - text
 - text-icu
-- text-regex-replace
+- replace-attoparsec
+- attoparsec
 - path
 - path-io
 - directory
