@@ -32,7 +32,7 @@ dependencies:
 - optparse-applicative
 - yaml
 - aeson
-- Glob
+- filepattern
 - parsec
 - file-embed
 - monad-memo

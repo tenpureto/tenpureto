@@ -76,7 +76,7 @@ test_excludes =
             ("expected pattern: " ++ show a ++ " to match file: " ++ show b)
             (compileExcludes (Set.singleton a) b)
         assertNotMatches a b = assertBool
-            ("expected pattern: " ++ show a ++ " to match file: " ++ show b)
+            ("expected pattern: " ++ show a ++ " to not match file: " ++ show b)
             (not $ compileExcludes (Set.singleton a) b)
     in
         [ testGroup
@@ -98,6 +98,8 @@ test_excludes =
             "root dir"
             [ testCase "should match a file in a dir"
                 $ assertMatches "/a/" [relfile|a/b|]
+            , testCase "should match a file in a subdir"
+                $ assertMatches "/a/" [relfile|a/b/c|]
             , testCase "should not match a file"
                 $ assertNotMatches "/a/" [relfile|a|]
             ]
@@ -105,6 +107,8 @@ test_excludes =
             "root path"
             [ testCase "should match a file in a dir"
                 $ assertMatches "/a" [relfile|a/b|]
+            , testCase "should match a file in a subdir"
+                $ assertMatches "/a" [relfile|a/b/c|]
             , testCase "should match a file" $ assertMatches "/a" [relfile|a|]
             ]
         , testGroup
@@ -116,6 +120,8 @@ test_excludes =
                 $ assertMatches "a/" [relfile|a/b|]
             , testCase "should match a file in a dir when starts with a dot"
                 $ assertMatches ".a/" [relfile|.a/b|]
+            , testCase "should match a file in a subdir when starts with a dot"
+                $ assertMatches ".a/" [relfile|.a/b/c|]
             ]
         , testGroup
             "path"
