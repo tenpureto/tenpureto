@@ -23,6 +23,9 @@ test_extractTemplateName =
         , testCase "should extract from update message"
             $   extractTemplateName (commitUpdateMessage "foo/bar")
             @?= Just (selectedTemplate cfg)
+        , testCase "should extract from create message with additional text"
+            $ extractTemplateName (commitCreateMessage "foo/bar" <> "\nFoo foo foo")
+            @?= Just (selectedTemplate cfg)
         , testCase "should not extract from other messages"
             $   extractTemplateName "A\n\nTemplate foo/bar"
             @?= Nothing

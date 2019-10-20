@@ -17,6 +17,7 @@ import qualified Data.Map                      as Map
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
 import           Data.Functor
+import           Control.Applicative
 import           Data.Attoparsec.Text    hiding ( try )
 import qualified Algebra.Graph.Export.Dot      as Dot
 
@@ -537,9 +538,10 @@ commitMessagePattern = "^Template: .*$"
 
 extractTemplateNameRegex :: Parser Text
 extractTemplateNameRegex =
-    skipMany (skipWhile (not . isEndOfLine) *> endOfLine)
-        *> string "Template: "
-        *> takeWhile1 (not . isEndOfLine)
+    string "Template: "
+        *>  takeWhile1 (not . isEndOfLine)
+        <|> (skipWhile (not . isEndOfLine) *> endOfLine)
+        *>  extractTemplateNameRegex
 
 extractTemplateName :: Text -> Maybe Text
 extractTemplateName msg = rightToMaybe $ parseOnly extractTemplateNameRegex msg
