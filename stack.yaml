@@ -6,7 +6,7 @@ extra-deps:
 - hedgehog-classes-0.2.4@sha256:f38ce9900e03e45108cb0f27860b8bf3671e0261d5e2197b4fa1bc27acb77df7,5355
 
 nix:
-  packages: [ icu, zlib ]
+  packages: [ zlib ]
 
 flags:
   polysemy:

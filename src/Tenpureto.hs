@@ -16,8 +16,8 @@ import qualified Data.Set                      as Set
 import qualified Data.Map                      as Map
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
-import qualified Data.Text.ICU                 as ICU
 import           Data.Functor
+import           Data.Attoparsec.Text    hiding ( try )
 import qualified Algebra.Graph.Export.Dot      as Dot
 
 import           Tenpureto.Data
@@ -535,11 +535,14 @@ try f = catch (Right <$> f) (return . Left)
 commitMessagePattern :: Text
 commitMessagePattern = "^Template: .*$"
 
-extractTemplateNameRegex :: ICU.Regex
-extractTemplateNameRegex = ICU.regex [ICU.Multiline] "^Template: (.*)$"
+extractTemplateNameRegex :: Parser Text
+extractTemplateNameRegex =
+    skipMany (skipWhile (not . isEndOfLine) *> endOfLine)
+        *> string "Template: "
+        *> takeWhile1 (not . isEndOfLine)
 
 extractTemplateName :: Text -> Maybe Text
-extractTemplateName msg = ICU.find extractTemplateNameRegex msg >>= ICU.group 1
+extractTemplateName msg = rightToMaybe $ parseOnly extractTemplateNameRegex msg
 
 isChildBranch :: Text -> TemplateBranchInformation -> Bool
 isChildBranch branch bi =

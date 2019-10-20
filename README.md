@@ -25,29 +25,7 @@ $ brew install tenpureto
 
 ### Build from sources
 
-You need to get [Haskell Stack](https://haskellstack.org) first.
-
-If you are building on macOS, you will also need `icu4c`:
-
-```sh
-$ brew install icu4c
-```
-
-Let `Stack` know the location of the `icu4c` library by adding
-the following snippet to your `~/.stack/config.yaml`:
-
-```yaml
-extra-lib-dirs:
-  - /usr/local/opt/icu4c/lib
-
-extra-include-dirs:
-  - /usr/local/opt/icu4c/include
-```
-
-On Linux you will need to install `libicu-devel` (on RPM-based distributions)
-or `libicu-dev` (on DEB-based distibutions).
-
-Once you have everything set up, get `tenpureto` sources and run
+You need to get [Haskell Stack](https://haskellstack.org) first. Get `tenpureto` sources and run
 
 ```sh
 # will install tenpureto binary to ~/.local/bin

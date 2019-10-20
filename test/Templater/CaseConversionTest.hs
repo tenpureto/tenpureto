@@ -12,8 +12,8 @@ import           Test.SmallCheck.Series
 
 import           Data.Maybe
 import qualified Data.Text                     as T
-import qualified Data.Text.ICU                 as ICU
 import           Data.Foldable
+import           Data.Attoparsec.Text
 import           Templater.CaseConversion
 import           GHC.Generics
 
@@ -29,7 +29,7 @@ assertNotElem a b = assertBool
 
 scprop_wordCasePatternsNotEmpty :: WordCase -> Bool
 scprop_wordCasePatternsNotEmpty wc =
-  isNothing $ ICU.find (ICU.regex [] $ wordCasePattern wc) ""
+  isNothing $ maybeResult $ parse (wordCasePattern wc) ""
 
 test_detectValueStyle :: [TestTree]
 test_detectValueStyle =

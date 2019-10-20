@@ -10,6 +10,3 @@ RUN gem install --no-ri --no-rdoc fpm
 
 # ghc dependencies
 RUN yum install -y gmp-devel ncurses-devel
-
-# tenpureto dependencies
-RUN yum install -y libicu-devel
