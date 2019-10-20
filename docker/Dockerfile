@@ -3,7 +3,6 @@ FROM ubuntu:18.04 AS build
 # stack
 RUN apt-get update && apt-get install -y \
     build-essential \
-    libicu-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
 RUN apt-get update \
@@ -34,7 +33,6 @@ RUN apt-get update && apt-get install -y \
     curl \
     git \
     graphviz \
-    libicu60 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV HUB_VERSION=2.11.2

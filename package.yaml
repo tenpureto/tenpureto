@@ -13,7 +13,6 @@ dependencies:
 - bytestring
 - either
 - text
-- text-icu
 - replace-attoparsec
 - attoparsec
 - path

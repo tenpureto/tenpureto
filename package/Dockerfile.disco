@@ -11,6 +11,3 @@ RUN gem install --no-ri --no-rdoc fpm
 
 # ghc dependencies
 RUN apt-get install -y libncurses-dev
-
-# tenpureto dependencies
-RUN apt-get install -y libicu-dev
