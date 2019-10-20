@@ -67,11 +67,17 @@ projectCreated dir = "Created" <+> pretty dir <> "."
 projectUpdated :: Path t Dir -> Doc a
 projectUpdated dir = "Updated" <+> pretty dir <> "."
 
+projectUpdatedWithoutConflicts :: Path t Dir -> Doc a
+projectUpdatedWithoutConflicts dir =
+    "Updated"
+        <+> pretty dir
+        <>  ". Please verify the merge result and commit changes."
+
 projectUpdatedWithConflicts :: Path t Dir -> Doc a
 projectUpdatedWithConflicts dir =
     "Updated"
         <+> pretty dir
-        <> " but there are merge conflicts, please resolve them manually and commit changes."
+        <> ". There are merge conflicts, please resolve them manually and commit changes."
 
 noRelevantTemplateChanges :: Doc a
 noRelevantTemplateChanges = "There are no relevant changes in the template."

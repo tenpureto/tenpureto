@@ -156,11 +156,9 @@ updateProject projectConfiguration = do
                                                             (repositoryPath
                                                                 project
                                                             )
-                                              MergeSuccessUncommitted -> do
-                                                  _ <- commit project
-                                                              commitMessage
+                                              MergeSuccessUncommitted ->
                                                   sayLn
-                                                      $ projectUpdated
+                                                      $ projectUpdatedWithoutConflicts
                                                             (repositoryPath
                                                                 project
                                                             )
@@ -366,11 +364,10 @@ propagateTemplateBranchChanges template branchFilter pushMode =
                     UpstreamPullRequest{} -> PropagatePushSeparately
             logInfo $ "Propagating changes for" <+> pretty
                 (fmap branchName branches)
-            runPropagateGraph
-                repo
-                mode
-                (branchesGraph templateInformation)
-                (Set.fromList branches)
+            runPropagateGraph repo
+                              mode
+                              (branchesGraph templateInformation)
+                              (Set.fromList branches)
 
 listTemplateConflicts
     :: Members
