@@ -105,7 +105,6 @@ package-$(2): export DOCKER_GROUP=$(shell id -g)
 package-$(2): export OS_DISTRIBUTION=$(2)
 package-$(2):
 	mkdir -p .build/$(2)/staging .build/$(2)/.stack-work .build/$(2)/.stack dist
-	$(docker_compose) pull
 	$(docker_compose) build
 	$(docker_compose) run --rm agent sh -c "make package-$(1)"
 
