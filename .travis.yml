@@ -81,6 +81,12 @@ jobs:
       name: Ubuntu 19.04
       env: OS=disco
     - <<: *package
+      name: Ubuntu 19.10
+      env: OS=eoan
+    - <<: *package
+      name: Ubuntu 20.04
+      env: OS=focal
+    - <<: *package
       name: Debian Buster
       env: OS=buster
 
