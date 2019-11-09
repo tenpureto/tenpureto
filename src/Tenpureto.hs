@@ -12,7 +12,9 @@ import           Data.Maybe
 import           Data.Either
 import           Data.Either.Combinators        ( rightToMaybe )
 import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
 import qualified Data.Set                      as Set
+import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
@@ -39,25 +41,6 @@ data RemoteChangeMode = PushDirectly
                       | UpstreamPullRequest { pullRequestSettings :: PullRequestSettings }
 
 data ChangesNature = ExistingChanges | NewChanges
-
-makeFinalTemplateConfiguration
-    :: Member UI r
-    => PreliminaryProjectConfiguration
-    -> Sem r FinalTemplateConfiguration
-makeFinalTemplateConfiguration = inputTemplateConfiguration
-
-makeFinalProjectConfiguration
-    :: Member UI r
-    => TemplateInformation
-    -> PreliminaryProjectConfiguration
-    -> Sem r FinalProjectConfiguration
-makeFinalProjectConfiguration = inputProjectConfiguration
-
-makeFinalUpdateConfiguration
-    :: Member UI r
-    => PreliminaryProjectConfiguration
-    -> Sem r FinalUpdateConfiguration
-makeFinalUpdateConfiguration = inputUpdateConfiguration
 
 buildTemplaterSettings
     :: TemplateYaml -> FinalProjectConfiguration -> TemplaterSettings
@@ -103,8 +86,7 @@ updateProject
     => PreliminaryProjectConfiguration
     -> Sem r ()
 updateProject projectConfiguration = do
-    finalUpdateConfiguration <- makeFinalUpdateConfiguration
-        projectConfiguration
+    finalUpdateConfiguration <- inputUpdateConfiguration projectConfiguration
     logDebug
         $  "Final update configuration"
         <> line
@@ -188,7 +170,7 @@ withPreparedTemplate projectConfiguration block = do
         $  "Preliminary project configuration:"
         <> line
         <> (indent 4 . pretty) projectConfiguration
-    finalTemplateConfiguration <- makeFinalTemplateConfiguration
+    finalTemplateConfiguration <- inputTemplateConfiguration
         projectConfiguration
     withClonedRepository
             (parseRepositoryUri $ selectedTemplate finalTemplateConfiguration)
@@ -198,7 +180,7 @@ withPreparedTemplate projectConfiguration block = do
                   $  "Template information"
                   <> line
                   <> (indent 4 . pretty) templateInformation
-              finalProjectConfiguration <- makeFinalProjectConfiguration
+              finalProjectConfiguration <- inputProjectConfiguration
                   templateInformation
                   projectConfiguration
               logDebug
@@ -233,14 +215,15 @@ loadExistingProjectConfiguration projectPath =
                                           previousCommit
         let yaml = templateYamlContent >>= (rightToMaybe . parseTemplateYaml)
         return PreliminaryProjectConfiguration
-            { preSelectedTemplate       = extractTemplateName
-                                              =<< previousCommitMessage
-            , preTargetDirectory        = Just projectPath
-            , prePreviousTemplateCommit = previousCommit
-            , preSelectedBranches       = fmap
-                                              (Set.map yamlFeatureName . yamlFeatures)
-                                              yaml
-            , preVariableValues         = fmap yamlVariables yaml
+            { preSelectedTemplate            = extractTemplateName
+                                                   =<< previousCommitMessage
+            , preTargetDirectory             = Just projectPath
+            , prePreviousTemplateCommit      = previousCommit
+            , preSelectedBranches            = fmap
+                                                   (Set.map yamlFeatureName . yamlFeatures)
+                                                   yaml
+            , preVariableValues              = fmap yamlVariables yaml
+            , preVariableDefaultReplacements = mempty
             }
 
 prepareTemplate
@@ -562,3 +545,11 @@ getTemplateBranch templateInformation branch = maybe
     (throw $ TemplateBranchNotFoundException branch)
     return
     (findTemplateBranch templateInformation branch)
+
+templateNameDefaultReplacement :: Text -> FilePath -> Map Text Text
+templateNameDefaultReplacement template target = Map.singleton
+    (keepRepoName $ dropGitSuffix template)
+    (keepRepoName $ T.pack target)
+  where
+    dropGitSuffix url = fromMaybe url (T.stripSuffix ".git" url)
+    keepRepoName url = last $ T.split (== '/') url

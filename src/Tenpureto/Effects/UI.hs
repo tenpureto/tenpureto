@@ -66,7 +66,10 @@ runUIInTerminal = interpret $ \case
                 (Set.toList sbi)
         let cvars =
                 fromMaybe Map.empty (preVariableValues providedConfiguration)
-        let vars = withDefaults sbvars cvars
+        let vars = withDefaults
+                sbvars
+                cvars
+                (preVariableDefaultReplacements providedConfiguration)
         varVals <- inputVariables vars
         return FinalProjectConfiguration { projectBranches = Set.toList sbi
                                          , variableValues  = varVals

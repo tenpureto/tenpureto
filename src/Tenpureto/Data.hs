@@ -18,6 +18,7 @@ data PreliminaryProjectConfiguration = PreliminaryProjectConfiguration
         , prePreviousTemplateCommit :: Maybe Committish
         , preSelectedBranches :: Maybe (Set Text)
         , preVariableValues :: Maybe (Map Text Text)
+        , preVariableDefaultReplacements :: Map Text Text
         }
         deriving (Show)
 
@@ -47,20 +48,24 @@ instance Semigroup PreliminaryProjectConfiguration where
                                           <|> prePreviousTemplateCommit b
         , preSelectedBranches = preSelectedBranches a <|> preSelectedBranches b
         , preVariableValues = preVariableValues a <|> preVariableValues b
+        , preVariableDefaultReplacements =
+            preVariableDefaultReplacements a <> preVariableDefaultReplacements b
         }
 
 instance Pretty PreliminaryProjectConfiguration where
     pretty cfg = (align . vsep)
-        [ "Template:                "
+        [ "Template:                      "
             <+> (align . pretty) (preSelectedTemplate cfg)
-        , "Target directory:        "
+        , "Target directory:              "
             <+> (align . pretty) (preTargetDirectory cfg)
-        , "Previous template commit:"
+        , "Previous template commit:      "
             <+> (align . pretty . show) (prePreviousTemplateCommit cfg)
-        , "Selected branches:       "
+        , "Selected branches:             "
             <+> (align . pretty) (preSelectedBranches cfg)
-        , "Variable values:         "
+        , "Variable values:               "
             <+> (align . pretty) (preVariableValues cfg)
+        , "Variable default replacements: "
+            <+> (align . pretty) (preVariableDefaultReplacements cfg)
         ]
 
 instance Pretty FinalProjectConfiguration where
