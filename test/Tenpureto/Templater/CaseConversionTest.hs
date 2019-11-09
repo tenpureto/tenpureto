@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Templater.CaseConversionTest where
+module Tenpureto.Templater.CaseConversionTest where
 
 import           Test.Tasty
 import           Test.Tasty.HUnit
@@ -14,8 +14,9 @@ import           Data.Maybe
 import qualified Data.Text                     as T
 import           Data.Foldable
 import           Data.Attoparsec.Text
-import           Templater.CaseConversion
 import           GHC.Generics
+
+import           Tenpureto.Templater.CaseConversion
 
 assertElem :: (Show a, Eq a) => a -> [a] -> Assertion
 assertElem a b = assertBool

@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module Templater.CaseConversion where
+module Tenpureto.Templater.CaseConversion where
 
 import           Data.Char
 import           Data.Text                      ( Text )

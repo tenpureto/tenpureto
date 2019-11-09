@@ -23,9 +23,10 @@ import           System.FilePattern
 import           Tenpureto.Effects.Logging
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Git
+import           Tenpureto.Templater.CaseConversion
+
 import           Tenpureto.Orphanage            ( )
 
-import           Templater.CaseConversion
 
 data TemplaterSettings = TemplaterSettings
     { templaterFromVariables :: InsOrdHashMap Text Text
