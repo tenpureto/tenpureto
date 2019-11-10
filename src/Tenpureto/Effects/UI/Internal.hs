@@ -214,9 +214,18 @@ inputBranches graph initialNameSelection = case initial of
                 in  (available newSelected, newSelected, Nothing)
             Nothing -> (availableBranches, selected, Just input)
 
-withDefaults :: Ord a => InsOrdHashMap a b -> Map a b -> InsOrdHashMap a b
-withDefaults vars defaults =
-    InsOrdHashMap.mapWithKey (\k v -> fromMaybe v (Map.lookup k defaults)) vars
+withDefaults
+    :: (Ord a, Ord b)
+    => InsOrdHashMap a b
+    -> Map a b
+    -> Map b b
+    -> InsOrdHashMap a b
+withDefaults defaults vars replacements = InsOrdHashMap.mapWithKey
+    getDefault
+    defaults
+  where
+    getDefault k v = fromMaybe (replace v) (Map.lookup k vars)
+    replace v = fromMaybe v $ Map.lookup v replacements
 
 inputVariable :: Member TerminalInput r => (Text, Text) -> Sem r (Text, Text)
 inputVariable (desc, name) = (desc, ) <$> ask (pretty desc) (Just name)

@@ -319,33 +319,18 @@ runAppM
     => Bool
     -> Bool
     -> Sem
-           ( GitServer
-                 ':
-                 Git
-                 ':
-                 Process
-                 ':
-                 Logging
-                 ':
-                 UI
-                 ':
-                 FileSystem
-                 ':
-                 TerminalInput
-                 ':
-                 Error
-                 TemplateLoaderException
-                 ':
-                 Error
-                 UIException
-                 ':
-                 Error
-                 GitException
-                 ':
-                 Error
-                 TenpuretoException
-                 ':
-                 r
+           (  GitServer
+           ': Git
+           ': Process
+           ': Logging
+           ': UI
+           ': FileSystem
+           ': TerminalInput
+           ': Error TemplateLoaderException
+           ': Error UIException
+           ': Error GitException
+           ': Error TenpuretoException
+           ': r
            )
            a
     -> Sem r a
@@ -383,24 +368,23 @@ runUI
 runUI False = runUIInTerminal
 runUI True  = runUIUnattended
 
-runCommand
-    :: Members '[Terminal, Resource, Embed IO] r
-    => Command
-    -> Sem r ()
+runCommand :: Members '[Terminal, Resource, Embed IO] r => Command -> Sem r ()
 runCommand Create { maybeTemplateName = t, maybeTargetDirectory = td, maybeProjectConfiguration = c, runUnattended = u, enableDebugLogging = d }
     = runAppM d u $ do
         resolvedTd <- traverse resolveDir td
         resolvedC  <- traverse resolveFile c
         maybeYaml  <- traverse loadTemplateYaml resolvedC
-        createProject PreliminaryProjectConfiguration
-            { preSelectedTemplate       = t
-            , preTargetDirectory        = resolvedTd
-            , prePreviousTemplateCommit = Nothing
-            , preSelectedBranches       = Set.map yamlFeatureName
-                .   yamlFeatures
-                <$> maybeYaml
-            , preVariableValues         = yamlVariables <$> maybeYaml
-            }
+        let inputConfig = PreliminaryProjectConfiguration
+                { preSelectedTemplate            = t
+                , preTargetDirectory             = resolvedTd
+                , prePreviousTemplateCommit      = Nothing
+                , preSelectedBranches            = Set.map yamlFeatureName
+                                                   .   yamlFeatures
+                                                   <$> maybeYaml
+                , preVariableValues              = yamlVariables <$> maybeYaml
+                , preVariableDefaultReplacements = fromMaybe mempty $ liftA2 templateNameDefaultReplacement t td
+                }
+        createProject inputConfig
 runCommand Update { maybeTemplateName = t, maybeTargetDirectory = td, maybeProjectConfiguration = c, maybePreviousCommit = pc, runUnattended = u, enableDebugLogging = d }
     = runAppM d u $ do
         resolvedTd    <- resolveDir (fromMaybe "." td)
@@ -409,13 +393,14 @@ runCommand Update { maybeTemplateName = t, maybeTargetDirectory = td, maybeProje
         currentConfig <- loadExistingProjectConfiguration resolvedTd
         let
             inputConfig = PreliminaryProjectConfiguration
-                { preSelectedTemplate       = t
-                , preTargetDirectory        = Just resolvedTd
-                , prePreviousTemplateCommit = fmap Committish pc
-                , preSelectedBranches       = Set.map yamlFeatureName
-                    .   yamlFeatures
-                    <$> maybeYaml
-                , preVariableValues         = yamlVariables <$> maybeYaml
+                { preSelectedTemplate            = t
+                , preTargetDirectory             = Just resolvedTd
+                , prePreviousTemplateCommit      = fmap Committish pc
+                , preSelectedBranches            = Set.map yamlFeatureName
+                                                   .   yamlFeatures
+                                                   <$> maybeYaml
+                , preVariableValues              = yamlVariables <$> maybeYaml
+                , preVariableDefaultReplacements = mempty
                 }
         updateProject (inputConfig <> currentConfig)
 runCommand TemplateGraph { templateName = t, branchFilter = bf, enableDebugLogging = d }
@@ -431,8 +416,7 @@ runCommand TemplateListConflicts { templateName = t, enableDebugLogging = d } =
 runCommand TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d False $ changeTemplateVariableValue t ov nv i
 
-runOptParser
-    :: Members '[Terminal, Resource, Embed IO] r => Sem r ()
+runOptParser :: Members '[Terminal, Resource, Embed IO] r => Sem r ()
 runOptParser = do
     w <- fromMaybe 80 <$> terminalWidth
     let p = prefs (showHelpOnEmpty <> columns w)
