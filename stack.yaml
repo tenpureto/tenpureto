@@ -1,9 +1,10 @@
-resolver: lts-14.20
+resolver: lts-14.25
 packages:
 - .
 extra-deps:
-- hedgehog-classes-0.2.4@sha256:f38ce9900e03e45108cb0f27860b8bf3671e0261d5e2197b4fa1bc27acb77df7,5355
-- polysemy-1.2.3.0@sha256:d9cfa7942940c7c6d07d1f26ae70c4f1170f9bd6c331bdbe586e810fafc25f17,5878
+- hedgehog-classes-0.2.4.1
+- polysemy-1.2.2.0
+- polysemy-plugin-0.2.3.0
 
 nix:
   packages: [ zlib ]

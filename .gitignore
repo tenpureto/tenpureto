@@ -2,7 +2,8 @@
 .build/
 .staging/
 /tenpureto.cabal
-/dist
+/dist/
+/dist-newstyle/
 *~
 
 /docs/node_modules/

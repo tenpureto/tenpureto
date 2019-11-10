@@ -5,22 +5,29 @@
 
 packages:
 - completed:
-    hackage: hedgehog-classes-0.2.4@sha256:f38ce9900e03e45108cb0f27860b8bf3671e0261d5e2197b4fa1bc27acb77df7,5355
+    hackage: hedgehog-classes-0.2.4.1@sha256:9097738d37a8dec291f6478639dfc02857df160cc5b8fc7f7ab7e9a9130c25b1,5404
     pantry-tree:
       size: 5059
-      sha256: a294760bf52590c0998b139993d53169aa4a6f031f8d2e130c6d1742e82e0c71
+      sha256: a9e04bb05b0d5426e4bf5d024786c694d00075bd0effc40b9c752aea8bd7ecf2
   original:
-    hackage: hedgehog-classes-0.2.4@sha256:f38ce9900e03e45108cb0f27860b8bf3671e0261d5e2197b4fa1bc27acb77df7,5355
+    hackage: hedgehog-classes-0.2.4.1
 - completed:
-    hackage: polysemy-1.2.3.0@sha256:d9cfa7942940c7c6d07d1f26ae70c4f1170f9bd6c331bdbe586e810fafc25f17,5878
+    hackage: polysemy-1.2.2.0@sha256:20e278d6e2f16b79634864e6d3b1457b479378b058fd96c6135d8f48ba2306db,5776
     pantry-tree:
-      size: 3625
-      sha256: a54b1b565848944e37a5533bd91e91ecb7cdfa21294ba599c13d015d354c4f39
+      size: 3622
+      sha256: 12f504ac889727c61c686ce184ca55f67b129489fc7a030810db2d000a6c81ca
   original:
-    hackage: polysemy-1.2.3.0@sha256:d9cfa7942940c7c6d07d1f26ae70c4f1170f9bd6c331bdbe586e810fafc25f17,5878
+    hackage: polysemy-1.2.2.0
+- completed:
+    hackage: polysemy-plugin-0.2.3.0@sha256:f3d7e3eb685deb590928367e663783352e07d14fc1ca93abb7f204e063c56a1f,2697
+    pantry-tree:
+      size: 1230
+      sha256: 3f5d41e30ed3cb19636243c1351c23b0159734ac99735133dbf58d75373036cd
+  original:
+    hackage: polysemy-plugin-0.2.3.0
 snapshots:
 - completed:
-    size: 524154
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/14/20.yaml
-    sha256: 2f5099f69ddb6abfe64400fe1e6a604e8e628f55e6837211cd70a81eb0a8fa4d
-  original: lts-14.20
+    size: 524163
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/14/25.yaml
+    sha256: 97548b4e927a8a862d4a203687ca18a3f5d2ae75b4b72c946fb29c17df1a5082
+  original: lts-14.25

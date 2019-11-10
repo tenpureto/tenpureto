@@ -36,10 +36,10 @@ dependencies:
 - parsec
 - file-embed
 - monad-memo
-- polysemy >= 1.2.3.0
-- polysemy-plugin >= 0.2.4.0
+- polysemy >= 1.2.2.0
+- polysemy-plugin >= 0.2.3.0
 
-ghc-options: -O2 -fplugin=Polysemy.Plugin -flate-specialise -fspecialise-aggressively
+ghc-options: -O2 -fplugin=Polysemy.Plugin -flate-specialise -fspecialise-aggressively -optP-Wno-nonportable-include-path
 
 default-extensions:
 - DataKinds

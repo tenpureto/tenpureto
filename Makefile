@@ -70,13 +70,21 @@ clean:
 	OS_DISTRIBUTION="bionic" $(docker_compose) down --remove-orphans --rmi local
 	OS_DISTRIBUTION="buster" $(docker_compose) down --remove-orphans --rmi local
 
-.PHONY: build
+.PHONY: build-deps
 build-deps:
 	$(stack_build) --only-dependencies
 
 .PHONY: build
 build:
 	$(stack_build)
+
+.PHONY: test-deps
+test-deps:
+	$(stack_build) --test --only-dependencies
+
+.PHONY: build-tests
+build-tests:
+	$(stack_build) --test --no-run-tests
 
 .PHONY: test
 test:
@@ -208,4 +216,4 @@ publish-docs: build-docs
 	git -C $(docs_dist) init
 	git -C $(docs_dist) add -A
 	git -C $(docs_dist) commit -m deploy
-	git -C $(docs_dist) push -f git@github.com:$(package)/$(package).github.io.git master
+	git -C $(docs_dist) push -f https://$(GITHUB_ACTOR):$(GITHUB_TOKEN)@github.com/$(GITHUB_REPOSITORY).git master:gh-pages

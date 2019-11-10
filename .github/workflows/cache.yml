@@ -1,0 +1,24 @@
+name: Build Cache
+
+on:
+  push:
+    branches: [ master ]
+  schedule:
+    - cron: 0 0 * * *
+
+jobs:
+  build-cache:
+    if: github.repository == 'tenpureto/tenpureto'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v1
+      - uses: cachix/install-nix-action@v6
+      - uses: cachix/cachix-action@v3
+        with:
+          name: tenpureto
+          attributes: default.shellFor
+          signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
