@@ -19,7 +19,9 @@ import           Data.Text.Prettyprint.Doc
 import           Data.Text.Prettyprint.Doc.Render.Terminal
 import           Data.IORef
 
-import           System.IO                      ( stdout )
+import           System.IO                      ( stdin
+                                                , stdout
+                                                )
 import           System.Console.ANSI            ( hSupportsANSI )
 
 import           Tenpureto.Effects.Terminal.Internal
@@ -65,15 +67,18 @@ traverseWithProgressBar info action tasks =
     in  traverseWithIndex fullAction tasks
 
 runTerminalIOOutput
-    :: Member (Embed IO) r
-    => IO (Sem (Terminal ': r) a -> Sem r a)
+    :: Member (Embed IO) r => IO (Sem (Terminal ': r) a -> Sem r a)
 runTerminalIOOutput = do
-    ioRef        <- newIORef (TemporaryHeight 0)
-    supportsANSI <- hSupportsANSI stdout
+    ioRef              <- newIORef (TemporaryHeight 0)
+    stdoutSupportsANSI <- hSupportsANSI stdout
+    stdinSupportsANSI  <- hSupportsANSI stdin
     let fmt :: Doc AnsiStyle -> Doc AnsiStyle
-        fmt = if supportsANSI then id else unAnnotate
+        fmt = if stdoutSupportsANSI then id else unAnnotate
+    let getTerminalWidth' = if stdoutSupportsANSI && stdinSupportsANSI
+            then getTerminalWidth
+            else return Nothing
     return $ runStateIORef ioRef . reinterpret \case
-        TerminalWidth -> embed getTerminalWidth
+        TerminalWidth -> embed getTerminalWidth'
         SayLn msg     -> do
             TemporaryHeight ph <- get
             embed $ clearLastLinesTerminal ph
