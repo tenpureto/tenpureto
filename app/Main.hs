@@ -1,4 +1,3 @@
-{-# LANGUAGE ImpredicativeTypes #-}
 {-# LANGUAGE LambdaCase #-}
 
 module Main where
@@ -6,7 +5,6 @@ module Main where
 import           Polysemy
 import           Polysemy.Error
 import           Polysemy.Resource
-import           Polysemy.IdempotentLowering
 
 import           Options.Applicative
 import           Data.Semigroup                 ( (<>) )
@@ -416,7 +414,7 @@ runCommand TemplateListConflicts { templateName = t, enableDebugLogging = d } =
 runCommand TemplateChangeVariable { templateName = t, oldVariableValue = ov, newVariableValue = nv, enableInteractivity = i, enableDebugLogging = d }
     = runAppM d False $ changeTemplateVariableValue t ov nv i
 
-runOptParser :: Members '[Terminal, Resource, Embed IO] r => Sem r ()
+runOptParser :: Members '[Terminal, Resource, Embed IO, Final IO] r => Sem r ()
 runOptParser = do
     w <- fromMaybe 80 <$> terminalWidth
     let p = prefs (showHelpOnEmpty <> columns w)
@@ -441,5 +439,5 @@ runOptParser = do
 
 main :: IO ()
 main = do
-    handler <- nat (runM @IO) .@! runTerminalIOOutput .@! liftNat lowerResource
-    handler runOptParser
+    runTerminalIOOutput' <- runTerminalIOOutput
+    runFinal . embedToFinal @IO . resourceToIOFinal . runTerminalIOOutput' $ runOptParser

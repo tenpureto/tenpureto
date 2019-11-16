@@ -18,6 +18,20 @@ packages:
       sha256: a294760bf52590c0998b139993d53169aa4a6f031f8d2e130c6d1742e82e0c71
   original:
     hackage: hedgehog-classes-0.2.4@sha256:f38ce9900e03e45108cb0f27860b8bf3671e0261d5e2197b4fa1bc27acb77df7,5355
+- completed:
+    hackage: polysemy-1.2.3.0@sha256:d9cfa7942940c7c6d07d1f26ae70c4f1170f9bd6c331bdbe586e810fafc25f17,5878
+    pantry-tree:
+      size: 3625
+      sha256: a54b1b565848944e37a5533bd91e91ecb7cdfa21294ba599c13d015d354c4f39
+  original:
+    hackage: polysemy-1.2.3.0@sha256:d9cfa7942940c7c6d07d1f26ae70c4f1170f9bd6c331bdbe586e810fafc25f17,5878
+- completed:
+    hackage: polysemy-plugin-0.2.4.0@sha256:b27f399946e90d480271d2b655b6172ed80f9d421f871c21a804511bc7b0f53c,2952
+    pantry-tree:
+      size: 1232
+      sha256: cb625393a44faa3c25e513c7df89742b5bbe457533f8f2ebf37bc6a32bf10423
+  original:
+    hackage: polysemy-plugin-0.2.4.0@sha256:b27f399946e90d480271d2b655b6172ed80f9d421f871c21a804511bc7b0f53c,2952
 snapshots:
 - completed:
     size: 524130

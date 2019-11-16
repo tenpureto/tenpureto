@@ -36,9 +36,8 @@ dependencies:
 - parsec
 - file-embed
 - monad-memo
-- polysemy >= 1.0.0.0
-- polysemy-zoo
-- polysemy-plugin
+- polysemy >= 1.2.3.0
+- polysemy-plugin >= 0.2.4.0
 
 ghc-options: -O2 -fplugin=Polysemy.Plugin -flate-specialise -fspecialise-aggressively
 

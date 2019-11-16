@@ -1,6 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE ImpredicativeTypes #-}
 
 module Tenpureto.Effects.Terminal
     ( module Tenpureto.Effects.Terminal
@@ -13,7 +12,6 @@ where
 import           Polysemy
 import           Polysemy.State
 import           Polysemy.Resource
-import           Polysemy.IdempotentLowering
 
 import           Data.Bool
 import           Data.Text                      ( Text )
@@ -68,14 +66,13 @@ traverseWithProgressBar info action tasks =
 
 runTerminalIOOutput
     :: Member (Embed IO) r
-    => (forall x . Sem r x -> IO x)
-    -> IO (forall a . Sem (Terminal ': r) a -> Sem r a)
-runTerminalIOOutput _ = do
+    => IO (Sem (Terminal ': r) a -> Sem r a)
+runTerminalIOOutput = do
     ioRef        <- newIORef (TemporaryHeight 0)
     supportsANSI <- hSupportsANSI stdout
     let fmt :: Doc AnsiStyle -> Doc AnsiStyle
         fmt = if supportsANSI then id else unAnnotate
-    nat $ runStateIORef ioRef . reinterpret \case
+    return $ runStateIORef ioRef . reinterpret \case
         TerminalWidth -> embed getTerminalWidth
         SayLn msg     -> do
             TemporaryHeight ph <- get

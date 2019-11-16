@@ -4,6 +4,8 @@ packages:
 extra-deps:
 - replace-attoparsec-1.0.3.0@sha256:f5a6ed1ab83a2291c3190fc152c76967a1ccafbc488041f51519425716784ea6,2465
 - hedgehog-classes-0.2.4@sha256:f38ce9900e03e45108cb0f27860b8bf3671e0261d5e2197b4fa1bc27acb77df7,5355
+- polysemy-1.2.3.0@sha256:d9cfa7942940c7c6d07d1f26ae70c4f1170f9bd6c331bdbe586e810fafc25f17,5878
+- polysemy-plugin-0.2.4.0@sha256:b27f399946e90d480271d2b655b6172ed80f9d421f871c21a804511bc7b0f53c,2952
 
 nix:
   packages: [ zlib ]
