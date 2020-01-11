@@ -5,13 +5,6 @@
 
 packages:
 - completed:
-    hackage: replace-attoparsec-1.0.3.0@sha256:f5a6ed1ab83a2291c3190fc152c76967a1ccafbc488041f51519425716784ea6,2465
-    pantry-tree:
-      size: 592
-      sha256: e316b4238ef761b56f456fab0d97f19d7fed87dce0072608175636be6b916d66
-  original:
-    hackage: replace-attoparsec-1.0.3.0@sha256:f5a6ed1ab83a2291c3190fc152c76967a1ccafbc488041f51519425716784ea6,2465
-- completed:
     hackage: hedgehog-classes-0.2.4@sha256:f38ce9900e03e45108cb0f27860b8bf3671e0261d5e2197b4fa1bc27acb77df7,5355
     pantry-tree:
       size: 5059
@@ -25,16 +18,9 @@ packages:
       sha256: a54b1b565848944e37a5533bd91e91ecb7cdfa21294ba599c13d015d354c4f39
   original:
     hackage: polysemy-1.2.3.0@sha256:d9cfa7942940c7c6d07d1f26ae70c4f1170f9bd6c331bdbe586e810fafc25f17,5878
-- completed:
-    hackage: polysemy-plugin-0.2.4.0@sha256:b27f399946e90d480271d2b655b6172ed80f9d421f871c21a804511bc7b0f53c,2952
-    pantry-tree:
-      size: 1232
-      sha256: cb625393a44faa3c25e513c7df89742b5bbe457533f8f2ebf37bc6a32bf10423
-  original:
-    hackage: polysemy-plugin-0.2.4.0@sha256:b27f399946e90d480271d2b655b6172ed80f9d421f871c21a804511bc7b0f53c,2952
 snapshots:
 - completed:
-    size: 524130
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/14/10.yaml
-    sha256: 04841e0397d7ce6364f19359fce89aa45ca8684609d665845db80d398002baa9
-  original: lts-14.10
+    size: 524154
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/14/20.yaml
+    sha256: 2f5099f69ddb6abfe64400fe1e6a604e8e628f55e6837211cd70a81eb0a8fa4d
+  original: lts-14.20
