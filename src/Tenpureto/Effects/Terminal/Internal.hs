@@ -9,7 +9,6 @@ import           Data.Text.Prettyprint.Doc.Render.Terminal
 import           Data.Functor
 import           Data.Traversable
 import           Control.Monad
-import           Control.Exception
 
 import           System.IO                      ( stdout
                                                 , hFlush
@@ -17,8 +16,8 @@ import           System.IO                      ( stdout
 import           System.Console.ANSI            ( cursorUp
                                                 , setCursorColumn
                                                 , clearFromCursorToScreenEnd
-                                                , getTerminalSize
                                                 )
+import qualified System.Console.Terminal.Size  as TS
 
 newtype TemporaryHeight = TemporaryHeight Int
 
@@ -26,10 +25,7 @@ layoutOptions :: Maybe Int -> LayoutOptions
 layoutOptions w = LayoutOptions $ maybe Unbounded (flip AvailablePerLine 1.0) w
 
 getTerminalWidth :: IO (Maybe Int)
-getTerminalWidth = fmap snd <$> catch getTerminalSize ignore
-  where
-    ignore :: SomeException -> IO (Maybe a)
-    ignore _ = return Nothing
+getTerminalWidth = fmap TS.width <$> TS.size
 
 sayLnTerminal :: Doc AnsiStyle -> IO ()
 sayLnTerminal msg = do
