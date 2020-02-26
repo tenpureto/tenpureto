@@ -85,6 +85,8 @@ templateValueText (MultiWordTemplateValue fwc owc s tt) =
 sameStyle :: TemplateValue -> TemplateValue -> Bool
 sameStyle (MultiWordTemplateValue fwc owc s _) (MultiWordTemplateValue fwc' owc' s' _)
     = fwc == fwc' && owc == owc' && s == s'
+sameStyle (MultiWordTemplateValue fwc _ _ _) (SingleWordTemplateValue c' _) =
+    fwc == c'
 sameStyle (SingleWordTemplateValue c _) (SingleWordTemplateValue c' _) =
     c == c'
 sameStyle (LiteralTemplateValue _) (LiteralTemplateValue _) = True
