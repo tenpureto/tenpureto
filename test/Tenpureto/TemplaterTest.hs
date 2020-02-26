@@ -18,6 +18,25 @@ import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Logging
 import           Tenpureto.Templater
 
+test_translate_multiWordToSingleWord :: [TestTree]
+test_translate_multiWordToSingleWord =
+    let Right settings = runTest $ compileSettings TemplaterSettings
+            { templaterFromVariables = InsOrdHashMap.singleton "A" "bbb-ccc-ddd"
+            , templaterToVariables   = InsOrdHashMap.singleton "A" "xxx"
+            , templaterExcludes      = Set.empty
+            }
+    in  [testCase "should replace in text" $ translate settings "a Bbb ccc ddd e" @?= "a Xxx e"]
+
+
+test_translate_singleWordToMultiWord :: [TestTree]
+test_translate_singleWordToMultiWord =
+    let Right settings = runTest $ compileSettings TemplaterSettings
+            { templaterFromVariables = InsOrdHashMap.singleton "A" "bbb"
+            , templaterToVariables   = InsOrdHashMap.singleton "A" "xxx-yyy"
+            , templaterExcludes      = Set.empty
+            }
+    in  [testCase "should replace in text" $ translate settings "a bbb e" @?= "a xxx-yyy e"]
+
 test_translateFile :: [TestTree]
 test_translateFile =
     let Right settings = runTest $ compileSettings TemplaterSettings
@@ -33,6 +52,7 @@ test_translateFile =
             $   mv [relfile|a/bbb/ccc/ddd/e/f.txt|]
             @?= Right [relfile|a/xxx/yyy/e/f.txt|]
         ]
+
 
 test_translateFile_toVariablesHasSpace :: [TestTree]
 test_translateFile_toVariablesHasSpace =
