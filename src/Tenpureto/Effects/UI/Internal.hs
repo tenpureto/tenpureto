@@ -94,10 +94,10 @@ inputBranchList graph availableBranches selectedBranches = vsep $ zipWith6
     renderLine selectedPrefix index branch description stability note =
         " " <> selectedPrefix <+> pretty index <> ")" <+> hang
             4
-            (   annotate (color White) (pretty branch)
+            (   annotate (colorDull White) (pretty branch)
             <>  softline
             <>  softline
-            <>  annotate (color Green) (pretty description)
+            <>  annotate (colorDull Green) (pretty description)
             <+> stabilityNote stability
             <>  annotate (color Black) (pretty note)
             )
