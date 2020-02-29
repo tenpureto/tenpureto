@@ -1,4 +1,4 @@
-# tenpureto [![Build Status](https://travis-ci.com/tenpureto/tenpureto.svg?branch=master)](https://travis-ci.com/tenpureto/tenpureto)
+# tenpureto [![CI](https://github.com/tenpureto/tenpureto/workflows/CI/badge.svg)](https://github.com/tenpureto/tenpureto/actions?query=workflow%3ACI+branch%3Amaster)
 
 ## Introduction
 
