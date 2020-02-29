@@ -168,3 +168,37 @@ jobs:
         with:
           name: tenpureto-x86_64-linux.${{ matrix.packaging }}
           path: dist/
+  release:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - build-x86_64-darwin
+      - build-x86_64-linux
+      - package-x86_64-linux
+    steps:
+      - uses: actions/download-artifact@v1
+        with:
+          name: tenpureto-x86_64-linux
+      - uses: actions/download-artifact@v1
+        with:
+          name: tenpureto-x86_64-darwin
+      - uses: actions/download-artifact@v1
+        with:
+          name: tenpureto-x86_64-linux.deb
+      - uses: actions/download-artifact@v1
+        with:
+          name: tenpureto-x86_64-linux.rpm
+      - run: |
+          mkdir release
+          mv tenpureto-x86_64-linux/tenpureto release/tenpureto-${GITHUB_REF#refs/tags/v}-x86_64-linux
+          mv tenpureto-x86_64-darwin/tenpureto release/tenpureto-${GITHUB_REF#refs/tags/v}-x86_64-darwin
+          mv tenpureto-x86_64-linux.deb/* release/
+          mv tenpureto-x86_64-linux.rpm/* release/
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          draft: true
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
