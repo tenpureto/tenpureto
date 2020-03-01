@@ -99,32 +99,19 @@ instance FromJSON TemplateYamlFeature where
     parseJSON (Y.Object v) = case HashMap.toList v of
         [(k, Y.Object vv)] ->
             TemplateYamlFeature k
-                <$> vv
-                .:? "description"
-                <*> vv
-                .:? "hidden"
-                .!= False
-                <*> vv
-                .:? "stability"
-                .!= Stable
+                <$> (vv .:? "description")
+                <*> (vv .:? "hidden" .!= False)
+                <*> (vv .:? "stability" .!= Stable)
         _ -> fail "Invalid template YAML feature definition"
     parseJSON _ = fail "Invalid template YAML feature definition"
 
 instance FromJSON TemplateYaml where
     parseJSON (Y.Object v) =
         TemplateYaml
-            <$> v
-            .:? "variables"
-            .!= Map.empty
-            <*> v
-            .:? "features"
-            .!= Set.empty
-            <*> v
-            .:? "excludes"
-            .!= Set.empty
-            <*> v
-            .:? "conflicts"
-            .!= Set.empty
+            <$> (Map.map (fromMaybe "") <$> v .:? "variables" .!= Map.empty)
+            <*> (v .:? "features" .!= Set.empty)
+            <*> (v .:? "excludes" .!= Set.empty)
+            <*> (v .:? "conflicts" .!= Set.empty)
     parseJSON _ = fail "Invalid template YAML definition"
 
 instance ToJSON TemplateYamlFeature where
@@ -210,25 +197,22 @@ transposeMapSet = Map.foldrWithKey combine Map.empty
 commutativeConflicts
     :: [TemplateBranchInformation] -> [TemplateBranchInformation]
 commutativeConflicts bis =
-    let
-        conflictsMap =
-            Map.fromList [ (branchName b, branchConflicts b) | b <- bis ]
+    let conflictsMap =
+                Map.fromList [ (branchName b, branchConflicts b) | b <- bis ]
         transposedMap = transposeMapSet conflictsMap
-    in
-        [ TemplateBranchInformation
+    in  [ TemplateBranchInformation
               { branchName   = branchName b
               , branchCommit = branchCommit b
-              , templateYaml =
-                  TemplateYaml
-                      { yamlVariables = (yamlVariables . templateYaml) b
-                      , yamlFeatures  = (yamlFeatures . templateYaml) b
-                      , yamlExcludes  = (yamlExcludes . templateYaml) b
-                      , yamlConflicts = (yamlConflicts . templateYaml) b
-                                            <> Map.findWithDefault
-                                                   Set.empty
-                                                   (branchName b)
-                                                   transposedMap
-                      }
+              , templateYaml = TemplateYaml
+                  { yamlVariables = (yamlVariables . templateYaml) b
+                  , yamlFeatures  = (yamlFeatures . templateYaml) b
+                  , yamlExcludes  = (yamlExcludes . templateYaml) b
+                  , yamlConflicts = (yamlConflicts . templateYaml) b
+                                        <> Map.findWithDefault
+                                               Set.empty
+                                               (branchName b)
+                                               transposedMap
+                  }
               }
         | b <- bis
         ]
