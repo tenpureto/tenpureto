@@ -12,6 +12,10 @@ reasonable amount of flexibility:
 * Projects created from a template can be updated to include upstream changes.
 * Contributing to a template is as easy as contributing to any other project.
 
+## Documentation
+
+Project documentation including installation instructions, usage examples and information about authoring new templates is available at [tenpureto.org](https://tenpureto.org/).
+
 ## Installation
 
 ### macOS
@@ -22,6 +26,14 @@ You can install `tenpureto` with [Homebrew](https://brew.sh):
 $ brew tap rtimush/tap # you need it only once
 $ brew install tenpureto
 ```
+
+You can also download a binary from the [releases](https://github.com/tenpureto/tenpureto/releases/latest) page.
+
+### Linux
+
+You can download a statically built binary from the [releases](https://github.com/tenpureto/tenpureto/releases/latest) page.
+
+If you use [Linuxbrew](https://docs.brew.sh/Homebrew-on-Linux), you can also install `tenpureto` from the `rtimush/tap` tap in the same way as described in the [macOS](#macos) section.
 
 ### Build from sources
 
@@ -36,6 +48,8 @@ or
 # will run tenpureto without installing
 $ stack run -- <tenpureto options here>
 ```
+
+You may need to install `libtinfo-dev` (DEB) or `libtinfo-devel` (RPM) package before running `stack`.
 
 ## Usage
 
