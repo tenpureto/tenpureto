@@ -218,7 +218,7 @@ loadExistingProjectConfiguration projectPath =
             { preSelectedTemplate            = extractTemplateName
                                                    =<< previousCommitMessage
             , preTargetDirectory             = Just projectPath
-            , prePreviousTemplateCommit      = previousCommit
+            , prePreviousTemplateCommit      = ExistingParentCommit <$> previousCommit
             , preSelectedBranches            = fmap
                                                    (Set.map yamlFeatureName . yamlFeatures)
                                                    yaml

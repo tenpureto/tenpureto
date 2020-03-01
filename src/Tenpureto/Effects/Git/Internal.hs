@@ -49,6 +49,10 @@ data RepositoryLocation = LocalRepository (Path Abs Dir)
 newtype GitRepository = GitRepository { repositoryPath :: Path Abs Dir }
 newtype Committish = Committish { unCommittish :: Text } deriving (Show, Eq, Ord)
 
+data ParentCommit = ExistingParentCommit Committish
+                  | OrphanCommit
+        deriving (Show)
+
 data GitException = GitExecException { exitCode :: Int, stdOut :: Maybe ByteString, stdErr :: Maybe ByteString }
                   | HubExecException { exitCode :: Int, stdOut :: Maybe ByteString, stdErr :: Maybe ByteString }
                   | HubResponseParseException { failure :: Text, responseContent :: ByteString }
@@ -181,6 +185,10 @@ data IssueInputPayload = IssueInputPayload { setIssueAssignees :: [Text], setIss
 
 instance Pretty Committish where
     pretty (Committish c) = pretty c
+
+instance Pretty ParentCommit where
+    pretty (ExistingParentCommit c) = pretty c
+    pretty OrphanCommit             = "<orphan>"
 
 instance FromJSON RepositoryOwner where
     parseJSON (Aeson.Object v) =

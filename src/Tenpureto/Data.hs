@@ -15,7 +15,7 @@ import           Tenpureto.Orphanage            ( )
 data PreliminaryProjectConfiguration = PreliminaryProjectConfiguration
         { preSelectedTemplate :: Maybe Text
         , preTargetDirectory :: Maybe (Path Abs Dir)
-        , prePreviousTemplateCommit :: Maybe Committish
+        , prePreviousTemplateCommit :: Maybe ParentCommit
         , preSelectedBranches :: Maybe (Set Text)
         , preVariableValues :: Maybe (Map Text Text)
         , preVariableDefaultReplacements :: Map Text Text
@@ -29,7 +29,7 @@ data FinalTemplateConfiguration = FinalTemplateConfiguration
         deriving (Show)
 
 newtype FinalUpdateConfiguration = FinalUpdateConfiguration
-        { previousTemplateCommit :: Committish
+        { previousTemplateCommit :: ParentCommit
         }
         deriving (Show)
 
@@ -48,8 +48,8 @@ instance Semigroup PreliminaryProjectConfiguration where
                                           <|> prePreviousTemplateCommit b
         , preSelectedBranches = preSelectedBranches a <|> preSelectedBranches b
         , preVariableValues = preVariableValues a <|> preVariableValues b
-        , preVariableDefaultReplacements =
-            preVariableDefaultReplacements a <> preVariableDefaultReplacements b
+        , preVariableDefaultReplacements = preVariableDefaultReplacements a
+            <> preVariableDefaultReplacements b
         }
 
 instance Pretty PreliminaryProjectConfiguration where
