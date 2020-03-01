@@ -177,6 +177,13 @@ test_parseTemplateYaml =
                 , yamlExcludes  = mempty
                 , yamlConflicts = mempty
                 }
+    , testCase "parse nulls"
+        $   parseTemplateYaml "variables: { \"Key\": }"
+        @?= Right TemplateYaml { yamlVariables = Map.singleton "Key" ""
+                               , yamlFeatures  = mempty
+                               , yamlExcludes  = mempty
+                               , yamlConflicts = mempty
+                               }
     ]
 
 test_buildGraph :: [TestTree]
