@@ -11,6 +11,7 @@ import           Polysemy.Resource
 import           Data.Maybe
 import           Data.Either
 import           Data.Either.Combinators        ( rightToMaybe )
+import qualified Data.ByteString.Lazy          as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Set                      as Set
@@ -61,15 +62,18 @@ createProject
     -> Sem r ()
 createProject projectConfiguration =
     withPreparedTemplate projectConfiguration
-        $ \template finalTemplateConfiguration templaterSettings ->
+        $ \template finalTemplateConfiguration finalProjectConfiguration templaterSettings mergedTemplateYaml ->
               let dst = targetDirectory finalTemplateConfiguration
-              in
-                  do
+                  translatedTemplateYaml = translateTemplateYaml
+                      finalProjectConfiguration
+                      mergedTemplateYaml
+              in  do
                       project          <- initRepository dst
                       compiledSettings <- compileSettings templaterSettings
-                      files            <- copy compiledSettings
-                                               template
-                                               (repositoryPath project)
+                      files            <- copyTemplate compiledSettings
+                                                       translatedTemplateYaml
+                                                       template
+                                                       (repositoryPath project)
                       addFiles project files
                       _ <- commit
                           project
@@ -92,66 +96,95 @@ updateProject projectConfiguration = do
         <> line
         <> (indent 4 . pretty) finalUpdateConfiguration
     withPreparedTemplate projectConfiguration
-        $ \template finalTemplateConfiguration templaterSettings ->
-              withRepository (targetDirectory finalTemplateConfiguration)
-                  $ \project ->
-                        withNewWorktree
-                                project
-                                (previousTemplateCommit finalUpdateConfiguration
-                                )
-                            $ \staging -> do
-                                  compiledSettings <- compileSettings
-                                      templaterSettings
-                                  files <- copy compiledSettings
-                                                template
-                                                (repositoryPath staging)
-                                  addFiles staging files
-                                  hasChanges <- hasChangedFiles staging
-                                  if hasChanges
-                                      then do
-                                          updatedTemplateCommit <- commit
-                                              staging
-                                              (commitUpdateMessage
-                                                  (selectedTemplate
-                                                      finalTemplateConfiguration
-                                                  )
-                                              )
-                                          logInfo
-                                              $   "Updated template commit:"
-                                              <+> pretty updatedTemplateCommit
-                                          let
-                                              commitMessage =
-                                                  commitUpdateMergeMessage
+        $ \template finalTemplateConfiguration finalProjectConfiguration templaterSettings mergedTemplateYaml ->
+              let translatedTemplateYaml = translateTemplateYaml
+                      finalProjectConfiguration
+                      mergedTemplateYaml
+              in
+                  withRepository (targetDirectory finalTemplateConfiguration)
+                      $ \project ->
+                            withNewWorktree
+                                    project
+                                    (previousTemplateCommit
+                                        finalUpdateConfiguration
+                                    )
+                                $ \staging -> do
+                                      compiledSettings <- compileSettings
+                                          templaterSettings
+                                      files <- copyTemplate
+                                          compiledSettings
+                                          translatedTemplateYaml
+                                          template
+                                          (repositoryPath staging)
+                                      addFiles staging files
+                                      hasChanges <- hasChangedFiles staging
+                                      if hasChanges
+                                          then do
+                                              updatedTemplateCommit <- commit
+                                                  staging
+                                                  (commitUpdateMessage
                                                       (selectedTemplate
                                                           finalTemplateConfiguration
                                                       )
-                                          mergeResult <- mergeBranch
-                                              project
-                                              MergeAllowFastForward
-                                              (unCommittish
-                                                  updatedTemplateCommit
-                                              )
-                                              commitMessage
-                                          case mergeResult of
-                                              MergeSuccessCommitted ->
-                                                  sayLn
-                                                      $ projectUpdated
-                                                            (repositoryPath
-                                                                project
-                                                            )
-                                              MergeSuccessUncommitted ->
-                                                  sayLn
-                                                      $ projectUpdatedWithoutConflicts
-                                                            (repositoryPath
-                                                                project
-                                                            )
-                                              MergeConflicts _ ->
-                                                  sayLn
-                                                      $ projectUpdatedWithConflicts
-                                                            (repositoryPath
-                                                                project
-                                                            )
-                                      else sayLn noRelevantTemplateChanges
+                                                  )
+                                              logInfo
+                                                  $   "Updated template commit:"
+                                                  <+> pretty
+                                                          updatedTemplateCommit
+                                              let
+                                                  commitMessage =
+                                                      commitUpdateMergeMessage
+                                                          (selectedTemplate
+                                                              finalTemplateConfiguration
+                                                          )
+                                              mergeResult <- mergeBranch
+                                                  project
+                                                  MergeAllowFastForward
+                                                  (unCommittish
+                                                      updatedTemplateCommit
+                                                  )
+                                                  commitMessage
+                                              case mergeResult of
+                                                  MergeSuccessCommitted ->
+                                                      sayLn
+                                                          $ projectUpdated
+                                                                (repositoryPath
+                                                                    project
+                                                                )
+                                                  MergeSuccessUncommitted ->
+                                                      sayLn
+                                                          $ projectUpdatedWithoutConflicts
+                                                                (repositoryPath
+                                                                    project
+                                                                )
+                                                  MergeConflicts _ ->
+                                                      sayLn
+                                                          $ projectUpdatedWithConflicts
+                                                                (repositoryPath
+                                                                    project
+                                                                )
+                                          else sayLn noRelevantTemplateChanges
+
+translateTemplateYaml
+    :: FinalProjectConfiguration -> TemplateYaml -> TemplateYaml
+translateTemplateYaml cfg yaml = TemplateYaml
+    { yamlVariables = variableValues cfg
+    , yamlFeatures  = yamlFeatures yaml
+    , yamlExcludes  = mempty
+    , yamlConflicts = mempty
+    }
+
+copyTemplate
+    :: (Member FileSystem r, Member Logging r, Member Git r)
+    => CompiledTemplaterSettings
+    -> TemplateYaml
+    -> GitRepository
+    -> Path Abs Dir
+    -> Sem r [Path Rel File]
+copyTemplate settings yaml repo dst = do
+    files <- copy settings repo dst
+    writeFileAsByteString (dst </> templateYamlFile) (BS.toStrict . formatTemplateYaml $ yaml)
+    return $ templateYamlFile : files
 
 withPreparedTemplate
     :: Members
@@ -161,7 +194,9 @@ withPreparedTemplate
     => PreliminaryProjectConfiguration
     -> (  GitRepository
        -> FinalTemplateConfiguration
+       -> FinalProjectConfiguration
        -> TemplaterSettings
+       -> TemplateYaml
        -> Sem r ()
        )
     -> Sem r ()
@@ -198,7 +233,11 @@ withPreparedTemplate projectConfiguration block = do
               let templaterSettings = buildTemplaterSettings
                       mergedTemplateYaml
                       finalProjectConfiguration
-              block repository finalTemplateConfiguration templaterSettings
+              block repository
+                    finalTemplateConfiguration
+                    finalProjectConfiguration
+                    templaterSettings
+                    mergedTemplateYaml
 
 loadExistingProjectConfiguration
     :: Members '[Git, Logging] r
@@ -218,7 +257,8 @@ loadExistingProjectConfiguration projectPath =
             { preSelectedTemplate            = extractTemplateName
                                                    =<< previousCommitMessage
             , preTargetDirectory             = Just projectPath
-            , prePreviousTemplateCommit      = ExistingParentCommit <$> previousCommit
+            , prePreviousTemplateCommit      = ExistingParentCommit
+                                                   <$> previousCommit
             , preSelectedBranches            = fmap
                                                    (Set.map yamlFeatureName . yamlFeatures)
                                                    yaml
