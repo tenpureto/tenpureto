@@ -15,20 +15,22 @@ import           Data.Foldable
 import           Tenpureto.Data
 import           Tenpureto.Messages
 import           Tenpureto.TemplateLoader
-import           Tenpureto.Effects.Git          ( BranchRef
-                                                )
+import           Tenpureto.Effects.Git          ( BranchRef )
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Terminal
 import           Tenpureto.Effects.UI.Internal
 
 data UIException = UnattendedNotPossible Text
                  | NoBaseBranchesException
+                 | NoPreviousCommitException
 
 instance Pretty UIException where
     pretty (UnattendedNotPossible missing) =
         "Input required when running in an unattended mode:" <+> pretty missing
     pretty NoBaseBranchesException =
         "Repository does not contain template branches"
+    pretty NoPreviousCommitException =
+        "Cannot find a previous template commit, either the repository was not created with tenpureto or the commit history has been amended in an incompatible way"
 
 data ConflictResolutionStrategy = AlreadyResolved | MergeTool
 
@@ -55,7 +57,8 @@ runUIInTerminal = interpret $ \case
             <*> maybe inputTarget   return mbtd
 
     InputUpdateConfiguration PreliminaryProjectConfiguration { prePreviousTemplateCommit = mbc }
-        -> FinalUpdateConfiguration <$> maybe inputPreviousCommit return mbc
+        -> FinalUpdateConfiguration
+            <$> maybe (throw NoPreviousCommitException) return mbc
 
     InputProjectConfiguration templateInformation providedConfiguration -> do
         let psb = fromMaybe mempty (preSelectedBranches providedConfiguration)
