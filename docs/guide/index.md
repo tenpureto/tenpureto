@@ -7,18 +7,19 @@ lets you focus on the actual logic.
 
 ## Installing tenpureto
 
-On **MacOS** you can install `tenpureto` with [Homebrew](https://brew.sh):
+On **macOS** you can install `tenpureto` with [Homebrew](https://brew.sh):
 
 ```
 $ brew tap rtimush/tap
 $ brew install tenpureto
 ```
 
-On **Linux** you can install `tenpureto` from the binary packages available on
-[BinTray](https://bintray.com/tenpureto/).
+Alternatively, you can just download a binary from the
+[GitHub Releases](https://github.com/tenpureto/tenpureto/releases/latest) page.
 
-If there is no pre-built package available for your OS, you can build `tenpureto` from
-[sources](https://github.com/tenpureto/tenpureto/blob/master/README.md#build-from-sources).
+On **Linux** you can download the static binary from the
+[GitHub Releases](https://github.com/tenpureto/tenpureto/releases/latest) page, or install `tenpureto` with
+[Linuxbrew](https://docs.brew.sh/Homebrew-on-Linux).
 
 ## Scaffolding a new project
 
