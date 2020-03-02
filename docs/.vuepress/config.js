@@ -10,5 +10,11 @@ module.exports = {
     repo: "tenpureto/tenpureto",
     docsDir: "docs",
     editLinks: true
+  },
+  plugins: {
+    sitemap: {
+      hostname: "https://tenpureto.org",
+      exclude: ["/404.html"]
+    }
   }
 };
