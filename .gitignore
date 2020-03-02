@@ -4,6 +4,7 @@
 /tenpureto.cabal
 /dist/
 /dist-newstyle/
+codecov.json
 *~
 
 /docs/node_modules/
