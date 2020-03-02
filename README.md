@@ -1,4 +1,4 @@
-# tenpureto [![CI](https://github.com/tenpureto/tenpureto/workflows/CI/badge.svg)](https://github.com/tenpureto/tenpureto/actions?query=workflow%3ACI+branch%3Amaster)
+# tenpureto [![CI](https://github.com/tenpureto/tenpureto/workflows/CI/badge.svg)](https://github.com/tenpureto/tenpureto/actions?query=workflow%3ACI+branch%3Amaster) [![codecov](https://codecov.io/gh/tenpureto/tenpureto/branch/master/graph/badge.svg)](https://codecov.io/gh/tenpureto/tenpureto)
 
 ## Introduction
 

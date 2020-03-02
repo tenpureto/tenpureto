@@ -23,14 +23,9 @@ default: build
 .PHONY: clean
 clean:
 	rm -rf .stack-work
-	rm -rf .build/*/.stack-work
-	rm -rf staging
-	rm -rf .build/*/staging
+	rm -rf .build
 	rm -rf $(dist)
 	rm -rf $(docs_dist)
-	OS_DISTRIBUTION="amzn2" $(docker_compose) down --remove-orphans --rmi local
-	OS_DISTRIBUTION="bionic" $(docker_compose) down --remove-orphans --rmi local
-	OS_DISTRIBUTION="buster" $(docker_compose) down --remove-orphans --rmi local
 
 .PHONY: build-deps
 build-deps:
@@ -48,9 +43,24 @@ test-deps:
 build-tests:
 	$(stack_build) --test --no-run-tests
 
+.PHONY: build-tests-coverage
+build-tests-coverage:
+	$(stack_build) --coverage --test --no-run-tests
+
 .PHONY: test
 test:
 	$(stack_build) --test
+
+.PHONY: test-coverage
+test-coverage:
+	$(stack_build) --coverage --test
+
+.PHONE: report-coverage
+report-coverage:
+	$(stack) exec --package hpc-codecov hpc-codecov -- \
+		--mixdir $(shell stack path --dist-dir)/hpc \
+		--out=codecov.json \
+		$(shell stack path --local-hpc-root)/tenpureto/tenpureto-test/tenpureto-test.tix
 
 .PHONY: $(staging_package)
 $(staging_package):

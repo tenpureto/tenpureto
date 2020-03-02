@@ -22,9 +22,16 @@ jobs:
       - name: Install dependencies
         run: make test-deps
       - name: Build
-        run: make build-tests
+        run: make build-tests-coverage
       - name: Run tests
-        run: make test
+        run: make test-coverage
+      - name: Generate coverage report
+        run: make report-coverage
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./codecov.json
   test-docs:
     runs-on: ubuntu-latest
     steps:
