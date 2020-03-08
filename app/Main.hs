@@ -299,7 +299,7 @@ templateCommands = hsubparser
     (  command
           "graph"
           (info templateGraphCommand
-                (progDesc "Change a template variable value")
+                (progDesc "Generate a graph of template branches")
           )
     <> command
            "list-branches"
@@ -452,12 +452,12 @@ runOptParser = do
         (  command
               "create"
               (info createCommand
-                    (progDesc "Create a new project for a template")
+                    (progDesc "Create a new project from a template")
               )
         <> command
                "update"
                (info updateCommand
-                     (progDesc "Update a project for a template")
+                     (progDesc "Update a project from a template")
                )
         <> command
                "adopt"
