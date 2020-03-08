@@ -24,7 +24,7 @@ the "pure backend service".
 The second aspect you need to think of when you create a template is variables. Tenpureto templates don't have any
 special syntax to mark the variables to be replaced. All you need is to define the variables in `.template.yaml`, and
 Tenpureto will replace all occurrences. It will also take care of using the correct style of the variable value:
-`template-project` will be replaced with `my-cool-service`, while `Template Project` will become `My Cool Project`.
+`template-project` will be replaced with `my-cool-service`, while `Template Project` will become `My Cool Service`.
 
 ## Template descriptor
 
