@@ -223,6 +223,9 @@ isFeatureBranch b = branchName b `Set.member` requiredBranches b
 isHiddenBranch :: TemplateBranchInformation -> Bool
 isHiddenBranch = maybe False yamlFeatureHidden . templateYamlFeature
 
+isParentOf :: TemplateBranchInformation -> TemplateBranchInformation -> Bool
+isParentOf child parent = branchName parent `Set.member` requiredBranches child
+
 isMergeOf :: TemplateBranchInformation -> [TemplateBranchInformation] -> Bool
 isMergeOf bi bis =
     foldMap requiredBranches bis
@@ -233,7 +236,7 @@ isMergeBranch'
     :: [TemplateBranchInformation] -> TemplateBranchInformation -> Bool
 isMergeBranch' bis b = any (isMergeOf b) mergeOptions
   where
-    fb           = filter isFeatureBranch bis
+    fb           = filter (isParentOf b) $ filter isFeatureBranch bis
     mergeOptions = filter ((<) 1 . length) (subsequences fb)
 
 isMergeBranch :: TemplateInformation -> TemplateBranchInformation -> Bool
