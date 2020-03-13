@@ -1,5 +1,5 @@
 let
-  pkgs = import <nixpkgs> (import (builtins.fetchTarball https://github.com/input-output-hk/haskell.nix/archive/84072ccd666df8596a3475f5a9791959e6656f93.tar.gz));
+  pkgs = import <nixpkgs> (import (builtins.fetchTarball https://github.com/input-output-hk/haskell.nix/archive/98ac006e995d310c9329787bd93f6c3384174713.tar.gz));
   modules = haskellPackages: [
     { reinstallableLibGhc = true; }
     { packages.ghc.patches = [ ./ghc-8.6.5.patch ]; }
