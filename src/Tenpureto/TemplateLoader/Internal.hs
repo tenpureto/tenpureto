@@ -7,19 +7,23 @@ import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
-import qualified Data.HashMap.Strict           as HashMap
 import           Data.Text.Prettyprint.Doc
-import           Data.Yaml                      ( FromJSON(..)
-                                                , ToJSON(..)
+import           Data.YAML                      ( FromYAML(..)
+                                                , ToYAML(..)
+                                                , Pair
+                                                , Node
+                                                , withStr
+                                                , withMap
                                                 , (.:?)
                                                 , (.!=)
+                                                , mapping
                                                 , (.=)
                                                 )
-import qualified Data.Yaml                     as Y
-import           Data.Aeson.Types               ( KeyValue )
+import           Control.Applicative            ( (<|>) )
 
 import           Tenpureto.Graph
 import           Tenpureto.Effects.Git
+import           Tenpureto.Orphanage            ( )
 
 data FeatureStability = Deprecated | Experimental | Stable
         deriving (Show, Eq, Ord, Enum, Bounded)
@@ -78,57 +82,62 @@ instance Pretty TemplateYaml where
         , "Features: " <+> (align . pretty) (yamlFeatures cfg)
         ]
 
-instance FromJSON FeatureStability where
-    parseJSON (Y.String "stable"      ) = pure Stable
-    parseJSON (Y.String "experimental") = pure Experimental
-    parseJSON (Y.String "deprecated"  ) = pure Deprecated
-    parseJSON _                         = fail "Invalid feature stability value"
+instance FromYAML FeatureStability where
+    parseYAML = withStr "FeatureStability" $ \case
+        "stable"       -> pure Stable
+        "experimental" -> pure Experimental
+        "deprecated"   -> pure Deprecated
+        _              -> fail "Invalid feature stability value"
 
-instance ToJSON FeatureStability where
-    toJSON Stable       = toJSON @Text "stable"
-    toJSON Experimental = toJSON @Text "experimental"
-    toJSON Deprecated   = toJSON @Text "deprecated"
+instance ToYAML FeatureStability where
+    toYAML Stable       = toYAML @Text "stable"
+    toYAML Experimental = toYAML @Text "experimental"
+    toYAML Deprecated   = toYAML @Text "deprecated"
 
-instance FromJSON TemplateYamlFeature where
-    parseJSON (Y.String v) = pure $ TemplateYamlFeature
-        { yamlFeatureName        = v
-        , yamlFeatureDescription = Nothing
-        , yamlFeatureHidden      = False
-        , yamlFeatureStability   = Stable
-        }
-    parseJSON (Y.Object v) = case HashMap.toList v of
-        [(k, Y.Object vv)] ->
-            TemplateYamlFeature k
-                <$> (vv .:? "description")
-                <*> (vv .:? "hidden" .!= False)
-                <*> (vv .:? "stability" .!= Stable)
-        _ -> fail "Invalid template YAML feature definition"
-    parseJSON _ = fail "Invalid template YAML feature definition"
+instance FromYAML TemplateYamlFeature where
+    parseYAML yaml = simpleFeature yaml <|> complexFeature yaml
+      where
+        simpleFeature = withStr "TemplateYamlFeatureName"
+            $ \s -> pure (TemplateYamlFeature s Nothing False Stable)
+        complexFeature = withMap "TemplateYamlFeatureDefinition" $ \m ->
+            case Map.toList m of
+                [(k, v)] -> do
+                    kk <- parseYAML k
+                    withMap
+                        "TemplateYamlFeature"
+                        (\mm ->
+                            TemplateYamlFeature kk
+                                <$> (mm .:? "description")
+                                <*> (mm .:? "hidden" .!= False)
+                                <*> (mm .:? "stability" .!= Stable)
+                        )
+                        v
+                _ -> fail "Invalid template YAML feature definition"
 
-instance FromJSON TemplateYaml where
-    parseJSON (Y.Object v) =
+instance FromYAML TemplateYaml where
+    parseYAML = withMap "TemplateYaml" $ \v ->
         TemplateYaml
             <$> (Map.map (fromMaybe "") <$> v .:? "variables" .!= Map.empty)
             <*> (v .:? "features" .!= Set.empty)
             <*> (v .:? "excludes" .!= Set.empty)
             <*> (v .:? "conflicts" .!= Set.empty)
-    parseJSON _ = fail "Invalid template YAML definition"
 
-instance ToJSON TemplateYamlFeature where
-    toJSON TemplateYamlFeature { yamlFeatureName = n, yamlFeatureDescription = d, yamlFeatureHidden = h, yamlFeatureStability = s }
-        = case
-                catMaybes
-                    [ "description" .?= d
-                    , kvd "hidden"    False  h
-                    , kvd "stability" Stable s
-                    ]
-            of
-                []     -> toJSON n
-                fields -> Y.object [n .= (Y.object fields)]
+instance ToYAML TemplateYamlFeature where
+    toYAML TemplateYamlFeature { yamlFeatureName = n, yamlFeatureDescription = d, yamlFeatureHidden = h, yamlFeatureStability = s }
+        = case fields of
+            [] -> toYAML n
+            _  -> mapping [n .= mapping fields]
+      where
+        fields =
+            catMaybes
+                [ "description" .?= d
+                , kvd "hidden"    False  h
+                , kvd "stability" Stable s
+                ]
 
-instance ToJSON TemplateYaml where
-    toJSON TemplateYaml { yamlVariables = v, yamlFeatures = f, yamlExcludes = e, yamlConflicts = c }
-        = Y.object $ catMaybes
+instance ToYAML TemplateYaml where
+    toYAML TemplateYaml { yamlVariables = v, yamlFeatures = f, yamlExcludes = e, yamlConflicts = c }
+        = mappingMaybes
             [ "variables" .?= v
             , "features" .?= f
             , "excludes" .?= e
@@ -150,10 +159,13 @@ instance Monoid TemplateYaml where
                           , yamlConflicts = mempty
                           }
 
-(.?=) :: (KeyValue kv, ToJSON v, Eq v, Monoid v) => Text -> v -> Maybe kv
+mappingMaybes :: [Maybe Pair] -> Node ()
+mappingMaybes = mapping . catMaybes
+
+(.?=) :: (ToYAML v, Eq v, Monoid v) => Text -> v -> Maybe Pair
 (.?=) a b = if b == mempty then Nothing else Just (a .= b)
 
-kvd :: (KeyValue kv, ToJSON v, Eq v) => Text -> v -> v -> Maybe kv
+kvd :: (ToYAML v, Eq v) => Text -> v -> v -> Maybe Pair
 kvd a bd b = if b == bd then Nothing else Just (a .= b)
 
 requiredBranches :: TemplateBranchInformation -> Set Text

@@ -186,6 +186,40 @@ test_parseTemplateYaml =
                                }
     ]
 
+test_formatTemplateYaml :: [TestTree]
+test_formatTemplateYaml =
+    [ testCase "format simple features"
+        $   formatTemplateYaml
+                (TemplateYaml
+                    { yamlVariables = mempty
+                    , yamlFeatures  = Set.singleton TemplateYamlFeature
+                                          { yamlFeatureName        = "a"
+                                          , yamlFeatureDescription = Nothing
+                                          , yamlFeatureHidden      = False
+                                          , yamlFeatureStability   = Stable
+                                          }
+                    , yamlExcludes  = mempty
+                    , yamlConflicts = mempty
+                    }
+                )
+        @?= "features:\n- a\n"
+    , testCase "format extended features"
+        $ formatTemplateYaml
+              (TemplateYaml
+                  { yamlVariables = mempty
+                  , yamlFeatures  = Set.singleton TemplateYamlFeature
+                                        { yamlFeatureName        = "a"
+                                        , yamlFeatureDescription = Just "foo"
+                                        , yamlFeatureHidden      = False
+                                        , yamlFeatureStability   = Experimental
+                                        }
+                  , yamlExcludes  = mempty
+                  , yamlConflicts = mempty
+                  }
+              )
+        @?= "features:\n- a:\n    description: foo\n    stability: experimental\n"
+    ]
+
 test_buildGraph :: [TestTree]
 test_buildGraph =
     [ testCase "simple graph" $ nameGraph [a, b] @?= edge "a" "b"
