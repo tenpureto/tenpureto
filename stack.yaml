@@ -5,7 +5,6 @@ extra-deps:
 - hedgehog-classes-0.2.4.1
 - polysemy-1.2.2.0
 - polysemy-plugin-0.2.3.0
-- HsYAML-0.2.1.0
 
 nix:
   packages: [ zlib ]
