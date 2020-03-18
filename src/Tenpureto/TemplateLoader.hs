@@ -33,12 +33,11 @@ import qualified Data.Text                     as T
 import           Data.Text.Prettyprint.Doc
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
+import           Data.Bifunctor
+import           Control.Exception              ( displayException )
 import           Control.Monad
 import           Control.Monad.Trans.Maybe
-import           Data.YAML                      ( decode1
-                                                , encode1
-                                                , prettyPosWithSource
-                                                )
+import qualified Data.Yaml                     as Y
 
 import           Path
 
@@ -95,11 +94,11 @@ loadTemplateYaml
     :: Members '[FileSystem, Error TemplateLoaderException] r
     => Path Abs File
     -> Sem r TemplateYaml
-loadTemplateYaml file = do
-    yaml <- readFileAsByteString file
-    case parseTemplateYaml (BS.fromStrict yaml) of
-        Right result -> return result
-        Left  err  -> throw (TemplateYamlParseException err)
+loadTemplateYaml file =
+    either (throw . TemplateYamlParseException . T.pack . displayException)
+           return
+        =<< Y.decodeEither'
+        <$> readFileAsByteString file
 
 featureDescription :: TemplateBranchInformation -> Maybe Text
 featureDescription = yamlFeatureDescription <=< templateYamlFeature
@@ -115,13 +114,12 @@ branchesConflict a b =
 
 parseTemplateYaml :: ByteString -> Either Text TemplateYaml
 parseTemplateYaml yaml =
-    (mapLeft $ \(pos, err) ->
-            T.pack (prettyPosWithSource pos yaml "error") <> T.pack err
-        )
-        $ decode1 yaml
+    let info :: Either Y.ParseException TemplateYaml
+        info = Y.decodeEither' (BS.toStrict yaml)
+    in  first (T.pack . Y.prettyPrintParseException) info
 
 formatTemplateYaml :: TemplateYaml -> ByteString
-formatTemplateYaml y = encode1 TemplateYaml
+formatTemplateYaml y = (BS.fromStrict . Y.encode) TemplateYaml
     { yamlVariables = yamlVariables y
     , yamlFeatures  = Set.filter (not . yamlFeatureHidden) (yamlFeatures y)
     , yamlExcludes  = mempty
