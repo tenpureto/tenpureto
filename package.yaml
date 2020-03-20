@@ -21,9 +21,7 @@ dependencies:
 - directory
 - containers
 - semigroupoids
-- unordered-containers
 - algebraic-graphs
-- insert-ordered-containers
 - transformers
 - prettyprinter
 - prettyprinter-ansi-terminal
