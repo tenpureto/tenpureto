@@ -5,6 +5,7 @@ extra-deps:
 - hedgehog-classes-0.2.4.1
 - polysemy-1.2.2.0
 - polysemy-plugin-0.2.3.0
+- algebraic-graphs-0.5
 
 nix:
   packages: [ zlib ]

@@ -32,6 +32,8 @@ dependencies:
 - typed-process
 - optparse-applicative
 - yaml
+- libyaml
+- conduit
 - aeson
 - filepattern
 - parsec
@@ -86,4 +88,3 @@ tests:
     - tasty-hedgehog
     - smallcheck
     - hedgehog
-    - hedgehog-classes

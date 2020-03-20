@@ -5,19 +5,17 @@ import           Test.Tasty.HUnit
 import           Hedgehog
 import qualified Hedgehog.Gen                  as Gen
 import qualified Hedgehog.Range                as Range
-import           Hedgehog.Classes
 
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Set                      as Set
-import qualified Data.Map                      as Map
 import           Control.Applicative
 
 import           Tenpureto.Graph
 import           Tenpureto.TemplateTestHelper
 import           Tenpureto.TemplateLoader
 import           Tenpureto.TemplateLoader.Internal
-import           Tenpureto.PropertyTestHelpers
+import qualified Tenpureto.OrderedMap          as OrderedMap
 
 test_managedBranches :: [TestTree]
 test_managedBranches =
@@ -138,14 +136,15 @@ test_parseTemplateYaml :: [TestTree]
 test_parseTemplateYaml =
     [ testCase "parse variables"
         $   parseTemplateYaml "variables: { \"Key\": \"value\" }"
-        @?= Right TemplateYaml { yamlVariables = Map.singleton "Key" "value"
-                               , yamlFeatures  = mempty
-                               , yamlExcludes  = mempty
-                               , yamlConflicts = mempty
-                               }
+        @?= Right TemplateYaml
+                { yamlVariables = OrderedMap.singleton "Key" "value"
+                , yamlFeatures  = mempty
+                , yamlExcludes  = mempty
+                , yamlConflicts = mempty
+                }
     , testCase "parse excludes"
         $   parseTemplateYaml "excludes: [ \".*\" ]"
-        @?= Right TemplateYaml { yamlVariables = mempty
+        @?= Right TemplateYaml { yamlVariables = OrderedMap.empty
                                , yamlFeatures  = mempty
                                , yamlExcludes  = Set.singleton ".*"
                                , yamlConflicts = mempty
@@ -153,7 +152,7 @@ test_parseTemplateYaml =
     , testCase "parse simple features"
         $   parseTemplateYaml "features: [ \"a\" ]"
         @?= Right TemplateYaml
-                { yamlVariables = mempty
+                { yamlVariables = OrderedMap.empty
                 , yamlFeatures  = Set.singleton TemplateYamlFeature
                                       { yamlFeatureName        = "a"
                                       , yamlFeatureDescription = Nothing
@@ -167,7 +166,7 @@ test_parseTemplateYaml =
         $   parseTemplateYaml
                 "features: [ a: { description: foo, hidden: true, stability: experimental } ]"
         @?= Right TemplateYaml
-                { yamlVariables = mempty
+                { yamlVariables = OrderedMap.empty
                 , yamlFeatures  = Set.singleton TemplateYamlFeature
                                       { yamlFeatureName        = "a"
                                       , yamlFeatureDescription = Just "foo"
@@ -179,11 +178,55 @@ test_parseTemplateYaml =
                 }
     , testCase "parse nulls"
         $   parseTemplateYaml "variables: { \"Key\": }"
-        @?= Right TemplateYaml { yamlVariables = Map.singleton "Key" ""
+        @?= Right TemplateYaml { yamlVariables = OrderedMap.singleton "Key" ""
                                , yamlFeatures  = mempty
                                , yamlExcludes  = mempty
                                , yamlConflicts = mempty
                                }
+    , testCase "preserve variables order"
+        $   parseTemplateYaml
+                "variables: { \"a\": \"1\", \"c\": \"3\", \"b\": \"2\" }"
+        @?= Right TemplateYaml
+                { yamlVariables = OrderedMap.fromList
+                                      [("a", "1"), ("c", "3"), ("b", "2")]
+                , yamlFeatures  = mempty
+                , yamlExcludes  = mempty
+                , yamlConflicts = mempty
+                }
+    ]
+
+test_formatTemplateYaml :: [TestTree]
+test_formatTemplateYaml =
+    [ testCase "format simple features"
+        $   formatTemplateYaml
+                (TemplateYaml
+                    { yamlVariables = OrderedMap.empty
+                    , yamlFeatures  = Set.singleton TemplateYamlFeature
+                                          { yamlFeatureName        = "a"
+                                          , yamlFeatureDescription = Nothing
+                                          , yamlFeatureHidden      = False
+                                          , yamlFeatureStability   = Stable
+                                          }
+                    , yamlExcludes  = mempty
+                    , yamlConflicts = mempty
+                    }
+                )
+        @?= "features:\n- a\n"
+    , testCase "format extended features"
+        $ formatTemplateYaml
+              (TemplateYaml
+                  { yamlVariables = OrderedMap.empty
+                  , yamlFeatures  = Set.singleton TemplateYamlFeature
+                                        { yamlFeatureName        = "a"
+                                        , yamlFeatureDescription = Just "foo"
+                                        , yamlFeatureHidden      = False
+                                        , yamlFeatureStability   = Experimental
+                                        }
+                  , yamlExcludes  = mempty
+                  , yamlConflicts = mempty
+                  }
+              )
+        @?= "features:\n- a:\n    description: foo\n    stability: experimental\n"
     ]
 
 test_buildGraph :: [TestTree]
@@ -199,13 +242,6 @@ test_buildGraph =
     c         = childBranch "c" [b]
     nameGraph = mapVertices branchName . buildGraph
 
-test_semigroup :: TestTree
-test_semigroup = testGroup
-    "TemplateYaml"
-    [ lawTestTree $ semigroupLaws (genTemplateYaml (Range.exponential 0 10))
-    , lawTestTree $ monoidLaws (genTemplateYaml (Range.exponential 0 10))
-    ]
-
 genTemplateYaml :: Range Int -> Gen TemplateYaml
 genTemplateYaml range =
     let smallRange   = Range.constant 0 2
@@ -213,14 +249,15 @@ genTemplateYaml range =
         genTextTuple = liftA2 (\a -> \b -> (a, b)) genText genText
     in  do
             features  <- Gen.set range (genTemplateYamlFeature range)
-            variables <- Gen.map smallRange genTextTuple
+            variables <- Gen.list smallRange genTextTuple
             excludes  <- Gen.set smallRange genText
             conflicts <- Gen.set smallRange genText
-            return $ TemplateYaml { yamlVariables = variables
-                                  , yamlFeatures  = features
-                                  , yamlExcludes  = excludes
-                                  , yamlConflicts = conflicts
-                                  }
+            return $ TemplateYaml
+                { yamlVariables = OrderedMap.fromList variables
+                , yamlFeatures  = features
+                , yamlExcludes  = excludes
+                , yamlConflicts = conflicts
+                }
 
 genTemplateYamlFeature :: Range Int -> Gen TemplateYamlFeature
 genTemplateYamlFeature range = do

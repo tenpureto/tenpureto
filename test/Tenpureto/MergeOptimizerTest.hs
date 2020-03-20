@@ -8,6 +8,7 @@ import           Data.Functor.Identity
 
 import           Tenpureto.Graph
 import           Tenpureto.MergeOptimizer
+import qualified Tenpureto.OrderedMap          as OrderedMap
 
 
 test_mergeGraph :: [TestTree]
@@ -27,7 +28,8 @@ test_mergeGraph =
             { mergedBranchMeta       = x
             , mergedBranchDescriptor = MergedBranchDescriptor
                                              { mergedBranchName = n
-                                             , mergedVariables  = mempty
+                                             , mergedVariables  =
+                                                   OrderedMap.empty
                                              , mergedExcludes   = mempty
                                              , mergedConflicts  = mempty
                                              , mergedFeatures   = mempty

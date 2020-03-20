@@ -25,6 +25,13 @@ packages:
       sha256: 3f5d41e30ed3cb19636243c1351c23b0159734ac99735133dbf58d75373036cd
   original:
     hackage: polysemy-plugin-0.2.3.0
+- completed:
+    hackage: algebraic-graphs-0.5@sha256:6eeec5ed1687ff7aa916e7bf9f02f51aaabde6f314dc0b7b1a84156974d7da73,8071
+    pantry-tree:
+      size: 4128
+      sha256: cca4a0348bb126506cacd8436948a68aad62e75d45df8c71f4090a00e69b45ee
+  original:
+    hackage: algebraic-graphs-0.5
 snapshots:
 - completed:
     size: 524163

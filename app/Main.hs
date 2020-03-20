@@ -18,6 +18,7 @@ import           Data.Functor
 import           System.Exit
 
 import           Tenpureto.Data
+import qualified Tenpureto.OrderedMap          as OrderedMap
 import           Tenpureto.Effects.Git
 import           Tenpureto.Effects.Logging
 import           Tenpureto.Effects.Terminal
@@ -394,7 +395,7 @@ runCommand Create { maybeTemplateName = t, maybeTargetDirectory = td, maybeProje
                                                    .   yamlFeatures
                                                    <$> maybeYaml
                 , preVariableValues              = yamlVariables <$> maybeYaml
-                , preVariableDefaultReplacements = fromMaybe mempty $ liftA2 templateNameDefaultReplacement t td
+                , preVariableDefaultReplacements = fromMaybe OrderedMap.empty $ liftA2 templateNameDefaultReplacement t td
                 }
         createProject inputConfig
 runCommand Update { maybeTemplateName = t, maybeTargetDirectory = td, maybeProjectConfiguration = c, maybePreviousCommit = pc, runUnattended = u, enableDebugLogging = d }
@@ -412,7 +413,7 @@ runCommand Update { maybeTemplateName = t, maybeTargetDirectory = td, maybeProje
                                                    .   yamlFeatures
                                                    <$> maybeYaml
                 , preVariableValues              = yamlVariables <$> maybeYaml
-                , preVariableDefaultReplacements = mempty
+                , preVariableDefaultReplacements = OrderedMap.empty
                 }
         updateProject (inputConfig <> currentConfig)
 runCommand Adopt { maybeTemplateName = t, maybeTargetDirectory = td, runUnattended = u, enableDebugLogging = d }
@@ -425,7 +426,7 @@ runCommand Adopt { maybeTemplateName = t, maybeTargetDirectory = td, runUnattend
                 , prePreviousTemplateCommit      = Just OrphanCommit
                 , preSelectedBranches            = Nothing
                 , preVariableValues              = Nothing
-                , preVariableDefaultReplacements = mempty
+                , preVariableDefaultReplacements = OrderedMap.empty
                 }
         updateProject (inputConfig <> currentConfig)
 runCommand TemplateGraph { templateName = t, branchFilter = bf, enableDebugLogging = d }

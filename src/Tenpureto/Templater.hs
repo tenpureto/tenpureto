@@ -9,8 +9,6 @@ import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
-import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
-import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Maybe
 import           Data.Foldable
 import           Data.Functor
@@ -24,13 +22,14 @@ import           Tenpureto.Effects.Logging
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Git
 import           Tenpureto.Templater.CaseConversion
-
+import           Tenpureto.OrderedMap           ( OrderedMap )
+import qualified Tenpureto.OrderedMap          as OrderedMap
 import           Tenpureto.Orphanage            ( )
 
 
 data TemplaterSettings = TemplaterSettings
-    { templaterFromVariables :: InsOrdHashMap Text Text
-    , templaterToVariables :: InsOrdHashMap Text Text
+    { templaterFromVariables :: OrderedMap Text Text
+    , templaterToVariables :: OrderedMap Text Text
     , templaterExcludes :: Set Text
     }
 
@@ -56,9 +55,9 @@ expandReplacement (a, b) = removeDuplicated
     removeDuplicated = nubBy (\(t1, _) (t2, _) -> t1 == t2)
 
 expandReplacements
-    :: InsOrdHashMap Text Text -> InsOrdHashMap Text Text -> [(Text, Text)]
+    :: OrderedMap Text Text -> OrderedMap Text Text -> [(Text, Text)]
 expandReplacements fv tv = concatMap expandReplacement
-    $ InsOrdHashMap.elems (InsOrdHashMap.intersectionWith (,) fv tv)
+    $ OrderedMap.elems (OrderedMap.intersectionWith (,) fv tv)
 
 compileSettings
     :: Member Logging r => TemplaterSettings -> Sem r CompiledTemplaterSettings
@@ -68,18 +67,22 @@ compileSettings TemplaterSettings { templaterFromVariables = tfv, templaterToVar
           excludes     = compileExcludes ex
       in
           do
-              logDebug $ "From variables:" <+> align
-                  (sep
-                      [ pretty f <+> "->" <+> pretty t
-                      | (f, t) <- InsOrdHashMap.toList tfv
-                      ]
-                  )
-              logDebug $ "To variables:" <+> align
-                  (sep
-                      [ pretty f <+> "->" <+> pretty t
-                      | (f, t) <- InsOrdHashMap.toList ttv
-                      ]
-                  )
+              logDebug
+                  $   "From variables:"
+                  <+> align
+                          (sep
+                              [ pretty f <+> "->" <+> pretty t
+                              | (f, t) <- OrderedMap.toList tfv
+                              ]
+                          )
+              logDebug
+                  $   "To variables:"
+                  <+> align
+                          (sep
+                              [ pretty f <+> "->" <+> pretty t
+                              | (f, t) <- OrderedMap.toList ttv
+                              ]
+                          )
               logDebug
                   $   "Replacements:"
                   <+> align

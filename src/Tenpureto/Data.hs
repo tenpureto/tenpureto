@@ -2,14 +2,14 @@ module Tenpureto.Data where
 
 import           Data.Text                      ( Text )
 import           Data.Set                       ( Set )
-import           Data.Map                       ( Map )
 
 import           Control.Applicative
 
 import           Tenpureto.Effects.Git
 import           Tenpureto.Effects.Logging
 import           Tenpureto.TemplateLoader
-
+import           Tenpureto.OrderedMap           ( OrderedMap )
+import qualified Tenpureto.OrderedMap          as OrderedMap
 import           Tenpureto.Orphanage            ( )
 
 data PreliminaryProjectConfiguration = PreliminaryProjectConfiguration
@@ -17,8 +17,8 @@ data PreliminaryProjectConfiguration = PreliminaryProjectConfiguration
         , preTargetDirectory :: Maybe (Path Abs Dir)
         , prePreviousTemplateCommit :: Maybe ParentCommit
         , preSelectedBranches :: Maybe (Set Text)
-        , preVariableValues :: Maybe (Map Text Text)
-        , preVariableDefaultReplacements :: Map Text Text
+        , preVariableValues :: Maybe (OrderedMap Text Text)
+        , preVariableDefaultReplacements :: OrderedMap Text Text
         }
         deriving (Show)
 
@@ -35,7 +35,7 @@ newtype FinalUpdateConfiguration = FinalUpdateConfiguration
 
 data FinalProjectConfiguration = FinalProjectConfiguration
         { projectBranches :: [TemplateBranchInformation]
-        , variableValues :: Map Text Text
+        , variableValues :: OrderedMap Text Text
         }
         deriving (Show)
 
@@ -49,7 +49,7 @@ instance Semigroup PreliminaryProjectConfiguration where
         , preSelectedBranches = preSelectedBranches a <|> preSelectedBranches b
         , preVariableValues = preVariableValues a <|> preVariableValues b
         , preVariableDefaultReplacements = preVariableDefaultReplacements a
-            <> preVariableDefaultReplacements b
+            `OrderedMap.union` preVariableDefaultReplacements b
         }
 
 instance Pretty PreliminaryProjectConfiguration where

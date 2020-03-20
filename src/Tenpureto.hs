@@ -15,9 +15,6 @@ import qualified Data.ByteString.Lazy          as BS
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Set                      as Set
-import           Data.Map                       ( Map )
-import qualified Data.Map                      as Map
-import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
 import           Data.Functor
 import           Control.Applicative
@@ -37,6 +34,8 @@ import           Tenpureto.FeatureMerger
 import           Tenpureto.TemplateLoader
 import           Tenpureto.Templater
 import           Tenpureto.Internal
+import           Tenpureto.OrderedMap           ( OrderedMap )
+import qualified Tenpureto.OrderedMap          as OrderedMap
 
 data RemoteChangeMode = PushDirectly
                       | UpstreamPullRequest { pullRequestSettings :: PullRequestSettings }
@@ -46,10 +45,8 @@ data ChangesNature = ExistingChanges | NewChanges
 buildTemplaterSettings
     :: TemplateYaml -> FinalProjectConfiguration -> TemplaterSettings
 buildTemplaterSettings yaml cfg = TemplaterSettings
-    { templaterFromVariables = (InsOrdHashMap.fromList . Map.toList)
-                                   (yamlVariables yaml)
-    , templaterToVariables   = (InsOrdHashMap.fromList . Map.toList)
-                                   (variableValues cfg)
+    { templaterFromVariables = yamlVariables yaml
+    , templaterToVariables   = variableValues cfg
     , templaterExcludes      = yamlExcludes yaml
     }
 
@@ -183,7 +180,8 @@ copyTemplate
     -> Sem r [Path Rel File]
 copyTemplate settings yaml repo dst = do
     files <- copy settings repo dst
-    writeFileAsByteString (dst </> templateYamlFile) (BS.toStrict . formatTemplateYaml $ yaml)
+    writeFileAsByteString (dst </> templateYamlFile)
+                          (BS.toStrict . formatTemplateYaml $ yaml)
     return $ templateYamlFile : files
 
 withPreparedTemplate
@@ -263,7 +261,7 @@ loadExistingProjectConfiguration projectPath =
                                                    (Set.map yamlFeatureName . yamlFeatures)
                                                    yaml
             , preVariableValues              = fmap yamlVariables yaml
-            , preVariableDefaultReplacements = mempty
+            , preVariableDefaultReplacements = OrderedMap.empty
             }
 
 prepareTemplate
@@ -439,10 +437,9 @@ changeTemplateVariableValue template oldValue newValue interactive =
     runTemplateChange template interactive PushDirectly NewChanges $ \repo -> do
         bis <- branchesInformation <$> loadTemplateInformation repo
         templaterSettings <- compileSettings $ TemplaterSettings
-            { templaterFromVariables = InsOrdHashMap.singleton "Variable"
-                                                               oldValue
-            , templaterToVariables = InsOrdHashMap.singleton "Variable" newValue
-            , templaterExcludes = Set.empty
+            { templaterFromVariables = OrderedMap.singleton "Variable" oldValue
+            , templaterToVariables   = OrderedMap.singleton "Variable" newValue
+            , templaterExcludes      = Set.empty
             }
         let branches = filter (hasVariableValue oldValue) bis
             changeOnBranch bi = do
@@ -574,7 +571,7 @@ isChildBranch branch bi =
     branch /= branchName bi && Set.member branch (requiredBranches bi)
 
 hasVariableValue :: Text -> TemplateBranchInformation -> Bool
-hasVariableValue value bi = value `elem` Map.elems (branchVariables bi)
+hasVariableValue value bi = value `elem` OrderedMap.elems (branchVariables bi)
 
 getTemplateBranch
     :: Member (Error TenpuretoException) r
@@ -586,8 +583,8 @@ getTemplateBranch templateInformation branch = maybe
     return
     (findTemplateBranch templateInformation branch)
 
-templateNameDefaultReplacement :: Text -> FilePath -> Map Text Text
-templateNameDefaultReplacement template target = Map.singleton
+templateNameDefaultReplacement :: Text -> FilePath -> OrderedMap Text Text
+templateNameDefaultReplacement template target = OrderedMap.singleton
     (keepRepoName $ dropGitSuffix template)
     (keepRepoName $ T.pack target)
   where
