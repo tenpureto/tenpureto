@@ -5,11 +5,11 @@ module TenpuretoTest where
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
-import qualified Data.Map                      as Map
 import           Path
 
 import           Tenpureto.Data
 import           Tenpureto.Messages
+import qualified Tenpureto.OrderedMap          as OrderedMap
 
 import           Tenpureto
 
@@ -36,11 +36,11 @@ test_templateNameDefaultReplacement :: [TestTree]
 test_templateNameDefaultReplacement =
     [ testCase "should map ssh git url repo name"
         $   templateNameDefaultReplacement "git@github.com:x/foo.git" "/tmp/bar"
-        @?= Map.singleton "foo" "bar"
+        @?= OrderedMap.singleton "foo" "bar"
     , testCase "should map http git url repo name"
         $ templateNameDefaultReplacement "https://github.com/x/foo.git" "/tmp/bar"
-        @?= Map.singleton "foo" "bar"
+        @?= OrderedMap.singleton "foo" "bar"
     , testCase "should map local git url repo name"
         $   templateNameDefaultReplacement "/tmp/foo" "/tmp/bar"
-        @?= Map.singleton "foo" "bar"
+        @?= OrderedMap.singleton "foo" "bar"
     ]

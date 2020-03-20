@@ -14,7 +14,6 @@ import           Data.Maybe
 import           Data.Text                      ( Text )
 import qualified Data.Set                      as Set
 import           Data.Set                       ( Set )
-import           Data.Map                       ( Map )
 import           Data.Semigroup.Foldable
 import           Control.Monad
 
@@ -26,6 +25,8 @@ import           Tenpureto.TemplateLoader       ( TemplateBranchInformation(..)
                                                 , isHiddenBranch
                                                 , branchVariables
                                                 )
+import           Tenpureto.OrderedMap           ( OrderedMap )
+import qualified Tenpureto.OrderedMap          as OrderedMap
 
 data MergedBranchInformation a = MergedBranchInformation
     { mergedBranchMeta :: a
@@ -35,7 +36,7 @@ data MergedBranchInformation a = MergedBranchInformation
 
 data MergedBranchDescriptor = MergedBranchDescriptor
     { mergedBranchName :: Text
-    , mergedVariables :: Map Text Text
+    , mergedVariables :: OrderedMap Text Text
     , mergedExcludes :: Set Text
     , mergedConflicts :: Set Text
     , mergedFeatures :: Set TemplateYamlFeature
@@ -62,14 +63,13 @@ templateBranchInformationData
     -> MergedBranchInformation a
 templateBranchInformationData extract bi = MergedBranchInformation
     { mergedBranchMeta       = extract bi
-    , mergedBranchDescriptor =
-        MergedBranchDescriptor
-            { mergedBranchName = branchName bi
-            , mergedVariables  = branchVariables bi
-            , mergedExcludes   = (yamlExcludes . templateYaml) bi
-            , mergedConflicts  = (yamlConflicts . templateYaml) bi
-            , mergedFeatures   = (yamlFeatures . templateYaml) bi
-            }
+    , mergedBranchDescriptor = MergedBranchDescriptor
+        { mergedBranchName = branchName bi
+        , mergedVariables  = branchVariables bi
+        , mergedExcludes   = (yamlExcludes . templateYaml) bi
+        , mergedConflicts  = (yamlConflicts . templateYaml) bi
+        , mergedFeatures   = (yamlFeatures . templateYaml) bi
+        }
     }
 
 mergeBranchesGraph
@@ -125,7 +125,8 @@ mergeGraph mergeCommits = foldTopologically vcombine hcombine
   where
     hcombineD d1 d2 = MergedBranchDescriptor
         { mergedBranchName = mergedBranchName d1 <> "+" <> mergedBranchName d2
-        , mergedVariables  = mergedVariables d1 <> mergedVariables d2
+        , mergedVariables  = mergedVariables d1
+                                 `OrderedMap.union` mergedVariables d2
         , mergedExcludes   = mergedExcludes d1 <> mergedExcludes d2
         , mergedConflicts  = mergedConflicts d1 <> mergedConflicts d2
         , mergedFeatures   = mergedFeatures d1 <> mergedFeatures d2
@@ -170,7 +171,7 @@ vcombineD
     -> MergedBranchDescriptor
 vcombineD d1 d2 = MergedBranchDescriptor
     { mergedBranchName = mergedBranchName d1
-    , mergedVariables  = mergedVariables d1 <> mergedVariables d2
+    , mergedVariables = mergedVariables d1 `OrderedMap.union` mergedVariables d2
     , mergedExcludes   = mergedExcludes d1 <> mergedExcludes d2
     , mergedConflicts  = mergedConflicts d1
     , mergedFeatures   = mergedFeatures d1 <> mergedFeatures d2

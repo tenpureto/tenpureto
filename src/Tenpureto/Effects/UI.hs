@@ -8,13 +8,12 @@ import           Polysemy.Error
 import           Data.Bool
 import           Data.Maybe
 import qualified Data.Set                      as Set
-import qualified Data.Map                      as Map
-import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Foldable
 
 import           Tenpureto.Data
 import           Tenpureto.Messages
 import           Tenpureto.TemplateLoader
+import qualified Tenpureto.OrderedMap          as OrderedMap
 import           Tenpureto.Effects.Git          ( BranchRef )
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Terminal
@@ -29,8 +28,8 @@ instance Pretty UIException where
         "Input required when running in an unattended mode:" <+> pretty missing
     pretty NoBaseBranchesException =
         "Repository does not contain template branches"
-    pretty NoPreviousCommitException =
-        "Cannot find a previous template commit, either the repository was not created with tenpureto or the commit history has been amended in an incompatible way"
+    pretty NoPreviousCommitException
+        = "Cannot find a previous template commit, either the repository was not created with tenpureto or the commit history has been amended in an incompatible way"
 
 data ConflictResolutionStrategy = AlreadyResolved | MergeTool
 
@@ -65,11 +64,11 @@ runUIInTerminal = interpret $ \case
         let branches = filterTemplateBranches BranchFilterIsFeatureBranch
                                               templateInformation
         sbi <- inputBranches branches psb
-        let sbvars = mconcat $ fmap
-                (InsOrdHashMap.fromList . Map.toList . branchVariables)
-                (Set.toList sbi)
-        let cvars =
-                fromMaybe Map.empty (preVariableValues providedConfiguration)
+        let sbvars = foldr OrderedMap.union OrderedMap.empty
+                $ fmap branchVariables (Set.toList sbi)
+        let
+            cvars = fromMaybe OrderedMap.empty
+                              (preVariableValues providedConfiguration)
         let vars = withDefaults
                 sbvars
                 cvars

@@ -5,7 +5,6 @@ import           Test.Tasty.HUnit
 
 import           Data.Text                      ( Text )
 import qualified Data.Set                      as Set
-import qualified Data.Map                      as Map
 import           Algebra.Graph.ToGraph
 
 import           Tenpureto.Graph
@@ -17,6 +16,7 @@ import           Tenpureto.TemplateLoader.Internal
                                                 , TemplateYamlFeature(..)
                                                 )
 import           Tenpureto.Effects.Git          ( Committish(..) )
+import qualified Tenpureto.OrderedMap          as OrderedMap
 import           Tenpureto.FeatureMerger
 
 
@@ -25,7 +25,7 @@ v c = TemplateBranchInformation
     { branchName   = c
     , branchCommit = Committish ""
     , templateYaml = TemplateYaml
-                         { yamlVariables = Map.singleton c c
+                         { yamlVariables = OrderedMap.singleton c c
                          , yamlExcludes  = Set.singleton c
                          , yamlConflicts = Set.singleton c
                          , yamlFeatures  = Set.singleton $ TemplateYamlFeature
@@ -74,7 +74,7 @@ test_runMergeGraphPure =
         , testCase "variables"
         $   (fmap yamlVariables . snd)
                 (runMergeGraphPure' (vertices [v "a", v "b"]))
-        @?= Just (Map.fromList [("a", "a"), ("b", "b")])
+        @?= Just (OrderedMap.fromList [("a", "a"), ("b", "b")])
         , testCase "conflicts for different vertices"
         $   (fmap yamlConflicts . snd)
                 (runMergeGraphPure' (vertices [v "a", v "b"]))

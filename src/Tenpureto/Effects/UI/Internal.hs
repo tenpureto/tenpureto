@@ -9,21 +9,19 @@ import           Data.List
 import qualified Data.Text                     as T
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
-import           Data.Map                       ( Map )
-import qualified Data.Map                      as Map
-import           Data.HashMap.Strict.InsOrd     ( InsOrdHashMap )
-import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import           Data.Functor
 import           Data.Text.Prettyprint.Doc.Render.Terminal
 import           Algebra.Graph.ToGraph
 import           Data.Functor.Identity
-import           Data.Foldable
 
 import           Tenpureto.Graph
 import           Tenpureto.TemplateLoader
 import           Tenpureto.MergeOptimizer
 import           Tenpureto.Effects.Terminal
 import           Tenpureto.Effects.FileSystem
+import           Tenpureto.OrderedMap           ( OrderedMap )
+import qualified Tenpureto.OrderedMap          as OrderedMap
+
 
 inputTemplate :: Member TerminalInput r => Sem r Text
 inputTemplate = ask "Template URL" Nothing
@@ -57,10 +55,13 @@ preMergeBranches
     -> Set TemplateBranchInformation
     -> TemplateYaml
 preMergeBranches graph selectedBranches =
-    fold $ fmap snd $ runIdentity $ mergeBranchesGraph (const ())
-                                                       (\_ _ _ -> return ())
-                                                       graph
-                                                       selectedBranches
+    foldr templateYamlUnion emptyTemplateYaml
+        $ fmap snd
+        $ runIdentity
+        $ mergeBranchesGraph (const ())
+                             (\_ _ _ -> return ())
+                             graph
+                             selectedBranches
 
 inputBranchList
     :: Graph TemplateBranchInformation
@@ -212,23 +213,22 @@ inputBranches graph initialNameSelection = case initial of
 
 withDefaults
     :: (Ord a, Ord b)
-    => InsOrdHashMap a b
-    -> Map a b
-    -> Map b b
-    -> InsOrdHashMap a b
-withDefaults defaults vars replacements = InsOrdHashMap.mapWithKey
-    getDefault
-    defaults
+    => OrderedMap a b
+    -> OrderedMap a b
+    -> OrderedMap b b
+    -> OrderedMap a b
+withDefaults defaults vars replacements = OrderedMap.mapWithKey getDefault
+                                                                defaults
   where
-    getDefault k v = fromMaybe (replace v) (Map.lookup k vars)
-    replace v = fromMaybe v $ Map.lookup v replacements
+    getDefault k v = fromMaybe (replace v) (OrderedMap.lookup k vars)
+    replace v = fromMaybe v $ OrderedMap.lookup v replacements
 
 inputVariable :: Member TerminalInput r => (Text, Text) -> Sem r (Text, Text)
 inputVariable (desc, name) = (desc, ) <$> ask (pretty desc) (Just name)
 
 inputVariables
     :: Member TerminalInput r
-    => InsOrdHashMap Text Text
-    -> Sem r (Map Text Text)
+    => OrderedMap Text Text
+    -> Sem r (OrderedMap Text Text)
 inputVariables vars =
-    Map.fromList <$> traverse inputVariable (InsOrdHashMap.toList vars)
+    OrderedMap.fromList <$> traverse inputVariable (OrderedMap.toList vars)

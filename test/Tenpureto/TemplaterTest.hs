@@ -9,39 +9,45 @@ import           Polysemy
 import           Polysemy.Error
 
 import qualified Data.Set                      as Set
-import qualified Data.HashMap.Strict.InsOrd    as InsOrdHashMap
 import qualified Control.Exception             as E
 
 import           Path
 
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Logging
+import qualified Tenpureto.OrderedMap          as OrderedMap
 import           Tenpureto.Templater
 
 test_translate_multiWordToSingleWord :: [TestTree]
 test_translate_multiWordToSingleWord =
     let Right settings = runTest $ compileSettings TemplaterSettings
-            { templaterFromVariables = InsOrdHashMap.singleton "A" "bbb-ccc-ddd"
-            , templaterToVariables   = InsOrdHashMap.singleton "A" "xxx"
+            { templaterFromVariables = OrderedMap.singleton "A" "bbb-ccc-ddd"
+            , templaterToVariables   = OrderedMap.singleton "A" "xxx"
             , templaterExcludes      = Set.empty
             }
-    in  [testCase "should replace in text" $ translate settings "a Bbb ccc ddd e" @?= "a Xxx e"]
+    in  [ testCase "should replace in text"
+              $   translate settings "a Bbb ccc ddd e"
+              @?= "a Xxx e"
+        ]
 
 
 test_translate_singleWordToMultiWord :: [TestTree]
 test_translate_singleWordToMultiWord =
     let Right settings = runTest $ compileSettings TemplaterSettings
-            { templaterFromVariables = InsOrdHashMap.singleton "A" "bbb"
-            , templaterToVariables   = InsOrdHashMap.singleton "A" "xxx-yyy"
+            { templaterFromVariables = OrderedMap.singleton "A" "bbb"
+            , templaterToVariables   = OrderedMap.singleton "A" "xxx-yyy"
             , templaterExcludes      = Set.empty
             }
-    in  [testCase "should replace in text" $ translate settings "a bbb e" @?= "a xxx-yyy e"]
+    in  [ testCase "should replace in text"
+              $   translate settings "a bbb e"
+              @?= "a xxx-yyy e"
+        ]
 
 test_translateFile :: [TestTree]
 test_translateFile =
     let Right settings = runTest $ compileSettings TemplaterSettings
-            { templaterFromVariables = InsOrdHashMap.singleton "A" "bbb-ccc-ddd"
-            , templaterToVariables   = InsOrdHashMap.singleton "A" "xxx-yyy"
+            { templaterFromVariables = OrderedMap.singleton "A" "bbb-ccc-ddd"
+            , templaterToVariables   = OrderedMap.singleton "A" "xxx-yyy"
             , templaterExcludes      = Set.empty
             }
         mv = runTest . translateFile settings
@@ -57,8 +63,8 @@ test_translateFile =
 test_translateFile_toVariablesHasSpace :: [TestTree]
 test_translateFile_toVariablesHasSpace =
     let Right settings = runTest $ compileSettings TemplaterSettings
-            { templaterFromVariables = InsOrdHashMap.singleton "A" "bbb-ccc-ddd"
-            , templaterToVariables   = InsOrdHashMap.singleton "A" "xxx yyy"
+            { templaterFromVariables = OrderedMap.singleton "A" "bbb-ccc-ddd"
+            , templaterToVariables   = OrderedMap.singleton "A" "xxx yyy"
             , templaterExcludes      = Set.empty
             }
         mv = runTest . translateFile settings
@@ -73,8 +79,8 @@ test_translateFile_toVariablesHasSpace =
 test_translateFile_toVariablesHasUpperCaseCharaters :: [TestTree]
 test_translateFile_toVariablesHasUpperCaseCharaters =
     let Right settings = runTest $ compileSettings TemplaterSettings
-            { templaterFromVariables = InsOrdHashMap.singleton "A" "bbb-ccc-ddd"
-            , templaterToVariables   = InsOrdHashMap.singleton "A" "Xxx Yyy"
+            { templaterFromVariables = OrderedMap.singleton "A" "bbb-ccc-ddd"
+            , templaterToVariables   = OrderedMap.singleton "A" "Xxx Yyy"
             , templaterExcludes      = Set.empty
             }
         mv = runTest . translateFile settings

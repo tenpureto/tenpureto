@@ -37,7 +37,6 @@ import           Data.Bifunctor
 import           Control.Exception              ( displayException )
 import           Control.Monad
 import           Control.Monad.Trans.Maybe
-import qualified Data.Yaml                     as Y
 
 import           Path
 
@@ -45,6 +44,8 @@ import           Tenpureto.Graph
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Git
 import           Tenpureto.TemplateLoader.Internal
+import           Tenpureto.Yaml
+import qualified Tenpureto.OrderedMap          as OrderedMap
 
 import           Tenpureto.Orphanage            ( )
 
@@ -97,7 +98,7 @@ loadTemplateYaml
 loadTemplateYaml file =
     either (throw . TemplateYamlParseException . T.pack . displayException)
            return
-        =<< Y.decodeEither'
+        =<< fromByteString
         <$> readFileAsByteString file
 
 featureDescription :: TemplateBranchInformation -> Maybe Text
@@ -114,12 +115,10 @@ branchesConflict a b =
 
 parseTemplateYaml :: ByteString -> Either Text TemplateYaml
 parseTemplateYaml yaml =
-    let info :: Either Y.ParseException TemplateYaml
-        info = Y.decodeEither' (BS.toStrict yaml)
-    in  first (T.pack . Y.prettyPrintParseException) info
+    first prettyPrintYamlParseException $ fromByteString (BS.toStrict yaml)
 
 formatTemplateYaml :: TemplateYaml -> ByteString
-formatTemplateYaml y = (BS.fromStrict . Y.encode) TemplateYaml
+formatTemplateYaml y = (BS.fromStrict . toByteString) TemplateYaml
     { yamlVariables = yamlVariables y
     , yamlFeatures  = Set.filter (not . yamlFeatureHidden) (yamlFeatures y)
     , yamlExcludes  = mempty
@@ -220,3 +219,18 @@ replaceVariableInYaml old new descriptor = TemplateYaml
 
 templateBranchesGraph :: TemplateInformation -> Graph TemplateBranchInformation
 templateBranchesGraph = branchesGraph
+
+templateYamlUnion :: TemplateYaml -> TemplateYaml -> TemplateYaml
+templateYamlUnion a b = TemplateYaml
+    { yamlVariables = yamlVariables a `OrderedMap.union` yamlVariables b
+    , yamlFeatures  = yamlFeatures a <> yamlFeatures b
+    , yamlExcludes  = yamlExcludes a <> yamlExcludes b
+    , yamlConflicts = yamlConflicts a <> yamlConflicts b
+    }
+
+emptyTemplateYaml :: TemplateYaml
+emptyTemplateYaml = TemplateYaml { yamlVariables = OrderedMap.empty
+                                 , yamlFeatures  = mempty
+                                 , yamlExcludes  = mempty
+                                 , yamlConflicts = mempty
+                                 }

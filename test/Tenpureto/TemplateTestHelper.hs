@@ -3,13 +3,16 @@ module Tenpureto.TemplateTestHelper where
 import           Data.Text                      ( Text )
 import qualified Data.Set                      as Set
 
+import qualified Tenpureto.OrderedMap          as OrderedMap
 import           Tenpureto.Effects.Git          ( Committish(..) )
 import           Tenpureto.TemplateLoader       ( TemplateBranchInformation(..)
                                                 , FeatureStability(..)
                                                 , requiredBranches
                                                 )
 import           Tenpureto.TemplateLoader.Internal
-                                                ( TemplateYaml(..), TemplateYamlFeature(..) )
+                                                ( TemplateYaml(..)
+                                                , TemplateYamlFeature(..)
+                                                )
 
 yamlFeature :: Text -> TemplateYamlFeature
 yamlFeature name = TemplateYamlFeature { yamlFeatureName        = name
@@ -20,13 +23,14 @@ yamlFeature name = TemplateYamlFeature { yamlFeatureName        = name
 
 anonymousBranch :: Text -> [Text] -> TemplateBranchInformation
 anonymousBranch name deps = TemplateBranchInformation
-    { branchName          = name
-    , branchCommit        = Committish "undefined"
-    , templateYaml        = TemplateYaml    { yamlVariables = mempty
-                                            , yamlFeatures = Set.fromList $ fmap yamlFeature deps
-                                            , yamlExcludes = mempty
-                                            , yamlConflicts = mempty
-                                            }
+    { branchName   = name
+    , branchCommit = Committish "undefined"
+    , templateYaml = TemplateYaml
+                         { yamlVariables = OrderedMap.empty
+                         , yamlFeatures  = Set.fromList $ fmap yamlFeature deps
+                         , yamlExcludes  = mempty
+                         , yamlConflicts = mempty
+                         }
     }
 
 branch :: Text -> [Text] -> TemplateBranchInformation
