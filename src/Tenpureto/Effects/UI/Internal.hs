@@ -24,10 +24,10 @@ import qualified Tenpureto.OrderedMap          as OrderedMap
 
 
 inputTemplate :: Member TerminalInput r => Sem r Text
-inputTemplate = ask "Template URL" Nothing
+inputTemplate = ask "Template URL:" Nothing
 
 inputTarget :: Members '[TerminalInput, FileSystem] r => Sem r (Path Abs Dir)
-inputTarget = ask "Target directory" Nothing <&> T.unpack >>= resolveDir
+inputTarget = ask "Target directory:" Nothing <&> T.unpack >>= resolveDir
 
 templateBranchesByNames
     :: TemplateInformation -> Set Text -> [TemplateBranchInformation]
