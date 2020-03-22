@@ -26,6 +26,8 @@ import           Algebra.Graph.ToGraph
 
 import           Tenpureto.Messages
 import           Tenpureto.Graph
+import           Tenpureto.OrderedSet           ( OrderedSet )
+import qualified Tenpureto.OrderedSet          as OrderedSet
 import           Tenpureto.TemplateLoader
 import           Tenpureto.MergeOptimizer
 import           Tenpureto.Effects.Git
@@ -40,29 +42,34 @@ data MergeRecord = CheckoutRecord Text
 mergeCommits
     :: Members '[Git, UI, Terminal] r
     => GitRepository
-    -> (Committish, Text, Tree Text)
-    -> (Committish, Text, Tree Text)
+    -> MergeElement
+    -> MergeElement
     -> MergedBranchDescriptor
-    -> Sem r (Committish, Text, Tree Text)
-mergeCommits repo (b1c, b1n, b1t) (b2c, b2n, b2t) d = do
-    let mergedTree = Node (mergedBranchName d) [b2t, b1t]
-    let message    = commitMergeMessage b2n b1n <> "\n\n" <> showTree mergedTree
-    checkoutBranch repo (unCommittish b1c) Nothing
-    mergeResult <- mergeBranch repo
-                               MergeAllowFastForward
-                               (unCommittish b2c)
-                               message
-    c <- case mergeResult of
-        MergeSuccessCommitted   -> getCurrentHead repo
-        MergeSuccessUncommitted -> do
-            updateTemplateYaml
-            commit repo message
-        MergeConflicts mergeConflicts -> do
-            updateTemplateYaml
-            resolve d mergeConflicts
-            commit repo message
+    -> Sem r MergeElement
+mergeCommits repo (MergeElement b1c b1n b1t b1hs) (MergeElement b2c b2n b2t b2hs) d
+    = do
+        let mergedTree = Node (mergedBranchName d) [b2t, b1t]
+        let message =
+                commitMergeMessage b2n b1n <> "\n\n" <> showTree mergedTree
+        checkoutBranch repo (unCommittish b1c) Nothing
+        mergeResult <- mergeBranch repo
+                                   MergeAllowFastForward
+                                   (unCommittish b2c)
+                                   message
+        c <- case mergeResult of
+            MergeSuccessCommitted   -> getCurrentHead repo
+            MergeSuccessUncommitted -> do
+                updateTemplateYaml
+                commit repo message
+            MergeConflicts mergeConflicts -> do
+                updateTemplateYaml
+                resolve d mergeConflicts
+                commit repo message
 
-    return (c, mergedBranchName d, mergedTree)
+        return $ MergeElement c
+                              (mergedBranchName d)
+                              mergedTree
+                              (b1hs `OrderedSet.union` b2hs)
   where
     resolve _ [] = return ()
     resolve descriptor mergeConflicts =
@@ -87,14 +94,15 @@ runMergeGraph
     => GitRepository
     -> Graph TemplateBranchInformation
     -> Set TemplateBranchInformation
-    -> Sem r (Maybe TemplateYaml)
+    -> Sem r (Maybe (TemplateYaml, OrderedSet Committish))
 runMergeGraph repo graph branches = do
     mbd <- mergeBranchesGraph branchData mergeCommitsCached graph branches
-    forM_ mbd $ \((c, _, _), d) -> do
-        checkoutBranch repo (unCommittish c) Nothing
-        writeAddFile repo templateYamlFile (formatTemplateYaml d)
-        commit repo commitUpdateTemplateYaml
-    return $ fmap snd mbd
+    forM_ mbd $ \case
+        MergeBranchesResult (MergeElement c _ _ _) d -> do
+            checkoutBranch repo (unCommittish c) Nothing
+            writeAddFile repo templateYamlFile (formatTemplateYaml d)
+            commit repo commitUpdateTemplateYaml
+    return $ fmap runResult mbd
   where
     mergeCommitsCached a b d = do
         cache <- get
@@ -104,7 +112,16 @@ runMergeGraph repo graph branches = do
                 r <- mergeCommits repo a b d
                 modify (Map.insert (a, b) r)
                 return r
-    branchData bi = (branchCommit bi, branchName bi, Leaf (branchName bi))
+    branchData bi = MergeElement
+        { mergeHead  = branchCommit bi
+        , mergeName  = branchName bi
+        , mergeTree  = Leaf (branchName bi)
+        , mergeHeads = OrderedSet.singleton (branchCommit bi)
+        }
+    runResult mbd =
+        ( mergeBranchesResultTemplateYaml mbd
+        , (mergeHeads . mergeBranchesResultMeta) mbd
+        )
 
 runMergeGraphPure
     :: Graph TemplateBranchInformation
@@ -116,8 +133,8 @@ runMergeGraphPure graph selectedBranches =
             logMerges
             graph
             selectedBranches
-        co = maybeToList $ fmap (CheckoutRecord . fst) c
-    in  (records <> co, fmap snd c)
+        co = maybeToList $ fmap (CheckoutRecord . mergeBranchesResultMeta) c
+    in  (records <> co, fmap mergeBranchesResultTemplateYaml c)
   where
     logMerges b1 b2 d =
         let mc = mergedBranchName d in output (MergeRecord b1 b2 mc) $> mc

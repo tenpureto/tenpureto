@@ -34,6 +34,8 @@ import           Tenpureto.FeatureMerger
 import           Tenpureto.TemplateLoader
 import           Tenpureto.Templater
 import           Tenpureto.Internal
+import           Tenpureto.OrderedSet           ( OrderedSet )
+import qualified Tenpureto.OrderedSet          as OrderedSet
 import           Tenpureto.OrderedMap           ( OrderedMap )
 import qualified Tenpureto.OrderedMap          as OrderedMap
 
@@ -59,7 +61,7 @@ createProject
     -> Sem r ()
 createProject projectConfiguration =
     withPreparedTemplate projectConfiguration
-        $ \template finalTemplateConfiguration finalProjectConfiguration templaterSettings mergedTemplateYaml ->
+        $ \template finalTemplateConfiguration finalProjectConfiguration templaterSettings mergedTemplateYaml mergedHeads ->
               let dst = targetDirectory finalTemplateConfiguration
                   translatedTemplateYaml = translateTemplateYaml
                       finalProjectConfiguration
@@ -76,6 +78,8 @@ createProject projectConfiguration =
                           project
                           (commitCreateMessage
                               (selectedTemplate finalTemplateConfiguration)
+                              (fmap unCommittish (OrderedSet.toList mergedHeads)
+                              )
                           )
                       sayLn $ projectCreated dst
 
@@ -93,7 +97,7 @@ updateProject projectConfiguration = do
         <> line
         <> (indent 4 . pretty) finalUpdateConfiguration
     withPreparedTemplate projectConfiguration
-        $ \template finalTemplateConfiguration finalProjectConfiguration templaterSettings mergedTemplateYaml ->
+        $ \template finalTemplateConfiguration finalProjectConfiguration templaterSettings mergedTemplateYaml mergedHeads ->
               let translatedTemplateYaml = translateTemplateYaml
                       finalProjectConfiguration
                       mergedTemplateYaml
@@ -122,6 +126,12 @@ updateProject projectConfiguration = do
                                                   (commitUpdateMessage
                                                       (selectedTemplate
                                                           finalTemplateConfiguration
+                                                      )
+                                                      (fmap
+                                                          unCommittish
+                                                          (OrderedSet.toList
+                                                              mergedHeads
+                                                          )
                                                       )
                                                   )
                                               logInfo
@@ -195,6 +205,7 @@ withPreparedTemplate
        -> FinalProjectConfiguration
        -> TemplaterSettings
        -> TemplateYaml
+       -> OrderedSet Committish
        -> Sem r ()
        )
     -> Sem r ()
@@ -220,7 +231,7 @@ withPreparedTemplate projectConfiguration block = do
                   $  "Final project configuration"
                   <> line
                   <> (indent 4 . pretty) finalProjectConfiguration
-              mergedTemplateYaml <- prepareTemplate
+              (mergedTemplateYaml, mergedHeads) <- prepareTemplate
                   repository
                   templateInformation
                   finalProjectConfiguration
@@ -236,6 +247,7 @@ withPreparedTemplate projectConfiguration block = do
                     finalProjectConfiguration
                     templaterSettings
                     mergedTemplateYaml
+                    mergedHeads
 
 loadExistingProjectConfiguration
     :: Members '[Git, Logging] r
@@ -269,7 +281,7 @@ prepareTemplate
     => GitRepository
     -> TemplateInformation
     -> FinalProjectConfiguration
-    -> Sem r TemplateYaml
+    -> Sem r (TemplateYaml, OrderedSet Committish)
 prepareTemplate repository template configuration =
     let
         graph            = branchesGraph template
