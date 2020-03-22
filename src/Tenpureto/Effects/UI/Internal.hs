@@ -56,7 +56,7 @@ preMergeBranches
     -> TemplateYaml
 preMergeBranches graph selectedBranches =
     foldr templateYamlUnion emptyTemplateYaml
-        $ fmap snd
+        $ fmap mergeBranchesResultTemplateYaml
         $ runIdentity
         $ mergeBranchesGraph (const ())
                              (\_ _ _ -> return ())

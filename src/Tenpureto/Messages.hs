@@ -1,6 +1,7 @@
 module Tenpureto.Messages where
 
 import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
 import           Data.Text.Prettyprint.Doc
 import           Path
 
@@ -8,13 +9,22 @@ import           Tenpureto.Orphanage            ( )
 
 -- Commit messages
 
-commitCreateMessage :: Text -> Text
-commitCreateMessage template =
-    "Create from a template\n\nTemplate: " <> template
+templateCommitMetadata :: Text -> [Text] -> Text
+templateCommitMetadata template sourceCommits =
+    "Template: "
+        <> template
+        <> T.concat (map ("\nTemplate commit: " <>) sourceCommits)
+        <> "\n"
 
-commitUpdateMessage :: Text -> Text
-commitUpdateMessage template =
-    "Update from a template\n\nTemplate: " <> template
+commitCreateMessage :: Text -> [Text] -> Text
+commitCreateMessage template sourceCommits =
+    "Create from a template\n\n"
+        <> templateCommitMetadata template sourceCommits
+
+commitUpdateMessage :: Text -> [Text] -> Text
+commitUpdateMessage template sourceCommits =
+    "Update from a template\n\n"
+        <> templateCommitMetadata template sourceCommits
 
 commitUpdateMergeMessage :: Text -> Text
 commitUpdateMergeMessage template = "Merge " <> template

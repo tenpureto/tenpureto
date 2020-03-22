@@ -3,6 +3,7 @@
 module Tenpureto.MergeOptimizer
     ( MergedBranchInformation(..)
     , MergedBranchDescriptor(..)
+    , MergeBranchesResult(..)
     , descriptorToTemplateYaml
     , mergeBranchesGraph
     , mergeGraph
@@ -43,6 +44,12 @@ data MergedBranchDescriptor = MergedBranchDescriptor
     }
     deriving (Show, Eq, Ord)
 
+data MergeBranchesResult a = MergeBranchesResult
+    { mergeBranchesResultMeta :: a
+    , mergeBranchesResultTemplateYaml :: TemplateYaml
+    }
+    deriving (Show, Eq)
+
 descriptorToTemplateYaml :: MergedBranchDescriptor -> TemplateYaml
 descriptorToTemplateYaml d = TemplateYaml { yamlVariables = mergedVariables d
                                           , yamlFeatures  = mergedFeatures d
@@ -50,12 +57,13 @@ descriptorToTemplateYaml d = TemplateYaml { yamlVariables = mergedVariables d
                                           , yamlConflicts = mergedConflicts d
                                           }
 
-mergedBranchInformationToTemplateYaml
-    :: MergedBranchInformation a -> (a, TemplateYaml)
-mergedBranchInformationToTemplateYaml mbi =
-    ( mergedBranchMeta mbi
-    , (descriptorToTemplateYaml . mergedBranchDescriptor) mbi
-    )
+mergedBranchInformationToResult
+    :: MergedBranchInformation a -> MergeBranchesResult a
+mergedBranchInformationToResult mbi = MergeBranchesResult
+    { mergeBranchesResultMeta         = mergedBranchMeta mbi
+    , mergeBranchesResultTemplateYaml = descriptorToTemplateYaml mbd
+    }
+    where mbd = mergedBranchDescriptor mbi
 
 templateBranchInformationData
     :: (TemplateBranchInformation -> a)
@@ -78,9 +86,9 @@ mergeBranchesGraph
     -> (a -> a -> MergedBranchDescriptor -> m a)
     -> Graph TemplateBranchInformation
     -> Set TemplateBranchInformation
-    -> m (Maybe (a, TemplateYaml))
+    -> m (Maybe (MergeBranchesResult a))
 mergeBranchesGraph extract mergeCommits graph selectedBranches =
-    fmap (fmap mergedBranchInformationToTemplateYaml)
+    fmap (fmap mergedBranchInformationToResult)
         $ mergeGraph mergeCommits
         $ mapVertices (templateBranchInformationData extract)
         $ graphSubset (vertexDecision selectedBranches) graph
