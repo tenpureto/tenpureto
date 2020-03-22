@@ -569,14 +569,25 @@ commitMessagePattern :: Text
 commitMessagePattern = "^Template: .*$"
 
 extractTemplateNameRegex :: Parser Text
-extractTemplateNameRegex =
-    string "Template: "
-        *>  takeWhile1 (not . isEndOfLine)
-        <|> (skipWhile (not . isEndOfLine) *> endOfLine)
-        *>  extractTemplateNameRegex
+extractTemplateNameRegex = matching <|> nonMatching *> extractTemplateNameRegex
+  where
+    matching    = string "Template: " *> takeWhile1 (not . isEndOfLine)
+    nonMatching = skipWhile (not . isEndOfLine) *> endOfLine
 
 extractTemplateName :: Text -> Maybe Text
 extractTemplateName msg = rightToMaybe $ parseOnly extractTemplateNameRegex msg
+
+extractTemplateCommitsRegex :: Parser [Text]
+extractTemplateCommitsRegex = catMaybes
+    <$> many' (Just <$> matching <|> Nothing <$ nonMatching)
+  where
+    matching    = string "Template commit: " *> takeWhile1 (not . isEndOfLine)
+    nonMatching = skipWhile (not . isEndOfLine) *> endOfLine
+
+
+extractTemplateCommits :: Text -> [Committish]
+extractTemplateCommits msg = either (const []) (fmap Committish)
+    $ parseOnly extractTemplateCommitsRegex msg
 
 isChildBranch :: Text -> TemplateBranchInformation -> Bool
 isChildBranch branch bi =
