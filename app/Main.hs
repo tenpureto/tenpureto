@@ -102,12 +102,16 @@ previousCommitOption = strOption
     )
 
 targetArgument :: Parser FilePath
-targetArgument =
-    strArgument (metavar "<dir>" <> help "Target directory" <> action "directory")
+targetArgument = strArgument
+    (metavar "<dir>" <> help "Target directory" <> action "directory")
 
 projectConfiguratonOption :: Parser FilePath
 projectConfiguratonOption = strOption
-    (long "configuration" <> metavar "<file>" <> help "Project configuration" <> action "file")
+    (  long "configuration"
+    <> metavar "<file>"
+    <> help "Project configuration"
+    <> action "file"
+    )
 
 unattendedSwitch :: Parser Bool
 unattendedSwitch = switch (long "unattended" <> help "Do not ask anything")
@@ -328,6 +332,8 @@ templateCommands = hsubparser
            )
     )
 
+
+-- brittany-disable-next-binding
 runAppM
     :: Members '[Terminal, Resource, Embed IO] r
     => Bool
@@ -388,7 +394,8 @@ runCommand Create { maybeTemplateName = t, maybeTargetDirectory = td, maybeProje
         resolvedTd <- traverse resolveDir td
         resolvedC  <- traverse resolveFile c
         maybeYaml  <- traverse loadTemplateYaml resolvedC
-        let inputConfig = PreliminaryProjectConfiguration
+        let
+            inputConfig = PreliminaryProjectConfiguration
                 { preSelectedTemplate            = t
                 , preTargetDirectory             = resolvedTd
                 , prePreviousTemplateCommit      = Nothing
@@ -396,7 +403,9 @@ runCommand Create { maybeTemplateName = t, maybeTargetDirectory = td, maybeProje
                                                    .   yamlFeatures
                                                    <$> maybeYaml
                 , preVariableValues              = yamlVariables <$> maybeYaml
-                , preVariableDefaultReplacements = fromMaybe OrderedMap.empty $ liftA2 templateNameDefaultReplacement t td
+                , preVariableDefaultReplacements =
+                    fromMaybe OrderedMap.empty
+                        $ liftA2 templateNameDefaultReplacement t td
                 }
         createProject inputConfig
 runCommand Update { maybeTemplateName = t, maybeTargetDirectory = td, maybeProjectConfiguration = c, maybePreviousCommit = pc, runUnattended = u, enableDebugLogging = d }
@@ -409,7 +418,11 @@ runCommand Update { maybeTemplateName = t, maybeTargetDirectory = td, maybeProje
             inputConfig = PreliminaryProjectConfiguration
                 { preSelectedTemplate            = t
                 , preTargetDirectory             = Just resolvedTd
-                , prePreviousTemplateCommit      = fmap (ExistingParentCommit . Committish) pc
+                , prePreviousTemplateCommit      = fmap
+                                                       ( ExistingParentCommit
+                                                       . Committish
+                                                       )
+                                                       pc
                 , preSelectedBranches            = Set.map yamlFeatureName
                                                    .   yamlFeatures
                                                    <$> maybeYaml
@@ -475,4 +488,8 @@ runOptParser = do
 main :: IO ()
 main = do
     runTerminalIOOutput' <- runTerminalIOOutput
-    runFinal . embedToFinal @IO . resourceToIOFinal . runTerminalIOOutput' $ runOptParser
+    runFinal
+        . embedToFinal @IO
+        . resourceToIOFinal
+        . runTerminalIOOutput'
+        $ runOptParser
