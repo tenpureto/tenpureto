@@ -54,6 +54,13 @@ data Command
             , runUnattended :: Bool
             , enableDebugLogging :: Bool
             }
+    | Log
+            { maybeTemplateName :: Maybe Text
+            , maybeTargetDirectory :: Maybe FilePath
+            , maybeProjectConfiguration :: Maybe FilePath
+            , showLogMode :: ShowLogMode
+            , enableDebugLogging :: Bool
+            }
     | TemplateGraph
             { templateName :: Text
             , branchFilter :: BranchFilter
@@ -230,6 +237,15 @@ remoteChangeModeOptionSet = asum
     , pure PushDirectly
     ]
 
+showLogModeOption :: Parser ShowLogMode
+showLogModeOption = incoming <|> included <|> pure ShowLogAll
+  where
+    incoming = flag' ShowLogIncoming
+                     (long "incoming" <> help "Show only incoming changes")
+    included = flag'
+        ShowLogIncluded
+        (long "included" <> help "Show only already included changes")
+
 createCommand :: Parser Command
 createCommand =
     Create
@@ -256,6 +272,15 @@ adoptCommand =
         <*> optional targetArgument
         <*> optional projectConfiguratonOption
         <*> unattendedSwitch
+        <*> debugSwitch
+
+logCommand :: Parser Command
+logCommand =
+    Log
+        <$> optional templateNameOption
+        <*> optional targetArgument
+        <*> optional projectConfiguratonOption
+        <*> showLogModeOption
         <*> debugSwitch
 
 templateGraphCommand :: Parser Command
@@ -408,6 +433,7 @@ runCommand Create { maybeTemplateName = t, maybeTargetDirectory = td, maybeProje
                 , preVariableDefaultReplacements =
                     fromMaybe OrderedMap.empty
                         $ liftA2 templateNameDefaultReplacement t td
+                , prePreviousMergedHeads         = Nothing
                 }
         createProject inputConfig
 runCommand Update { maybeTemplateName = t, maybeTargetDirectory = td, maybeProjectConfiguration = c, maybePreviousCommit = pc, runUnattended = u, enableDebugLogging = d }
@@ -430,6 +456,7 @@ runCommand Update { maybeTemplateName = t, maybeTargetDirectory = td, maybeProje
                                                    <$> maybeYaml
                 , preVariableValues              = yamlVariables <$> maybeYaml
                 , preVariableDefaultReplacements = OrderedMap.empty
+                , prePreviousMergedHeads         = Nothing
                 }
         updateProject (inputConfig <> currentConfig)
 runCommand Adopt { maybeTemplateName = t, maybeTargetDirectory = td, maybeProjectConfiguration = c, runUnattended = u, enableDebugLogging = d }
@@ -448,8 +475,28 @@ runCommand Adopt { maybeTemplateName = t, maybeTargetDirectory = td, maybeProjec
                                                    <$> maybeYaml
                 , preVariableValues              = yamlVariables <$> maybeYaml
                 , preVariableDefaultReplacements = OrderedMap.empty
+                , prePreviousMergedHeads         = Nothing
                 }
         updateProject (inputConfig <> currentConfig)
+runCommand Log { maybeTemplateName = t, maybeTargetDirectory = td, maybeProjectConfiguration = c, showLogMode = m, enableDebugLogging = d }
+    = runAppM d True $ do
+        resolvedTd    <- resolveDir (fromMaybe "." td)
+        resolvedC     <- traverse resolveFile c
+        maybeYaml     <- traverse loadTemplateYaml resolvedC
+        currentConfig <- loadExistingProjectConfiguration resolvedTd
+        let
+            inputConfig = PreliminaryProjectConfiguration
+                { preSelectedTemplate            = t
+                , preTargetDirectory             = Just resolvedTd
+                , prePreviousTemplateCommit      = Nothing
+                , preSelectedBranches            = Set.map yamlFeatureName
+                                                   .   yamlFeatures
+                                                   <$> maybeYaml
+                , preVariableValues              = yamlVariables <$> maybeYaml
+                , preVariableDefaultReplacements = OrderedMap.empty
+                , prePreviousMergedHeads         = Nothing
+                }
+        showLog (inputConfig <> currentConfig) m
 runCommand TemplateGraph { templateName = t, branchFilter = bf, enableDebugLogging = d }
     = runAppM d True $ generateTemplateGraph t bf
 runCommand TemplateListBranches { templateName = t, branchFilter = bf, enableDebugLogging = d }
@@ -487,6 +534,9 @@ runOptParser = do
                    adoptCommand
                    (progDesc "Adopt an existing project to use a template")
                )
+        <> command
+               "log"
+               (info logCommand (progDesc "Show log of template changes"))
         <> command "template"
                    (info templateCommands (progDesc "Manage a template"))
         )

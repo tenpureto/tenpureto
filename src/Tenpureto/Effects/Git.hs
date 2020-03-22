@@ -80,6 +80,7 @@ data Git m a where
     GitDiffHasCommits ::GitRepository -> Committish -> Committish -> Git m Bool
     GitLog ::GitRepository -> Committish -> Committish -> Git m Text
     GitLogDiff ::GitRepository -> Committish -> Committish -> Git m Text
+    GitLogInteractive ::GitRepository -> [Committish] -> [Committish] -> Git m ()
     ListFiles ::GitRepository -> Git m [Path Rel File]
     HasChangedFiles ::GitRepository -> Git m Bool
     GetCurrentBranch ::GitRepository -> Git m Text
@@ -115,7 +116,7 @@ withClonedRepository
     => RepositoryLocation
     -> (GitRepository -> Sem r a)
     -> Sem r a
-withClonedRepository location f =  withSystemTempDir "tenpureto" $ \dir -> do
+withClonedRepository location f = withSystemTempDir "tenpureto" $ \dir -> do
     repo <- initRepository dir
     addRepositoryOrigin repo location
     f repo
@@ -166,7 +167,8 @@ runGit = interpret $ \case
                 ]
             >>= asUnit
         branchSuffix <- embed randomIO
-        let branch = "tenpureto-temp-" <> (T.pack . show) (branchSuffix :: Word)
+        let branch =
+                "tenpureto-temp-" <> (T.pack . show) (branchSuffix :: Word)
         gitRepoCmd (GitRepository dir) ["checkout", "--orphan", branch]
             >>= asUnit
         return $ (GitRepository dir, Just branch)
@@ -176,7 +178,9 @@ runGit = interpret $ \case
         removeDirRecur dir
         gitRepoCmd repo ["worktree", "prune"] >>= asUnit
         case tempBranch of
-            Just branch -> gitRepoCmd repo ["branch", "--delete", "--force", branch] >>= asUnit
+            Just branch ->
+                gitRepoCmd repo ["branch", "--delete", "--force", branch]
+                    >>= asUnit
             Nothing -> return ()
 
     ListBranches repo ->
@@ -281,6 +285,13 @@ runGit = interpret $ \case
 
     GitLogDiff repo (Committish c) (Committish base) ->
         gitRepoCmd repo ["log", "--patch", "--color", c, "^" <> base] >>= asText
+
+    GitLogInteractive repo include exclude -> gitInteractiveRepoCmd
+        repo
+        (  ["log", "--color", "--oneline", "--no-merges", "--no-decorate"]
+        ++ fmap unCommittish              include
+        ++ fmap ((<>) "^" . unCommittish) exclude
+        )
 
     ListFiles repo -> gitRepoCmd repo ["ls-files"] >>= asFiles
 

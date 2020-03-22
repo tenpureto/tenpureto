@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module Tenpureto
     ( module Tenpureto
     , TenpuretoException(..)
@@ -43,6 +45,8 @@ data RemoteChangeMode = PushDirectly
                       | UpstreamPullRequest { pullRequestSettings :: PullRequestSettings }
 
 data ChangesNature = ExistingChanges | NewChanges
+
+data ShowLogMode = ShowLogAll | ShowLogIncoming | ShowLogIncluded
 
 buildTemplaterSettings
     :: TemplateYaml -> FinalProjectConfiguration -> TemplaterSettings
@@ -172,6 +176,34 @@ updateProject projectConfiguration = do
                                                                 )
                                           else sayLn noRelevantTemplateChanges
 
+showLog
+    :: Members
+           '[Git, UI, Terminal, FileSystem, Logging, Resource, Error
+               TenpuretoException]
+           r
+    => PreliminaryProjectConfiguration
+    -> ShowLogMode
+    -> Sem r ()
+showLog projectConfiguration logMode = do
+    finalUpdateConfiguration <- inputUpdateConfiguration projectConfiguration
+    logDebug
+        $  "Final update configuration"
+        <> line
+        <> (indent 4 . pretty) finalUpdateConfiguration
+    withPreparedTemplate projectConfiguration
+        $ \template _ _ _ _ mergedHeads ->
+              let previousHeads =
+                          case fold (prePreviousMergedHeads projectConfiguration) of
+                              [] -> throw TenpuretoNoPreviousMergedHeads
+                              hs -> return hs
+                  currentHeads = OrderedSet.toList mergedHeads
+              in  do
+                      (include, exclude) <- case logMode of
+                          ShowLogAll      -> return (currentHeads, [])
+                          ShowLogIncluded -> (, []) <$> previousHeads
+                          ShowLogIncoming -> (currentHeads, ) <$> previousHeads
+                      gitLogInteractive template include exclude
+
 translateTemplateYaml
     :: FinalProjectConfiguration -> TemplateYaml -> TemplateYaml
 translateTemplateYaml cfg yaml = TemplateYaml
@@ -274,6 +306,8 @@ loadExistingProjectConfiguration projectPath =
                                                    yaml
             , preVariableValues              = fmap yamlVariables yaml
             , preVariableDefaultReplacements = OrderedMap.empty
+            , prePreviousMergedHeads         = extractTemplateCommits
+                                                   <$> previousCommitMessage
             }
 
 prepareTemplate
@@ -569,14 +603,25 @@ commitMessagePattern :: Text
 commitMessagePattern = "^Template: .*$"
 
 extractTemplateNameRegex :: Parser Text
-extractTemplateNameRegex =
-    string "Template: "
-        *>  takeWhile1 (not . isEndOfLine)
-        <|> (skipWhile (not . isEndOfLine) *> endOfLine)
-        *>  extractTemplateNameRegex
+extractTemplateNameRegex = matching <|> nonMatching *> extractTemplateNameRegex
+  where
+    matching    = string "Template: " *> takeWhile1 (not . isEndOfLine)
+    nonMatching = skipWhile (not . isEndOfLine) *> endOfLine
 
 extractTemplateName :: Text -> Maybe Text
 extractTemplateName msg = rightToMaybe $ parseOnly extractTemplateNameRegex msg
+
+extractTemplateCommitsRegex :: Parser [Text]
+extractTemplateCommitsRegex = catMaybes
+    <$> many' (Just <$> matching <|> Nothing <$ nonMatching)
+  where
+    matching    = string "Template commit: " *> takeWhile1 (not . isEndOfLine)
+    nonMatching = skipWhile (not . isEndOfLine) *> endOfLine
+
+
+extractTemplateCommits :: Text -> [Committish]
+extractTemplateCommits msg = either (const []) (fmap Committish)
+    $ parseOnly extractTemplateCommitsRegex msg
 
 isChildBranch :: Text -> TemplateBranchInformation -> Bool
 isChildBranch branch bi =

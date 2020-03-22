@@ -15,6 +15,7 @@ data TenpuretoException = TemplateBranchNotFoundException Text
                         | TenpuretoBranchNotDeleted Text
                         | TenpuretoEmptySelection
                         | TenpuretoEmptyChangeset
+                        | TenpuretoNoPreviousMergedHeads
                         | TenpuretoGitException GitException
                         | TenpuretoUIException UIException
                         | TenpuretoTemplateLoaderException TemplateLoaderException
@@ -32,6 +33,8 @@ instance Pretty TenpuretoException where
         "Cannot create a project from an empty selection"
     pretty TenpuretoEmptyChangeset =
         "Cannot create a commit because the changeset is empty"
+    pretty TenpuretoNoPreviousMergedHeads =
+        "Cannot find information about previously merged template commits"
     pretty (TenpuretoGitException            e) = pretty e
     pretty (TenpuretoUIException             e) = pretty e
     pretty (TenpuretoTemplateLoaderException e) = pretty e
