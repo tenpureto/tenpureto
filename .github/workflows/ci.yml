@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches: [ '*' ]
-    tags: [ 'v*.*.*' ]
   pull_request:
 
 jobs:
@@ -177,34 +176,50 @@ jobs:
           path: dist/
   release:
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.repository == 'tenpureto/tenpureto' && github.ref == 'refs/heads/master'
     needs:
+      - test
       - build-x86_64-darwin
       - build-x86_64-linux
       - package-x86_64-linux
     steps:
+      - uses: actions/checkout@v2
+      - uses: jaliborc/action-general-autotag@1.0.1
+        id: tag
+        with:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          source_file: "package.yaml"
+          extraction_regex: "version:\\s*(\\d+\\.\\d+\\.\\d+)"
+          tag_format: "v{version}"
       - uses: actions/download-artifact@v1
+        if: steps.tag.outputs.tagsha != ''
         with:
           name: tenpureto-x86_64-linux
       - uses: actions/download-artifact@v1
+        if: steps.tag.outputs.tagsha != ''
         with:
           name: tenpureto-x86_64-darwin
       - uses: actions/download-artifact@v1
+        if: steps.tag.outputs.tagsha != ''
         with:
           name: tenpureto-x86_64-linux.deb
       - uses: actions/download-artifact@v1
+        if: steps.tag.outputs.tagsha != ''
         with:
           name: tenpureto-x86_64-linux.rpm
-      - run: |
+      - if: steps.tag.outputs.tagsha != ''
+        run: |
           mkdir release
-          mv tenpureto-x86_64-linux/tenpureto release/tenpureto-${GITHUB_REF#refs/tags/v}-x86_64-linux
-          mv tenpureto-x86_64-darwin/tenpureto release/tenpureto-${GITHUB_REF#refs/tags/v}-x86_64-darwin
+          mv tenpureto-x86_64-linux/tenpureto release/tenpureto-${{ steps.tag.outputs.version }}-x86_64-linux
+          mv tenpureto-x86_64-darwin/tenpureto release/tenpureto-${{ steps.tag.outputs.version }}-x86_64-darwin
           mv tenpureto-x86_64-linux.deb/* release/
           mv tenpureto-x86_64-linux.rpm/* release/
       - name: Release
+        if: steps.tag.outputs.tagsha != ''
         uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
         with:
+          tag_name: ${{ steps.tag.outputs.tagname }}
+          name: ${{ steps.tag.outputs.version }}
           draft: true
           files: release/*
         env:
