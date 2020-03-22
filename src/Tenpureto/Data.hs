@@ -19,6 +19,7 @@ data PreliminaryProjectConfiguration = PreliminaryProjectConfiguration
         , preSelectedBranches :: Maybe (Set Text)
         , preVariableValues :: Maybe (OrderedMap Text Text)
         , preVariableDefaultReplacements :: OrderedMap Text Text
+        , prePreviousMergedHeads :: Maybe [Committish]
         }
         deriving (Show)
 
@@ -50,6 +51,8 @@ instance Semigroup PreliminaryProjectConfiguration where
         , preVariableValues = preVariableValues a <|> preVariableValues b
         , preVariableDefaultReplacements = preVariableDefaultReplacements a
             `OrderedMap.union` preVariableDefaultReplacements b
+        , prePreviousMergedHeads = prePreviousMergedHeads a
+                                       <|> prePreviousMergedHeads b
         }
 
 instance Pretty PreliminaryProjectConfiguration where
@@ -66,6 +69,8 @@ instance Pretty PreliminaryProjectConfiguration where
             <+> (align . pretty) (preVariableValues cfg)
         , "Variable default replacements: "
             <+> (align . pretty) (preVariableDefaultReplacements cfg)
+        , "Previous merged heads: "
+            <+> (align . pretty) (prePreviousMergedHeads cfg)
         ]
 
 instance Pretty FinalProjectConfiguration where

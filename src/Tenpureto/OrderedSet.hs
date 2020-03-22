@@ -27,6 +27,11 @@ import           Algebra.Graph.AdjacencyMap     ( path
                                                 )
 import           Algebra.Graph.AdjacencyMap.Algorithm
                                                 ( topSort )
+import           Data.Text.Prettyprint.Doc      ( Pretty
+                                                , pretty
+                                                , group
+                                                , encloseSep
+                                                )
 
 newtype OrderedSet a = OrderedSet { toList :: [a] }
                                   deriving (Eq, Ord)
@@ -71,3 +76,6 @@ union a b = OrderedSet . sort $ ga `overlay` gb
 
 instance (Ord a, Show a) => Show (OrderedSet a) where
   show = show . toSet
+
+instance (Ord a, Pretty a) => Pretty (OrderedSet a) where
+  pretty s = group . encloseSep "[ " " ]" ", " $ pretty <$> toList s
