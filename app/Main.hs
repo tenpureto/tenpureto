@@ -102,11 +102,12 @@ previousCommitOption = strOption
     )
 
 targetArgument :: Parser FilePath
-targetArgument = strArgument (metavar "<dir>" <> help "Target directory")
+targetArgument =
+    strArgument (metavar "<dir>" <> help "Target directory" <> action "directory")
 
 projectConfiguratonOption :: Parser FilePath
 projectConfiguratonOption = strOption
-    (long "configuration" <> metavar "<file>" <> help "Project configuration")
+    (long "configuration" <> metavar "<file>" <> help "Project configuration" <> action "file")
 
 unattendedSwitch :: Parser Bool
 unattendedSwitch = switch (long "unattended" <> help "Do not ask anything")
