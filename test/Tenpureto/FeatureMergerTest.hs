@@ -16,6 +16,7 @@ import           Tenpureto.TemplateLoader.Internal
                                                 , TemplateYamlFeature(..)
                                                 )
 import           Tenpureto.Effects.Git          ( Committish(..) )
+import qualified Tenpureto.OrderedSet          as OrderedSet
 import qualified Tenpureto.OrderedMap          as OrderedMap
 import           Tenpureto.FeatureMerger
 
@@ -23,7 +24,7 @@ import           Tenpureto.FeatureMerger
 v :: Text -> TemplateBranchInformation
 v c = TemplateBranchInformation
     { branchName   = c
-    , branchCommit = Committish ""
+    , branchCommit = Committish c
     , templateYaml = TemplateYaml
                          { yamlVariables = OrderedMap.singleton c c
                          , yamlExcludes  = Set.singleton c
@@ -66,25 +67,38 @@ test_runMergeGraphPure =
             ]
         ]
     , testGroup
-        "merge data"
+        "merged yaml data"
         [ testCase "features"
-        $   (fmap (Set.map yamlFeatureName . yamlFeatures) . snd)
+        $   (fmap (Set.map yamlFeatureName . yamlFeatures) . yamlResult)
                 (runMergeGraphPure' (vertices [v "a", v "b"]))
         @?= Just (Set.fromList ["a", "b"])
         , testCase "variables"
-        $   (fmap yamlVariables . snd)
+        $   (fmap yamlVariables . yamlResult)
                 (runMergeGraphPure' (vertices [v "a", v "b"]))
         @?= Just (OrderedMap.fromList [("a", "a"), ("b", "b")])
         , testCase "conflicts for different vertices"
-        $   (fmap yamlConflicts . snd)
+        $   (fmap yamlConflicts . yamlResult)
                 (runMergeGraphPure' (vertices [v "a", v "b"]))
         @?= Just (Set.fromList ["a", "b"])
         , testCase "conflicts for a path"
-        $ (fmap yamlConflicts . snd) (runMergeGraphPure' (path [v "a", v "b"]))
+        $   (fmap yamlConflicts . yamlResult)
+                (runMergeGraphPure' (path [v "a", v "b"]))
         @?= Just (Set.fromList ["b"])
+        ]
+    , testGroup
+        "merge heads"
+        [ testCase "for two different vertices"
+        $   headsResult (runMergeGraphPure' (vertices [v "a", v "b"]))
+        @?= Just (OrderedSet.fromList [Committish "a", Committish "b"])
+        , testCase "for a path"
+        $   headsResult (runMergeGraphPure' (path [v "a", v "b"]))
+        @?= Just (OrderedSet.fromList [Committish "b"])
         ]
     , testCase "cycle"
         $   runMergeGraphPure' (path [v "a", v "b", v "c", v "a"])
         @?= ([], Nothing)
     ]
-    where runMergeGraphPure' graph = runMergeGraphPure graph (vertexSet graph)
+  where
+    runMergeGraphPure' graph = runMergeGraphPure graph (vertexSet graph)
+    yamlResult  = fmap fst . snd
+    headsResult = fmap snd . snd

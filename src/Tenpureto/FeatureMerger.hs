@@ -126,41 +126,58 @@ runMergeGraph repo graph branches = do
 runMergeGraphPure
     :: Graph TemplateBranchInformation
     -> Set TemplateBranchInformation
-    -> ([MergeRecord], Maybe TemplateYaml)
+    -> ([MergeRecord], Maybe (TemplateYaml, OrderedSet Committish))
 runMergeGraphPure graph selectedBranches =
-    let (records, c) = run . runOutputMonoid pure $ mergeBranchesGraph
-            branchName
+    let
+        (records, c) = run . runOutputMonoid pure $ mergeBranchesGraph
+            branchData
             logMerges
             graph
             selectedBranches
-        co = maybeToList $ fmap (CheckoutRecord . mergeBranchesResultMeta) c
-    in  (records <> co, fmap mergeBranchesResultTemplateYaml c)
+        co = maybeToList
+            $ fmap (CheckoutRecord . fst . mergeBranchesResultMeta) c
+    in
+        (records <> co, fmap runResult c)
   where
-    logMerges b1 b2 d =
-        let mc = mergedBranchName d in output (MergeRecord b1 b2 mc) $> mc
+    branchData bi = (branchName bi, OrderedSet.singleton (branchCommit bi))
+    logMerges (b1, b1hs) (b2, b2hs) d =
+        let mc = mergedBranchName d
+        in  output (MergeRecord b1 b2 mc) $> (mc, b1hs `OrderedSet.union` b2hs)
+    runResult mbd =
+        ( mergeBranchesResultTemplateYaml mbd
+        , (snd . mergeBranchesResultMeta) mbd
+        )
 
 listMergeCombinations
     :: Graph TemplateBranchInformation -> [Set TemplateBranchInformation]
 listMergeCombinations graph =
-    let selectable branch =
-                not (isHiddenBranch branch) && isFeatureBranch branch
+    let
+        selectable branch =
+            not (isHiddenBranch branch) && isFeatureBranch branch
         nodes        = filter selectable $ vertexList graph
         combinations = subsequences nodes
         addAncestors = filter selectable . graphAncestors graph
         noConflicts selected =
-                let conflicts :: Set Text
-                    conflicts =
-                            (maybe mempty yamlConflicts . snd . runMergeGraphPure graph)
-                                selected
-                    selectedNames = Set.map branchName selected
-                in  Set.null (Set.intersection conflicts selectedNames)
-    in  filter noConflicts
-            $   Set.toList
-            .   Set.fromList
-            $   fmap Set.fromList
-            $   filter (not . null)
-            $   addAncestors
-            <$> combinations
+            let
+                conflicts :: Set Text
+                conflicts =
+                    ( maybe mempty yamlConflicts
+                        . fmap fst
+                        . snd
+                        . runMergeGraphPure graph
+                        )
+                        selected
+                selectedNames = Set.map branchName selected
+            in
+                Set.null (Set.intersection conflicts selectedNames)
+    in
+        filter noConflicts
+        $   Set.toList
+        .   Set.fromList
+        $   fmap Set.fromList
+        $   filter (not . null)
+        $   addAncestors
+        <$> combinations
 
 data PropagatePushMode = PropagatePushMerged | PropagatePushSeparately
 data PropagateData = PropagateData { propagateCurrentCommit :: Committish
