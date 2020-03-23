@@ -129,21 +129,6 @@ jobs:
           homepage: homepage
           synopsis: synopsis
           author: author
-      - name: Describe git version
-        id: gitdescribe
-        shell: bash
-        run: |
-          GIT_DESCRIBE=$(git describe)
-          VERSION_DASHES=${GIT_DESCRIBE#v}
-          VERSION_UNDERSCORES=${VERSION_DASHES//-/_}
-          case "${{ matrix.packaging }}" in
-            rpm)
-              echo "::set-output name=version::${VERSION_UNDERSCORES}"
-              ;;
-            deb)
-              echo "::set-output name=version::${VERSION_DASHES}"
-              ;;
-          esac
       - name: Generate shell completions
         shell: bash
         run: |
@@ -160,7 +145,7 @@ jobs:
             --force
             --package dist/
             --name "${{ steps.package.outputs.name }}"
-            --version "${{ steps.gitdescribe.outputs.version }}"
+            --version "${{ steps.package.outputs.version }}"
             --url "${{ steps.package.outputs.homepage }}"
             --description "${{ steps.package.outputs.synopsis }}"
             --maintainer "${{ steps.package.outputs.author }}"
