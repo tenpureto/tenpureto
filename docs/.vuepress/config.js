@@ -4,17 +4,17 @@ module.exports = {
   themeConfig: {
     nav: [
       { text: "Home", link: "/" },
-      { text: "Guide", link: "/guide/" }
+      { text: "Guide", link: "/guide/" },
     ],
     sidebar: ["/", "/guide/", "/guide/authoring/"],
     repo: "tenpureto/tenpureto",
     docsDir: "docs",
-    editLinks: true
+    editLinks: true,
   },
   plugins: {
     sitemap: {
       hostname: "https://tenpureto.org",
-      exclude: ["/404.html"]
-    }
-  }
+      exclude: ["/404.html"],
+    },
+  },
 };
