@@ -74,12 +74,12 @@ jobs:
         run: sudo rm -rf /usr/local/lib/android /opt/ghc
       - uses: actions/checkout@v2
       - uses: cachix/install-nix-action@v8
-      - name: Build
-        uses: cachix/cachix-action@v5
+      - uses: cachix/cachix-action@v6
         with:
           name: tenpureto
-          attributes: static.tenpureto.components.exes.tenpureto
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+      - name: Build
+        run: nix-build -A static.tenpureto.components.exes.tenpureto
       - name: Upload
         uses: actions/upload-artifact@v1
         with:
