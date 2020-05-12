@@ -23,6 +23,7 @@ jobs:
         with:
           name: tenpureto
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+      - run: cachix use iohk
       - run: nix-build -A default.shellFor
   build-ci-cache:
     if: github.repository == 'tenpureto/tenpureto'
@@ -36,4 +37,5 @@ jobs:
         with:
           name: tenpureto
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+      - run: cachix use iohk
       - run: nix-build -A static.tenpureto.components.exes.tenpureto

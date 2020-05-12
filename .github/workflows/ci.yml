@@ -78,6 +78,7 @@ jobs:
         with:
           name: tenpureto
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
+      - run: cachix use iohk
       - name: Build
         run: nix-build -A static.tenpureto.components.exes.tenpureto
       - name: Upload
