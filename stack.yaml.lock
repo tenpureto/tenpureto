@@ -5,26 +5,12 @@
 
 packages:
 - completed:
-    hackage: hedgehog-classes-0.2.4.1@sha256:9097738d37a8dec291f6478639dfc02857df160cc5b8fc7f7ab7e9a9130c25b1,5404
+    hackage: polysemy-plugin-0.2.5.0@sha256:67e30be568a141b852aace1a60e180cb5060fbb2835365a81a3ea779536d6d35,2952
     pantry-tree:
-      size: 5059
-      sha256: a9e04bb05b0d5426e4bf5d024786c694d00075bd0effc40b9c752aea8bd7ecf2
+      size: 1232
+      sha256: 5c90dac2eba48b4e337b302347c233ecaedb63e333641e094e718a548ac86711
   original:
-    hackage: hedgehog-classes-0.2.4.1
-- completed:
-    hackage: polysemy-1.2.2.0@sha256:20e278d6e2f16b79634864e6d3b1457b479378b058fd96c6135d8f48ba2306db,5776
-    pantry-tree:
-      size: 3622
-      sha256: 12f504ac889727c61c686ce184ca55f67b129489fc7a030810db2d000a6c81ca
-  original:
-    hackage: polysemy-1.2.2.0
-- completed:
-    hackage: polysemy-plugin-0.2.3.0@sha256:0abf90c65d4b55ccfd37d438c9915a14a3f5ea11334fdf1c1834ef5caaddba90,2815
-    pantry-tree:
-      size: 1230
-      sha256: 17efa45f622c94c9f1f72e18c22e916e68614e12b73ef0d8d0dcf842dfa6744c
-  original:
-    hackage: polysemy-plugin-0.2.3.0
+    hackage: polysemy-plugin-0.2.5.0
 - completed:
     hackage: ghc-tcplugins-extra-0.3.2@sha256:1bbfd4449c3669a31618ea0ebc5d00d980a53988daad3b6218bab5c8cdff268d,1687
     pantry-tree:
@@ -32,16 +18,9 @@ packages:
       sha256: 4b16989344380c912e476dc232cc58264837b498e31a8bf16a17092ba6c1cfb9
   original:
     hackage: ghc-tcplugins-extra-0.3.2
-- completed:
-    hackage: first-class-families-0.6.0.0@sha256:9d2a2a0092dfb8fd0e688b0b6bf71242fbc393c028b0b669d25ed387667490c2,1304
-    pantry-tree:
-      size: 847
-      sha256: 17e0b275b62a3269f0c05e3f802ec85a31b9e9498248419cfc26e5277f56164c
-  original:
-    hackage: first-class-families-0.6.0.0
 snapshots:
 - completed:
-    size: 494635
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/15/12.yaml
-    sha256: a71c4293d8f461f455ff0d9815dfe4ab2f1adacd7e0bbc9a218f46ced8c4929a
-  original: lts-15.12
+    size: 531718
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/16/6.yaml
+    sha256: 230a7266fc11f76222bd3bb68e9503ed11d553060a752f164bff6753ed03e271
+  original: lts-16.6
