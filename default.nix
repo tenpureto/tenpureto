@@ -74,6 +74,5 @@ in {
         }
       ];
     };
-  # debug
   inherit pkgs;
 }
