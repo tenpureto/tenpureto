@@ -1,6 +1,6 @@
 let
   haskellNix = import (builtins.fetchTarball
-    "https://github.com/input-output-hk/haskell.nix/archive/7b1b5ec71817fb057fae5c598d4254faeebcbf91.tar.gz")
+    "https://github.com/input-output-hk/haskell.nix/archive/788e1983768cd810d94e77f4032288fb26e486d4.tar.gz")
     { };
   # haskell.nix provides access to the nixpkgs pins which are used by our CI, hence
   # you will be more likely to get cache hits when using these.
@@ -13,7 +13,7 @@ in { pkgs ? import nixpkgsSrc nixpkgsArgs }:
 let
   modules = haskellPackages: [
     { reinstallableLibGhc = true; }
-    { packages.ghc.patches = [ ./ghc-8.6.5.patch ]; }
+    { packages.ghc.patches = [ ./ghc.patch ]; }
     { packages.terminal-size.patches = [ ./terminal-size.patch ]; }
     {
       packages.tenpureto.components.tests.tenpureto-test.build-tools =
@@ -51,7 +51,7 @@ in {
         { doHaddock = false; }
         {
           ghc.package =
-            buildPackages.pkgs.haskell-nix.compiler.ghc865.override {
+            buildPackages.pkgs.haskell-nix.compiler.ghc883.override {
               enableIntegerSimple = true;
               enableShared = true;
             };

@@ -19,22 +19,29 @@ packages:
   original:
     hackage: polysemy-1.2.2.0
 - completed:
-    hackage: polysemy-plugin-0.2.3.0@sha256:f3d7e3eb685deb590928367e663783352e07d14fc1ca93abb7f204e063c56a1f,2697
+    hackage: polysemy-plugin-0.2.3.0@sha256:0abf90c65d4b55ccfd37d438c9915a14a3f5ea11334fdf1c1834ef5caaddba90,2815
     pantry-tree:
       size: 1230
-      sha256: 3f5d41e30ed3cb19636243c1351c23b0159734ac99735133dbf58d75373036cd
+      sha256: 17efa45f622c94c9f1f72e18c22e916e68614e12b73ef0d8d0dcf842dfa6744c
   original:
     hackage: polysemy-plugin-0.2.3.0
 - completed:
-    hackage: algebraic-graphs-0.5@sha256:6eeec5ed1687ff7aa916e7bf9f02f51aaabde6f314dc0b7b1a84156974d7da73,8071
+    hackage: ghc-tcplugins-extra-0.3.2@sha256:1bbfd4449c3669a31618ea0ebc5d00d980a53988daad3b6218bab5c8cdff268d,1687
     pantry-tree:
-      size: 4128
-      sha256: cca4a0348bb126506cacd8436948a68aad62e75d45df8c71f4090a00e69b45ee
+      size: 331
+      sha256: 4b16989344380c912e476dc232cc58264837b498e31a8bf16a17092ba6c1cfb9
   original:
-    hackage: algebraic-graphs-0.5
+    hackage: ghc-tcplugins-extra-0.3.2
+- completed:
+    hackage: first-class-families-0.6.0.0@sha256:9d2a2a0092dfb8fd0e688b0b6bf71242fbc393c028b0b669d25ed387667490c2,1304
+    pantry-tree:
+      size: 847
+      sha256: 17e0b275b62a3269f0c05e3f802ec85a31b9e9498248419cfc26e5277f56164c
+  original:
+    hackage: first-class-families-0.6.0.0
 snapshots:
 - completed:
-    size: 524996
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/14/27.yaml
-    sha256: 7ea31a280c56bf36ff591a7397cc384d0dff622e7f9e4225b47d8980f019a0f0
-  original: lts-14.27
+    size: 494635
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/15/12.yaml
+    sha256: a71c4293d8f461f455ff0d9815dfe4ab2f1adacd7e0bbc9a218f46ced8c4929a
+  original: lts-15.12
