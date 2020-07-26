@@ -97,7 +97,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-test-stack-${{ hashFiles('package.yaml') }}-
             ${{ runner.os }}-test-stack-
-      - uses: mstksg/setup-stack@v1
+      - uses: actions/setup-haskell@v1
+        with:
+          enable-stack: true
+          stack-no-global: true
       - name: Install dependencies
         run: make build-deps
       - name: Build
