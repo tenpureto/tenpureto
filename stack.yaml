@@ -1,12 +1,9 @@
-resolver: lts-15.12
+resolver: lts-16.6
 packages:
 - .
 extra-deps:
-- hedgehog-classes-0.2.4.1
-- polysemy-1.2.2.0
-- polysemy-plugin-0.2.3.0
+- polysemy-plugin-0.2.5.0
 - ghc-tcplugins-extra-0.3.2
-- first-class-families-0.6.0.0
 
 nix:
   packages: [ zlib ]

@@ -595,9 +595,6 @@ runTemplateChange template interactive changeMode changesNature f =
                     then pushRefsToServer changeMode changes
                     else throw CancelledException
 
-try :: Member (Error e) r => Sem r a -> Sem r (Either e a)
-try f = catch (Right <$> f) (return . Left)
-
 commitMessagePattern :: Text
 commitMessagePattern = "^Template: .*$"
 
