@@ -10,13 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v1
+      - uses: actions/cache@v2
         with:
-          path: ~/.stack
+          path: |
+            ~/.stack
+            !~/.stack/setup-exe-cache
           key: ${{ runner.os }}-test-stack-${{ hashFiles('package.yaml') }}-${{ hashFiles('stack.yaml*') }}
-          restore-keys: |
-            ${{ runner.os }}-test-stack-${{ hashFiles('package.yaml') }}-
-            ${{ runner.os }}-test-stack-
       - uses: actions/setup-haskell@v1
         with:
           enable-stack: true
@@ -37,12 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v1
+      - uses: actions/cache@v2
         with:
           path: ~/.npm
           key: ${{ runner.os }}-test-docs-npm-${{ hashFiles('docs/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-test-docs-npm-
       - name: Install dependencies
         run: make npm-ci-docs
       - name: Run tests
@@ -53,12 +50,10 @@ jobs:
     if: github.repository == 'tenpureto/tenpureto' && github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v1
+      - uses: actions/cache@v2
         with:
           path: ~/.npm
           key: ${{ runner.os }}-test-docs-npm-${{ hashFiles('docs/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-test-docs-npm-
       - name: Install dependencies
         run: make npm-ci-docs
       - name: Publish docs
@@ -92,13 +87,12 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v1
+      - uses: actions/cache@v2
         with:
-          path: ~/.stack
+          path: |
+            ~/.stack
+            !~/.stack/setup-exe-cache
           key: ${{ runner.os }}-test-stack-${{ hashFiles('package.yaml') }}-${{ hashFiles('stack.yaml*') }}
-          restore-keys: |
-            ${{ runner.os }}-test-stack-${{ hashFiles('package.yaml') }}-
-            ${{ runner.os }}-test-stack-
       - uses: actions/setup-haskell@v1
         with:
           enable-stack: true
