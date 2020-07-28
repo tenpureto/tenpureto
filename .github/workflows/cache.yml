@@ -25,6 +25,7 @@ jobs:
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
       - run: cachix use iohk
       - run: nix-build -A default.shellFor
+        timeout-minutes: 300
   build-ci-cache:
     if: github.repository == 'tenpureto/tenpureto'
     runs-on: ubuntu-latest
@@ -39,3 +40,4 @@ jobs:
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
       - run: cachix use iohk
       - run: nix-build -A static.tenpureto.components.exes.tenpureto
+        timeout-minutes: 300
