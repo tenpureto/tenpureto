@@ -267,14 +267,14 @@ runPropagateGraph repo mode graph branches =
     propagateOne PropagatePushMerged mi a =
         let mid = mergedBranchMeta mi
         in  do
-                (c, actions) <- mergeOne mid a
+                (c, _) <- mergeOne mid a
                 return
                     ( PropagateData
                         { propagateCurrentCommit  = c
                         , propagateUpstreamCommit = propagateUpstreamCommit mid
                         , propagateBranchName     = propagateBranchName mid
                         }
-                    , actions
+                    , Set.empty
                     )
     propagateMerge PropagatePushMerged b =
         let
