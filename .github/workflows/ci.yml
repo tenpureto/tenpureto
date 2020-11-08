@@ -88,12 +88,13 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.stack
-            !~/.stack/setup-exe-cache
-          key: ${{ runner.os }}-test-stack-${{ hashFiles('package.yaml') }}-${{ hashFiles('stack.yaml*') }}
+      # # Disabled because of https://github.com/actions/cache/issues/445
+      # - uses: actions/cache@v2
+      #   with:
+      #     path: |
+      #       ~/.stack
+      #       !~/.stack/setup-exe-cache
+      #     key: ${{ runner.os }}-test-stack-${{ hashFiles('package.yaml') }}-${{ hashFiles('stack.yaml*') }}
       - uses: actions/setup-haskell@v1
         with:
           enable-stack: true
