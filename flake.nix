@@ -27,8 +27,8 @@
           modules = [
             { doHaddock = false; }
             ({ pkgs, ... }: {
-              ghc.package =
-                pkgs.buildPackages.haskell-nix.compiler.ghc883.override {
+              ghc.package = if pkgs.stdenv.hostPlatform.isMusl then
+                pkgs.buildPackages.haskell-nix.compiler.ghc884.override {
                   enableIntegerSimple = true;
                 }
               else
@@ -58,7 +58,7 @@
         (project system).shellFor {
           exactDeps = true;
           withHoogle = true;
-          #tools = { brittany = "0.13.1.0"; };
+          tools = { brittany = "0.13.1.0"; };
         };
 
     in {
