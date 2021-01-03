@@ -1,9 +1,12 @@
 {
   description = "Tenpureto";
 
-  inputs = { haskell.url = "github:input-output-hk/haskell.nix"; };
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    haskell.url = "github:input-output-hk/haskell.nix";
+  };
 
-  outputs = { self, haskell }:
+  outputs = { self, nixpkgs, haskell }:
     let
 
       project = system:
@@ -17,8 +20,8 @@
 
       drv = system: (project system).tenpureto.components.exes.tenpureto;
 
-      staticProject = system:
-        let pkgs = haskell.legacyPackages.${system};
+      staticProject = # #
+        let pkgs = haskell.legacyPackages.x86_64-linux;
         in pkgs.pkgsCross.musl64.haskell-nix.stackProject {
           src = pkgs.haskell-nix.haskellLib.cleanGit {
             name = "tenpureto";
@@ -51,8 +54,48 @@
           ];
         };
 
-      staticDrv = system:
-        (staticProject system).tenpureto.components.exes.tenpureto;
+      tenpureto-static = staticProject.tenpureto.components.exes.tenpureto;
+
+      tenpureto-package = fmt:
+        with import nixpkgs { system = "x86_64-linux"; };
+        stdenv.mkDerivation {
+          name = "${tenpureto-static.package.identifier.name}-${fmt}";
+          version = tenpureto-static.package.identifier.version;
+          src = self;
+          buildInputs = [ fpm rpm ];
+          buildPhase = ''
+            mkdir -p bash_completions zsh_completions $out &&
+            cp ${tenpureto-static}/bin/tenpureto ./ &&
+            ${tenpureto-static}/bin/tenpureto --bash-completion-script /usr/bin/tenpureto >bash_completions/tenpureto &&
+            ${tenpureto-static}/bin/tenpureto --zsh-completion-script /usr/bin/tenpureto >zsh_completions/_tenpureto &&
+            fpm --input-type dir \
+                --output-type ${fmt} \
+                --force \
+                --package $out/ \
+                --name "${tenpureto-static.package.identifier.name}" \
+                --version "${tenpureto-static.package.identifier.version}" \
+                --url "${tenpureto-static.meta.homepage}" \
+                --description "${tenpureto-static.meta.description}" \
+                --maintainer "Roman Timushev" \
+                --depends git \
+                --deb-no-default-config-files \
+                tenpureto=/usr/bin/ \
+                ./bash_completions/tenpureto=/etc/bash_completion.d/ \
+                ./zsh_completions/_tenpureto=/usr/share/zsh/site-functions/
+          '';
+          dontInstall = true;
+        };
+
+      tenpureto-dist = with import nixpkgs { system = "x86_64-linux"; };
+        symlinkJoin {
+          name = "${tenpureto-static.package.identifier.name}-dist";
+          version = tenpureto-static.package.identifier.version;
+          paths = [
+            tenpureto-static
+            (tenpureto-package "deb")
+            (tenpureto-package "rpm")
+          ];
+        };
 
       shell = system:
         (project system).shellFor {
@@ -67,7 +110,7 @@
       };
       packages.x86_64-linux = { # #
         tenpureto = drv "x86_64-linux";
-        tenpureto-static = staticDrv "x86_64-linux";
+        inherit tenpureto-static tenpureto-dist;
       };
 
       defaultPackage.x86_64-darwin = self.packages.x86_64-darwin.tenpureto;
