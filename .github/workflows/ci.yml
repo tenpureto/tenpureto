@@ -70,22 +70,29 @@ jobs:
       - name: Cleanup
         run: sudo rm -rf /usr/local/lib/android /opt/ghc
       - uses: actions/checkout@v2
+        with:
+          # Nix Flakes doesn't work on shallow clones
+          fetch-depth: 0
       - uses: cachix/install-nix-action@v12
         with:
-          nix_path: nixpkgs=channel:nixpkgs-unstable
+          install_url: https://github.com/numtide/nix-flakes-installer/releases/download/nix-2.4pre20201221_9fab14a/install
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            substituters = https://cache.nixos.org https://hydra.iohk.io
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
       - uses: cachix/cachix-action@v8
         with:
           name: tenpureto
           signingKey: ${{ secrets.CACHIX_SIGNING_KEY }}
-          extraPullNames: iohk
       - name: Build
-        run: nix-build -A static.tenpureto.components.exes.tenpureto
+        run: nix build --print-build-logs .#tenpureto-dist
         timeout-minutes: 300
+      - run: mkdir artifacts && cp result/bin/tenpureto result/*.deb result/*.rpm artifacts/
       - name: Upload
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v2
         with:
           name: tenpureto-x86_64-linux
-          path: result/bin/tenpureto
+          path: artifacts/*
   build-x86_64-darwin:
     runs-on: macos-latest
     steps:
@@ -105,65 +112,10 @@ jobs:
       - name: Build
         run: make .build/staging/bin/tenpureto
       - name: Upload
-        uses: actions/upload-artifact@v1
+        uses: actions/upload-artifact@v2
         with:
           name: tenpureto-x86_64-darwin
           path: .build/staging/bin/tenpureto
-  package-x86_64-linux:
-    runs-on: ubuntu-latest
-    needs: build-x86_64-linux
-    strategy:
-      matrix:
-        packaging: [ rpm, deb ]
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: Fetch tags
-        run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
-      - uses: actions/download-artifact@v1
-        with:
-          name: tenpureto-x86_64-linux
-      - name: Read package.yaml
-        uses: CumulusDS/get-yaml-paths-action@v0.0.3
-        id: package
-        with:
-          file: package.yaml
-          name: name
-          version: version
-          homepage: homepage
-          synopsis: synopsis
-          author: author
-      - name: Generate shell completions
-        shell: bash
-        run: |
-          chmod +x ./tenpureto-x86_64-linux/tenpureto
-          mkdir -p bash_completions zsh_completions dist
-          ./tenpureto-x86_64-linux/tenpureto --bash-completion-script /usr/bin/tenpureto >bash_completions/tenpureto
-          ./tenpureto-x86_64-linux/tenpureto --zsh-completion-script /usr/bin/tenpureto >zsh_completions/_tenpureto
-      - name: Package ${{ matrix.packaging }}
-        uses: docker://ansemjo/fpm:latest
-        with:
-          args:
-            --input-type dir
-            --output-type "${{ matrix.packaging }}"
-            --force
-            --package dist/
-            --name "${{ steps.package.outputs.name }}"
-            --version "${{ steps.package.outputs.version }}"
-            --url "${{ steps.package.outputs.homepage }}"
-            --description "${{ steps.package.outputs.synopsis }}"
-            --maintainer "${{ steps.package.outputs.author }}"
-            --depends git
-            --deb-no-default-config-files
-            ./tenpureto-x86_64-linux/tenpureto=/usr/bin/
-            ./bash_completions/tenpureto=/etc/bash_completion.d/
-            ./zsh_completions/_tenpureto=/usr/share/zsh/site-functions/
-      - name: Upload
-        uses: actions/upload-artifact@v1
-        with:
-          name: tenpureto-x86_64-linux.${{ matrix.packaging }}
-          path: dist/
   release:
     runs-on: ubuntu-latest
     if: github.repository == 'tenpureto/tenpureto' && github.ref == 'refs/heads/master'
@@ -171,7 +123,6 @@ jobs:
       - test
       - build-x86_64-darwin
       - build-x86_64-linux
-      - package-x86_64-linux
     steps:
       - uses: actions/checkout@v2
       - uses: jaliborc/action-general-autotag@1.0.1
@@ -189,21 +140,13 @@ jobs:
         if: steps.tag.outputs.tagsha != ''
         with:
           name: tenpureto-x86_64-darwin
-      - uses: actions/download-artifact@v1
-        if: steps.tag.outputs.tagsha != ''
-        with:
-          name: tenpureto-x86_64-linux.deb
-      - uses: actions/download-artifact@v1
-        if: steps.tag.outputs.tagsha != ''
-        with:
-          name: tenpureto-x86_64-linux.rpm
       - if: steps.tag.outputs.tagsha != ''
         run: |
           mkdir release
-          mv tenpureto-x86_64-linux/tenpureto release/tenpureto-${{ steps.tag.outputs.version }}-x86_64-linux
+          mv tenpureto-x86_64-linux/bin/tenpureto release/tenpureto-${{ steps.tag.outputs.version }}-x86_64-linux
           mv tenpureto-x86_64-darwin/tenpureto release/tenpureto-${{ steps.tag.outputs.version }}-x86_64-darwin
-          mv tenpureto-x86_64-linux.deb/* release/
-          mv tenpureto-x86_64-linux.rpm/* release/
+          mv tenpureto-x86_64-linux/*.deb release/
+          mv tenpureto-x86_64-linux/*.rpm release/
       - name: Release
         if: steps.tag.outputs.tagsha != ''
         uses: softprops/action-gh-release@v1
