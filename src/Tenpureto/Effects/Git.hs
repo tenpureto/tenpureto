@@ -171,6 +171,7 @@ runGit = interpret $ \case
                 "tenpureto-temp-" <> (T.pack . show) (branchSuffix :: Word)
         gitRepoCmd (GitRepository dir) ["checkout", "--orphan", branch]
             >>= asUnit
+        gitRepoCmd (GitRepository dir) ["reset", "--hard"] >>= asUnit
         return $ (GitRepository dir, Just branch)
 
     DeleteWorktree repo dir tempBranch -> do
