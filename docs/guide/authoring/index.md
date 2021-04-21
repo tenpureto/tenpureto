@@ -80,5 +80,5 @@ current one in the `conflicts` section.
 
 Sometimes you want to have files in the template repository that shouldn't end up in generated projects. The typical
 examples are README files, or a CI pipeline definition (if the template uses a different CI system than the target
-projects). You can list these files in the `conflicts` section using the same pattern format as is used for
+projects). You can list these files in the `excludes` section using the same pattern format as is used for
 [gitignore](https://git-scm.com/docs/gitignore#_pattern_format) files.
