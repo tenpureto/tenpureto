@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Cleanup
         run: sudo rm -rf /usr/local/lib/android /opt/ghc
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v2.3.4
         with:
           # Nix Flakes doesn't work on shallow clones
           fetch-depth: 0
