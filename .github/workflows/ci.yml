@@ -28,7 +28,7 @@ jobs:
       - name: Generate coverage report
         run: make report-coverage
       - name: Upload coverage report
-        uses: codecov/codecov-action@v2.0.1
+        uses: codecov/codecov-action@v2.0.2
         with:
           file: ./codecov.json
   test-docs:
