@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ '*' ]
+    branches: ["*"]
   pull_request:
 
 jobs:
@@ -131,14 +131,16 @@ jobs:
           source_file: "package.yaml"
           extraction_regex: "version:\\s*(\\d+\\.\\d+\\.\\d+)"
           tag_format: "v{version}"
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2.0.10
         if: steps.tag.outputs.tagsha != ''
         with:
           name: tenpureto-x86_64-linux
-      - uses: actions/download-artifact@v1
+          path: tenpureto-x86_64-linux
+      - uses: actions/download-artifact@v2.0.10
         if: steps.tag.outputs.tagsha != ''
         with:
           name: tenpureto-x86_64-darwin
+          path: tenpureto-x86_64-darwin
       - if: steps.tag.outputs.tagsha != ''
         run: |
           mkdir release
