@@ -6,7 +6,7 @@
     "format:check": "prettier --check '**/*.{js,md,yaml}'"
   },
   "devDependencies": {
-    "prettier": "^2.4.0",
+    "prettier": "^2.4.1",
     "vuepress": "^1.8.2",
     "vuepress-plugin-sitemap": "^2.3.1"
   }
