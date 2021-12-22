@@ -58,7 +58,7 @@ test-coverage:
 .PHONE: report-coverage
 report-coverage:
 	$(stack) exec --package hpc-codecov hpc-codecov -- \
-		--mixdir $(shell stack path --dist-dir)/hpc \
+		--mix $(shell stack path --dist-dir)/hpc \
 		--out=codecov.json \
 		$(shell stack path --local-hpc-root)/tenpureto/tenpureto-test/tenpureto-test.tix
 
