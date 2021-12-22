@@ -3,7 +3,7 @@
 module Tenpureto.Internal where
 
 import           Algebra.Graph.Export.Dot
-import           Data.Text.Prettyprint.Doc
+import           Prettyprinter
 
 import           Tenpureto.Effects.Git
 import           Tenpureto.Effects.UI

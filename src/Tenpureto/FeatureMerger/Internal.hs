@@ -1,8 +1,8 @@
 module Tenpureto.FeatureMerger.Internal where
 
 import           Data.Map                       ( Map )
-import           Data.Text.Prettyprint.Doc
-import           Data.Text.Prettyprint.Doc.Render.Text
+import           Prettyprinter
+import           Prettyprinter.Render.Text
 
 import           Tenpureto.Effects.Git
 import           Tenpureto.OrderedSet           ( OrderedSet )

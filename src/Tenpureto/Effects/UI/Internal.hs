@@ -12,7 +12,7 @@ import           Data.Maybe
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import qualified Data.Text                     as T
-import           Data.Text.Prettyprint.Doc.Render.Terminal
+import           Prettyprinter.Render.Terminal
 
 import           Tenpureto.Effects.FileSystem
 import           Tenpureto.Effects.Terminal

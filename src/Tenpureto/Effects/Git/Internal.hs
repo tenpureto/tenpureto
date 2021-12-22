@@ -24,8 +24,8 @@ import           Data.Maybe
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as E
-import           Data.Text.Prettyprint.Doc
-import qualified Path                          as Path
+import qualified Path
+import           Prettyprinter
 import           Text.Parsec                    ( ParsecT
                                                 , alphaNum
                                                 , anyChar

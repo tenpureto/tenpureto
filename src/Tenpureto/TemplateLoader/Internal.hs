@@ -8,7 +8,6 @@ import           Data.Maybe
 import           Data.Set                       ( Set )
 import qualified Data.Set                      as Set
 import qualified Data.Text                     as T
-import           Data.Text.Prettyprint.Doc
 import           Data.Yaml.Builder              ( (.=)
                                                 , ToYaml(..)
                                                 , YamlBuilder
@@ -22,6 +21,7 @@ import           Data.Yaml.Parser               ( (.:)
                                                 , withMapping
                                                 , withText
                                                 )
+import           Prettyprinter
 
 import           Tenpureto.Effects.Git
 import           Tenpureto.Graph

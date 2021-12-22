@@ -3,7 +3,7 @@
 
 module Tenpureto.Effects.Terminal
     ( module Tenpureto.Effects.Terminal
-    , module Data.Text.Prettyprint.Doc
+    , module Prettyprinter
     , Text
     , AnsiStyle
     ) where
@@ -15,8 +15,8 @@ import           Polysemy.State
 import           Data.Bool
 import           Data.IORef
 import           Data.Text                      ( Text )
-import           Data.Text.Prettyprint.Doc
-import           Data.Text.Prettyprint.Doc.Render.Terminal
+import           Prettyprinter
+import           Prettyprinter.Render.Terminal
 
 import           System.Console.ANSI            ( hSupportsANSI )
 import           System.IO                      ( stdout )

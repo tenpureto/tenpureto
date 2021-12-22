@@ -25,7 +25,7 @@ import           Algebra.Graph.AdjacencyMap     ( hasEdge
                                                 )
 import           Algebra.Graph.AdjacencyMap.Algorithm
                                                 ( topSort )
-import           Data.Text.Prettyprint.Doc      ( Pretty
+import           Prettyprinter                  ( Pretty
                                                 , encloseSep
                                                 , group
                                                 , pretty
