@@ -2,13 +2,13 @@
 
 module Tenpureto.Effects.Logging
     ( module Tenpureto.Effects.Logging
-    , module Data.Text.Prettyprint.Doc
+    , module Prettyprinter
     , Severity(..)
     ) where
 
 import           Polysemy
 
-import           Data.Text.Prettyprint.Doc
+import           Prettyprinter
 
 import           Tenpureto.Effects.Logging.Internal
 import           Tenpureto.Effects.Terminal

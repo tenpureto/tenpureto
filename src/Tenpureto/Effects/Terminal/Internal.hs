@@ -6,9 +6,9 @@ import           Control.Monad
 import           Data.Functor
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
-import           Data.Text.Prettyprint.Doc
-import           Data.Text.Prettyprint.Doc.Render.Terminal
 import           Data.Traversable
+import           Prettyprinter
+import           Prettyprinter.Render.Terminal
 
 import           System.Console.ANSI            ( clearFromCursorToScreenEnd
                                                 , cursorUp

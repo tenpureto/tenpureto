@@ -2,8 +2,8 @@ module Tenpureto.Messages where
 
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
-import           Data.Text.Prettyprint.Doc
 import           Path
+import           Prettyprinter
 
 import           Tenpureto.Orphanage            ( )
 

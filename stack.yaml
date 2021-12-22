@@ -1,9 +1,6 @@
-resolver: lts-16.20
+resolver: lts-18.19
 packages:
 - .
-extra-deps:
-- polysemy-plugin-0.2.5.0
-- ghc-tcplugins-extra-0.3.2
 
 nix:
   packages: [ zlib ]

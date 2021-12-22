@@ -1,7 +1,8 @@
 module Tenpureto.Effects.Logging.Internal where
 
-import           Data.Text.Prettyprint.Doc
-import           Data.Text.Prettyprint.Doc.Render.Terminal
+import           Prettyprinter
+
+import           Prettyprinter.Render.Terminal
 
 data Severity = Silent | Info | Debug
     deriving (Eq, Ord)

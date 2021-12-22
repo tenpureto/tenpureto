@@ -27,7 +27,7 @@ import           Data.List
 import           Data.Maybe
 import           Data.Text                      ( Text )
 import qualified Data.Text                     as T
-import           Data.Text.Prettyprint.Doc
+import           Prettyprinter
 import           System.Random
 
 import           Path
@@ -154,7 +154,7 @@ runGit = interpret $ \case
                 repo
                 ["worktree", "add", "--no-checkout", T.pack (toFilePath dir), c]
             >>= asUnit
-        return $ (GitRepository dir, Nothing)
+        return (GitRepository dir, Nothing)
 
     InitWorktree repo OrphanCommit dir -> do
         gitRepoCmd
@@ -172,7 +172,7 @@ runGit = interpret $ \case
         gitRepoCmd (GitRepository dir) ["checkout", "--orphan", branch]
             >>= asUnit
         gitRepoCmd (GitRepository dir) ["reset", "--hard"] >>= asUnit
-        return $ (GitRepository dir, Just branch)
+        return (GitRepository dir, Just branch)
 
     DeleteWorktree repo dir tempBranch -> do
         -- "git worktree remove" required too modern git

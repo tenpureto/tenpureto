@@ -17,11 +17,6 @@ module Tenpureto.OrderedMap
 import           Data.Map                       ( Map )
 import qualified Data.Map                      as Map
 import           Data.Text                      ( Text )
-import           Data.Text.Prettyprint.Doc      ( Pretty
-                                                , encloseSep
-                                                , group
-                                                , pretty
-                                                )
 import           Data.Yaml.Builder              ( (.=)
                                                 , ToYaml(..)
                                                 , mapping
@@ -30,6 +25,11 @@ import           Data.Yaml.Parser               ( FromYaml(..)
                                                 , YamlParser
                                                 , YamlValue
                                                 , withMapping
+                                                )
+import           Prettyprinter                  ( Pretty
+                                                , encloseSep
+                                                , group
+                                                , pretty
                                                 )
 import           Tenpureto.OrderedSet           ( OrderedSet )
 import qualified Tenpureto.OrderedSet          as OrderedSet
