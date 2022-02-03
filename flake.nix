@@ -2,15 +2,17 @@
   description = "Tenpureto";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    haskell.url = "github:input-output-hk/haskell.nix";
+    nixpkgs.follows = "haskellNix/nixpkgs-unstable";
+    haskellNix.url = "github:input-output-hk/haskell.nix";
+    # This is a workaround to some flakes problem
+    nixpkgs-unstable.follows = "haskellNix/nixpkgs-unstable";
   };
 
-  outputs = { self, nixpkgs, haskell }:
+  outputs = { self, nixpkgs, nixpkgs-unstable, haskellNix }:
     let
 
       project = system:
-        let pkgs = haskell.legacyPackages.${system};
+        let pkgs = haskellNix.legacyPackages.${system};
         in pkgs.haskell-nix.stackProject {
           src = pkgs.haskell-nix.haskellLib.cleanGit {
             name = "tenpureto";
@@ -21,7 +23,7 @@
       drv = system: (project system).tenpureto.components.exes.tenpureto;
 
       staticProject = # #
-        let pkgs = haskell.legacyPackages.x86_64-linux;
+        let pkgs = haskellNix.legacyPackages.x86_64-linux;
         in pkgs.pkgsCross.musl64.haskell-nix.stackProject {
           src = pkgs.haskell-nix.haskellLib.cleanGit {
             name = "tenpureto";
@@ -31,11 +33,11 @@
             { doHaddock = false; }
             ({ pkgs, ... }: {
               ghc.package = if pkgs.stdenv.hostPlatform.isMusl then
-                pkgs.buildPackages.haskell-nix.compiler.ghc884.override {
+                pkgs.buildPackages.haskell-nix.compiler.ghc8107.override {
                   enableIntegerSimple = true;
                 }
               else
-                pkgs.buildPackages.haskell-nix.compiler.ghc884;
+                pkgs.buildPackages.haskell-nix.compiler.ghc8107;
               packages.bytestring.flags.integer-simple = true;
               packages.text.flags.integer-simple = true;
               packages.scientific.flags.integer-simple = true;
