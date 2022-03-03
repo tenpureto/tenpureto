@@ -129,12 +129,12 @@ jobs:
           source_file: "package.yaml"
           extraction_regex: "version:\\s*(\\d+\\.\\d+\\.\\d+)"
           tag_format: "v{version}"
-      - uses: actions/download-artifact@v2.1.0
+      - uses: actions/download-artifact@v3
         if: steps.tag.outputs.tagsha != ''
         with:
           name: tenpureto-x86_64-linux
           path: tenpureto-x86_64-linux
-      - uses: actions/download-artifact@v2.1.0
+      - uses: actions/download-artifact@v3
         if: steps.tag.outputs.tagsha != ''
         with:
           name: tenpureto-x86_64-darwin
