@@ -122,13 +122,14 @@ jobs:
       - build-x86_64-linux
     steps:
       - uses: actions/checkout@v3
-      - uses: jaliborc/action-general-autotag@1.0.1
+      - uses: butlerlogic/action-autotag@1.1.2
         id: tag
         with:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-          source_file: "package.yaml"
-          extraction_regex: "version:\\s*(\\d+\\.\\d+\\.\\d+)"
-          tag_format: "v{version}"
+          strategy: regex
+          root: "package.yaml"
+          regex_pattern: "version:\\s*(\\d+\\.\\d+\\.\\d+)"
+          tag_prefix: "v"
       - uses: actions/download-artifact@v3
         if: steps.tag.outputs.tagsha != ''
         with:
