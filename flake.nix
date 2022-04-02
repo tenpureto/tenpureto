@@ -18,6 +18,7 @@
             name = "tenpureto";
             src = ./.;
           };
+          modules = [{ reinstallableLibGhc = true; }];
         };
 
       drv = system: (project system).tenpureto.components.exes.tenpureto;
@@ -30,21 +31,9 @@
             src = ./.;
           };
           modules = [
+            { reinstallableLibGhc = true; }
             { doHaddock = false; }
-            ({ pkgs, ... }: {
-              ghc.package = if pkgs.stdenv.hostPlatform.isMusl then
-                pkgs.buildPackages.haskell-nix.compiler.ghc8107.override {
-                  enableIntegerSimple = true;
-                }
-              else
-                pkgs.buildPackages.haskell-nix.compiler.ghc8107;
-              packages.bytestring.flags.integer-simple = true;
-              packages.text.flags.integer-simple = true;
-              packages.scientific.flags.integer-simple = true;
-              packages.integer-logarithms.flags.integer-gmp = false;
-              packages.cryptonite.flags.integer-gmp = false;
-              packages.hashable.flags.integer-gmp = false;
-            })
+            ({ pkgs, ... }: { packages.cryptonite.flags.integer-gmp = false; })
             {
               packages.tenpureto.components.exes.tenpureto.configureFlags = [
                 "--disable-executable-dynamic"
@@ -103,25 +92,46 @@
         (project system).shellFor {
           exactDeps = true;
           withHoogle = true;
-          tools = { brittany = "0.13.1.0"; };
+          tools = {
+            brittany = { modules = [{ reinstallableLibGhc = true; }]; };
+            haskell-language-server = {
+              modules = [{ reinstallableLibGhc = true; }];
+            };
+          };
         };
 
     in {
       packages.x86_64-darwin = { # #
         tenpureto = drv "x86_64-darwin";
       };
+      packages.aarch64-darwin = { # #
+        tenpureto = drv "aarch64-darwin";
+      };
       packages.x86_64-linux = { # #
         tenpureto = drv "x86_64-linux";
         inherit tenpureto-static tenpureto-dist;
       };
+      packages.aarch64-linux = { # #
+        tenpureto = drv "aarch64-linux";
+        inherit tenpureto-static tenpureto-dist;
+      };
 
       defaultPackage.x86_64-darwin = self.packages.x86_64-darwin.tenpureto;
+      defaultPackage.aarch64-darwin = self.packages.x86_64-darwin.tenpureto;
       defaultPackage.x86_64-linux = self.packages.x86_64-linux.tenpureto;
+      defaultPackage.aarch64-linux = self.packages.aarch64-linux.tenpureto;
 
       apps.x86_64-darwin = {
         tenpureto = {
           type = "app";
           program = "${self.defaultPackage.x86_64-darwin}/bin/tenpureto";
+        };
+      };
+
+      apps.aarch64-darwin = {
+        tenpureto = {
+          type = "app";
+          program = "${self.defaultPackage.aarch64-darwin}/bin/tenpureto";
         };
       };
 
@@ -132,11 +142,22 @@
         };
       };
 
+      apps.aarch64-linux = {
+        tenpureto = {
+          type = "app";
+          program = "${self.defaultPackage.aarch64-linux}/bin/tenpureto";
+        };
+      };
+
       defaultApp.x86_64-darwin = self.apps.x86_64-darwin.tenpureto;
+      defaultApp.aarch64-darwin = self.apps.aarch64-darwin.tenpureto;
       defaultApp.x86_64-linux = self.apps.x86_64-linux.tenpureto;
+      defaultApp.aarch64-linux = self.apps.aarch64-linux.tenpureto;
 
       devShell.x86_64-darwin = shell "x86_64-darwin";
+      devShell.aarch64-darwin = shell "aarch64-darwin";
       devShell.x86_64-linux = shell "x86_64-linux";
+      devShell.aarch64-linux = shell "aarch64-linux";
     };
 
 }
