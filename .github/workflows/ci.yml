@@ -86,7 +86,7 @@ jobs:
         timeout-minutes: 300
       - run: mkdir artifacts && cp result/bin/tenpureto result/*.deb result/*.rpm artifacts/
       - name: Upload
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: tenpureto-x86_64-linux
           path: artifacts/*
@@ -109,7 +109,7 @@ jobs:
       - name: Build
         run: make .build/staging/bin/tenpureto
       - name: Upload
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: tenpureto-x86_64-darwin
           path: .build/staging/bin/tenpureto
