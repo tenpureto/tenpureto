@@ -51,6 +51,7 @@ exportDotStyle templateInformation = Style
     , vertexName              = branchName
     , vertexAttributes        = vertexAttributes'
     , edgeAttributes          = edgeAttributes'
+    , attributeQuoting        = DoubleQuotes
     }
   where
     vertexAttributes' branch
