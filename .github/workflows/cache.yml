@@ -2,7 +2,11 @@ name: Build Cache
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: nix-shell-cache
 
 jobs:
   build-shell-cache:
