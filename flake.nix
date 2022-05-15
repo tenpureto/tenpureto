@@ -11,6 +11,16 @@
   outputs = { self, nixpkgs, nixpkgs-unstable, haskellNix }:
     let
 
+      modules = [
+        # { doHaddock = false; }
+        ({ pkgs, ... }: { packages.cryptonite.flags.integer-gmp = false; })
+        # https://github.com/input-output-hk/haskell.nix/issues/1177
+        ({ lib, ... }: {
+          options.nonReinstallablePkgs =
+            lib.mkOption { apply = x: [ "exceptions" "stm" ] ++ x; };
+        })
+      ];
+
       project = system:
         let pkgs = haskellNix.legacyPackages.${system};
         in pkgs.haskell-nix.stackProject {
@@ -18,7 +28,7 @@
             name = "tenpureto";
             src = ./.;
           };
-          modules = [{ reinstallableLibGhc = true; }];
+          inherit modules;
         };
 
       drv = system: (project system).tenpureto.components.exes.tenpureto;
@@ -30,19 +40,14 @@
             name = "tenpureto";
             src = ./.;
           };
-          modules = [
-            { reinstallableLibGhc = true; }
-            { doHaddock = false; }
-            ({ pkgs, ... }: { packages.cryptonite.flags.integer-gmp = false; })
-            {
-              packages.tenpureto.components.exes.tenpureto.configureFlags = [
-                "--disable-executable-dynamic"
-                "--disable-shared"
-                "--ghc-option=-optl=-pthread"
-                "--ghc-option=-optl=-static"
-              ];
-            }
-          ];
+          modules = modules ++ [{
+            packages.tenpureto.components.exes.tenpureto.configureFlags = [
+              "--disable-executable-dynamic"
+              "--disable-shared"
+              "--ghc-option=-optl=-pthread"
+              "--ghc-option=-optl=-static"
+            ];
+          }];
         };
 
       tenpureto-static = staticProject.tenpureto.components.exes.tenpureto;
@@ -93,9 +98,16 @@
           exactDeps = true;
           withHoogle = true;
           tools = {
-            brittany = { modules = [{ reinstallableLibGhc = true; }]; };
+            brittany = { inherit modules; };
             haskell-language-server = {
-              modules = [{ reinstallableLibGhc = true; }];
+              modules = modules ++ [{
+                packages.haskell-language-server.flags = {
+                  ormolu = false;
+                  fourmolu = false;
+                  floskell = false;
+                  stylishhaskell = false;
+                };
+              }];
             };
           };
         };
