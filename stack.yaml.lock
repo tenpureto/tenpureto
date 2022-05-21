@@ -3,7 +3,49 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    pantry-tree:
+      sha256: 11b3a887542992b1ddd06b693852913673f386e06b8ded68127b2194021bc3c1
+      size: 3079
+    hackage: sydtest-0.10.0.0@sha256:ba0bd4863e5c27e3aef4c89eaffe7b4c22a9fa9a1fda67638ff7132b7bf9a288,3704
+  original:
+    hackage: sydtest-0.10.0.0@sha256:ba0bd4863e5c27e3aef4c89eaffe7b4c22a9fa9a1fda67638ff7132b7bf9a288,3704
+- completed:
+    pantry-tree:
+      sha256: 90f930c2da04ca9db76c5ce12cf6ee976b09538beaa0d7f50ad50e286875e7cc
+      size: 407
+    hackage: sydtest-hedgehog-0.3.0.0@sha256:543a695b652bc154e508bd2bfe1f3ec3bfacd9cb7e069f861954bf6970852f15,1435
+  original:
+    hackage: sydtest-hedgehog-0.3.0.0@sha256:543a695b652bc154e508bd2bfe1f3ec3bfacd9cb7e069f861954bf6970852f15,1435
+- completed:
+    pantry-tree:
+      sha256: d2aa8b7273960c05e4b39b1251267abd3c43143437b684a92f15453c0fbf572c
+      size: 760
+    hackage: autodocodec-0.1.0.1@sha256:4951b61e366a8b082bb1ac8d0ee4b3c8e5a9616327e3752df5d3106f281cdae6,1578
+  original:
+    hackage: autodocodec-0.1.0.1@sha256:4951b61e366a8b082bb1ac8d0ee4b3c8e5a9616327e3752df5d3106f281cdae6,1578
+- completed:
+    pantry-tree:
+      sha256: 71e63e0e2cc058a895722da1785d0719a23d64d7ab077a2f01cc695fcd4eae39
+      size: 439
+    hackage: autodocodec-yaml-0.1.0.1@sha256:03747eedd6cc0e157617211fc22f6b576fbe4c8df6cce5dd3d21cc6f35afc7f3,1191
+  original:
+    hackage: autodocodec-yaml-0.1.0.1@sha256:03747eedd6cc0e157617211fc22f6b576fbe4c8df6cce5dd3d21cc6f35afc7f3,1191
+- completed:
+    pantry-tree:
+      sha256: b1f609c52149913a0bd843b2037d486c69c51630d135d4aaf39eff313ff82073
+      size: 235
+    hackage: autodocodec-schema-0.1.0.1@sha256:806279a83ea7f90f418be44c3e7295c32661160f9bad1af4420fcd67929f49c0,1089
+  original:
+    hackage: autodocodec-schema-0.1.0.1@sha256:806279a83ea7f90f418be44c3e7295c32661160f9bad1af4420fcd67929f49c0,1089
+- completed:
+    pantry-tree:
+      sha256: bbd77378527e7ce68c5e581213f8a9036efbbb36c4e62f3933e96fe440c2e10e
+      size: 301
+    hackage: validity-aeson-0.2.0.5@sha256:e4baa2ad9deaf2c903e1ef8e55e9977410ed867c9e46fa14427e8f6ef8b4dc2e,1402
+  original:
+    hackage: validity-aeson-0.2.0.5@sha256:e4baa2ad9deaf2c903e1ef8e55e9977410ed867c9e46fa14427e8f6ef8b4dc2e,1402
 snapshots:
 - completed:
     sha256: fb634b19f31da06684bb07ce02a20c75a3162138f279b388905b03ebd57bb50f

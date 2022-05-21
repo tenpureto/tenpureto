@@ -2,6 +2,14 @@ resolver: lts-19.6
 packages:
   - .
 
+extra-deps:
+  - sydtest-0.10.0.0@sha256:ba0bd4863e5c27e3aef4c89eaffe7b4c22a9fa9a1fda67638ff7132b7bf9a288,3704
+  - sydtest-hedgehog-0.3.0.0@sha256:543a695b652bc154e508bd2bfe1f3ec3bfacd9cb7e069f861954bf6970852f15,1435
+  - autodocodec-0.1.0.1@sha256:4951b61e366a8b082bb1ac8d0ee4b3c8e5a9616327e3752df5d3106f281cdae6,1578
+  - autodocodec-yaml-0.1.0.1@sha256:03747eedd6cc0e157617211fc22f6b576fbe4c8df6cce5dd3d21cc6f35afc7f3,1191
+  - autodocodec-schema-0.1.0.1@sha256:806279a83ea7f90f418be44c3e7295c32661160f9bad1af4420fcd67929f49c0,1089
+  - validity-aeson-0.2.0.5@sha256:e4baa2ad9deaf2c903e1ef8e55e9977410ed867c9e46fa14427e8f6ef8b4dc2e,1402
+
 nix:
   packages: [zlib]
 
