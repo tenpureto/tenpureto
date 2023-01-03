@@ -16,7 +16,7 @@ jobs:
             ~/.stack
             !~/.stack/setup-exe-cache
           key: ${{ runner.os }}-test-stack-${{ hashFiles('package.yaml') }}-${{ hashFiles('stack.yaml*') }}
-      - uses: haskell/actions/setup@v2.0.2
+      - uses: haskell/actions/setup@v2.2.0
         with:
           enable-stack: true
       - name: Install dependencies
@@ -101,7 +101,7 @@ jobs:
       #       ~/.stack
       #       !~/.stack/setup-exe-cache
       #     key: ${{ runner.os }}-test-stack-${{ hashFiles('package.yaml') }}-${{ hashFiles('stack.yaml*') }}
-      - uses: haskell/actions/setup@v2.0.2
+      - uses: haskell/actions/setup@v2.2.0
         with:
           enable-stack: true
       - name: Install dependencies
