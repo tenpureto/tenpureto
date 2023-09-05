@@ -9,7 +9,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/cache@v3
         with:
           path: |
@@ -34,7 +34,7 @@ jobs:
   test-docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/cache@v3
         with:
           path: ~/.npm
@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'tenpureto/tenpureto' && github.ref == 'refs/heads/master'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/cache@v3
         with:
           path: ~/.npm
@@ -68,7 +68,7 @@ jobs:
     steps:
       - name: Cleanup
         run: sudo rm -rf /usr/local/lib/android /opt/ghc
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           # Nix Flakes doesn't work on shallow clones
           fetch-depth: 0
@@ -93,7 +93,7 @@ jobs:
   build-x86_64-darwin:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       # # Disabled because of https://github.com/actions/cache/issues/445
       # - uses: actions/cache@v3
       #   with:
@@ -121,7 +121,7 @@ jobs:
       - build-x86_64-darwin
       - build-x86_64-linux
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: butlerlogic/action-autotag@1.1.2
         id: tag
         with:
