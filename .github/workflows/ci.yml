@@ -149,7 +149,7 @@ jobs:
           mv tenpureto-x86_64-linux/*.rpm release/
       - name: Release
         if: steps.tag.outputs.tagsha != ''
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tagname }}
           name: ${{ steps.tag.outputs.version }}
