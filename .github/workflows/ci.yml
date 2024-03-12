@@ -122,7 +122,7 @@ jobs:
       - build-x86_64-linux
     steps:
       - uses: actions/checkout@v4
-      - uses: butlerlogic/action-autotag@1.1.2
+      - uses: butlerlogic/action-autotag@1.1.4
         id: tag
         with:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
